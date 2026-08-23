@@ -1,24 +1,218 @@
 @import 'tailwindcss';
 
-/*
- * Base plumbing only — dark-only, no `dark:` variants, no light theme.
- * The full token layer (accent ramp, elevation scale, fluid type,
- * density + motion tokens, self-hosted font wiring) is Phase 1 work
- * per PLAN.md §2.8. This just prevents a white flash before then.
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOKEN LAYER — PLAN.md §2.8
+   Dark only. No light theme, no `dark:` variants.
+   Zero hardcoded hex may appear in components; everything resolves here.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  color-scheme: dark;
-  --background: #0a0e0c;
-  --foreground: #eaf2ed;
+@theme {
+  /* ── Surfaces ──────────────────────────────────────────────────────────
+     A 4-step elevation scale. The old design used one surface and one
+     border for everything, which flattened all hierarchy. */
+  --color-bg: #0a0e0c;
+  --color-surface-1: #0f1410;
+  --color-surface-2: #131c17;
+  --color-surface-3: #18231d;
+  --color-surface-4: #1e2b24;
+
+  /* ── Foreground ───────────────────────────────────────────────────────
+     fg-muted lightened from the original #7C8B84 (4.8:1) to clear
+     WCAG AA at the 12–14px sizes it actually gets used at. */
+  --color-fg: #eaf2ed;
+  --color-fg-muted: #93a49c;
+  --color-fg-subtle: #6b7a73;
+
+  /* ── Accent ramp ──────────────────────────────────────────────────────
+     Five steps so emphasis has gradation instead of one flat value. */
+  --color-accent-whisper: color-mix(in oklab, #0fbf7a 6%, transparent);
+  --color-accent-soft: color-mix(in oklab, #0fbf7a 14%, transparent);
+  --color-accent: #0fbf7a;
+  --color-accent-bright: #7ce86a;
+  --color-accent-deep: #0b5c4e;
+
+  /* ── Borders ──────────────────────────────────────────────────────────*/
+  --color-border-subtle: color-mix(in oklab, #0fbf7a 8%, transparent);
+  --color-border: color-mix(in oklab, #0fbf7a 16%, transparent);
+  --color-border-strong: color-mix(in oklab, #0fbf7a 34%, transparent);
+
+  /* ── Signal ───────────────────────────────────────────────────────────*/
+  --color-signal-amber: #f5a524;
+  --color-signal-rose: #f2566a;
+
+  /* ── Type scale (fluid) ───────────────────────────────────────────────
+     One ramp replacing 20+ per-element clamp() calls. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.4;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.6;
+  --text-base: 1rem;
+  --text-base--line-height: 1.7;
+  --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
+  --text-lg--line-height: 1.7;
+  --text-xl: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-xl--line-height: 1.45;
+  --text-2xl: clamp(1.5rem, 1.25rem + 1.1vw, 2.125rem);
+  --text-2xl--line-height: 1.25;
+  --text-3xl: clamp(1.875rem, 1.4rem + 2.1vw, 3rem);
+  --text-3xl--line-height: 1.15;
+  --text-4xl: clamp(2.375rem, 1.6rem + 3.4vw, 4.25rem);
+  --text-4xl--line-height: 1.06;
+  --text-5xl: clamp(3rem, 1.7rem + 5.8vw, 6rem);
+  --text-5xl--line-height: 0.98;
+
+  --tracking-tighter: -0.04em;
+  --tracking-tight: -0.022em;
+  --tracking-wide: 0.08em;
+  --tracking-widest: 0.16em;
+
+  /* ── Density ──────────────────────────────────────────────────────────
+     Replaces the uniform py-28 that made every section feel identical. */
+  --spacing-density-compact: clamp(3rem, 5vw, 4.5rem);
+  --spacing-density-default: clamp(4.5rem, 7.5vw, 7rem);
+  --spacing-density-spacious: clamp(7rem, 12vw, 11rem);
+
+  /* ── Radius ───────────────────────────────────────────────────────────*/
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* ── Motion ───────────────────────────────────────────────────────────
+     Three durations, three easings. Nothing bespoke per component. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --duration-fast: 160ms;
+  --duration-base: 320ms;
+  --duration-slow: 620ms;
+
+  /* ── Elevation ────────────────────────────────────────────────────────*/
+  --shadow-e1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-e2: 0 4px 16px rgb(0 0 0 / 0.35);
+  --shadow-e3: 0 12px 40px rgb(0 0 0 / 0.45);
+  --shadow-e4: 0 24px 68px rgb(0 0 0 / 0.55);
+  --shadow-glow:
+    0 0 0 1px color-mix(in oklab, #0fbf7a 22%, transparent),
+    0 8px 44px color-mix(in oklab, #0fbf7a 14%, transparent);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Anchor targets clear the fixed header instead of hiding beneath it. */
+  scroll-padding-top: 6rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 28%, transparent);
+  color: var(--color-fg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-4);
+  border: 3px solid var(--color-bg);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}
+
+/* Focus: always visible, never removed. WCAG 2.2 AA. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION — global kill switch, PLAN.md §2 (non-negotiable)
+
+   Belt and braces: this CSS rule catches every animation and transition
+   including ones we didn't write, while <MotionConfig reducedMotion="user">
+   handles JS-driven motion and usePrefersReducedMotion() lets components
+   render a genuinely different (static) tree. Information always survives;
+   only movement is dropped.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAMES — only for genuinely always-on, information-carrying loops.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(2%, 2%) scale(1.04);
+  }
+  66% {
+    transform: translate(-2%, 3%) scale(0.96);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
