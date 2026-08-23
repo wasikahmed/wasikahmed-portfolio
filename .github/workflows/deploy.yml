@@ -1,0 +1,220 @@
+name: Test, build, and deploy
+
+# --------------------------------------------------------------------------
+# Repository configuration this workflow reads. Settings → Secrets and
+# variables → Actions.
+#
+# Variables (plain, visible in logs — configuration, not credentials):
+#   DOCKERHUB_USERNAME   Docker Hub namespace the image is pushed to
+#   VPS_HOST             VPS hostname or IP
+#   VPS_USER             SSH user on the VPS
+#   VPS_SSH_PORT         SSH port (optional — defaults to 22)
+#   DEPLOY_PATH          Absolute path on the VPS for docker-compose.prod.yml
+#                        and .env, e.g. /home/deploy/portfolio. Required —
+#                        deliberately no default: a bare `~` doesn't expand
+#                        inside a quoted GitHub Actions expression, so a
+#                        clumsy fallback here would silently break `cd`.
+#   PORT_HOST            Host port the app is published on (optional —
+#                        defaults to 5000)
+#   DOMAIN                 e.g. wasikahmed.me
+#   NEXT_PUBLIC_SITE_URL   e.g. https://wasikahmed.me
+#   ADMIN_EMAIL             Bootstrap admin account email
+#   MONGO_ROOT_USER         Mongo root username for the prod container
+#
+# Secrets (masked in logs — actual credentials):
+#   DOCKERHUB_TOKEN     Docker Hub access token (not your account password)
+#   VPS_SSH_KEY         Private half of the deploy keypair
+#   AUTH_SECRET         Auth.js signing secret for production
+#   MONGO_ROOT_PASSWORD Mongo root password for the prod container
+# --------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping')\""
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create ephemeral .env for CI
+        # Next.js loads .env automatically, and scripts/seed.ts is invoked
+        # with --env-file=.env — this file only exists inside the runner's
+        # workspace and is discarded when the job ends. None of these
+        # values are real credentials; the CI database is a throwaway
+        # container on a job-local network no one else can reach.
+        run: |
+          cat > .env <<EOF
+          DOMAIN=example.com
+          NEXT_PUBLIC_SITE_URL=https://example.com
+          MONGODB_URI=mongodb://127.0.0.1:27017/portfolio
+          AUTH_SECRET=ci-only-secret-not-used-anywhere-real-0123456789ab
+          ADMIN_EMAIL=ci@example.com
+          EOF
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm seed
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  build-and-push:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        run: echo "value=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Must match the VPS's CPU architecture — @node-rs/argon2's
+          # prebuilt native binary is resolved per-platform at `pnpm
+          # install` time inside the build, so a mismatched platform here
+          # produces an image that fails at runtime, not at build time.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/portfolio:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/portfolio:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ vars.VPS_SSH_PORT || '22' }}" -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Record the currently deployed tag (rollback target)
+        id: prev
+        run: |
+          PREV=$(ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
+            "grep '^IMAGE_TAG=' ${{ vars.DEPLOY_PATH }}/.env 2>/dev/null | cut -d= -f2 || true")
+          echo "value=${PREV:-latest}" >> "$GITHUB_OUTPUT"
+
+      - name: Write production .env
+        # Assembled fresh on every deploy rather than hand-edited on the
+        # VPS — the workflow is the one source of truth for what's
+        # running, so a config drift on the box can't silently survive a
+        # deploy.
+        run: |
+          cat > deploy.env <<EOF
+          DOMAIN=${{ vars.DOMAIN }}
+          NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+          ADMIN_EMAIL=${{ vars.ADMIN_EMAIL }}
+          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+          DOCKERHUB_USERNAME=${{ vars.DOCKERHUB_USERNAME }}
+          MONGO_ROOT_USER=${{ vars.MONGO_ROOT_USER }}
+          MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+          PORT_HOST=${{ vars.PORT_HOST || '5000' }}
+          IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+          EOF
+
+      - name: Ship the new .env and compose file
+        run: |
+          DEST="${{ vars.DEPLOY_PATH }}"
+          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" "mkdir -p $DEST"
+          scp -i ~/.ssh/deploy_key -P "${{ vars.VPS_SSH_PORT || '22' }}" \
+            deploy.env "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:$DEST/.env"
+          scp -i ~/.ssh/deploy_key -P "${{ vars.VPS_SSH_PORT || '22' }}" \
+            docker-compose.prod.yml "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:$DEST/docker-compose.prod.yml"
+
+      - name: Pull and deploy
+        id: deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" bash -s <<'REMOTE'
+          set -e
+          cd "${{ vars.DEPLOY_PATH }}"
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          # PORT_HOST lives in .env for docker compose's own variable
+          # substitution — this shell needs it too, for the curl below.
+          set -a
+          . ./.env
+          set +a
+
+          echo "Waiting for /api/health..."
+          for i in $(seq 1 20); do
+            if curl -fsS "http://127.0.0.1:${PORT_HOST:-5000}/api/health" >/dev/null 2>&1; then
+              echo "Healthy."
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "Healthcheck did not pass within 60s."
+          exit 1
+          REMOTE
+
+      - name: Roll back on failed healthcheck
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          DEST="${{ vars.DEPLOY_PATH }}"
+          PREV="${{ steps.prev.outputs.value }}"
+          echo "Deploy failed its healthcheck — rolling back to $PREV"
+          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
+            "cd $DEST && sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREV/\" .env && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d --remove-orphans"
+          exit 1

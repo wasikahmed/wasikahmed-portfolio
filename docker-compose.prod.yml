@@ -1,0 +1,73 @@
+# Production stack — runs on the VPS behind the existing Cloudflare Tunnel.
+# Dev stack is docker-compose.yml (hot reload, unauthenticated mongo, ports
+# published to the host). This one:
+#   - binds `web` to 127.0.0.1 only — cloudflared reaches it over loopback,
+#     nothing else can, since the VPS has no inbound ports open at all
+#   - runs mongo with auth and no published port — only `web` can reach it,
+#     over the compose network, and only with a password
+#   - pulls a prebuilt image from Docker Hub rather than building locally —
+#     CI already built and tested it; the VPS's only job is to run it
+#
+# The deploy workflow writes IMAGE_TAG into .env before every `docker compose
+# pull && up -d` — always an immutable `sha-<short>` tag, never `latest`, so
+# rolling back is "write the previous tag, re-run those two commands."
+services:
+  web:
+    image: ${DOCKERHUB_USERNAME}/portfolio:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    ports:
+      - '127.0.0.1:${PORT_HOST:-5000}:3000'
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      HOSTNAME: '0.0.0.0'
+      # Overrides whatever MONGODB_URI is in .env — built here from the
+      # same MONGO_ROOT_USER/PASSWORD the mongo service below authenticates
+      # with, so there is exactly one place to rotate the password.
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/portfolio?authSource=admin
+    volumes:
+      - media-uploads:/app/public/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '-u',
+          '${MONGO_ROOT_USER}',
+          '-p',
+          '${MONGO_ROOT_PASSWORD}',
+          '--authenticationDatabase',
+          'admin',
+          '--eval',
+          "db.adminCommand('ping')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+volumes:
+  mongo-data:
+  media-uploads:

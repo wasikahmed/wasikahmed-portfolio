@@ -14,8 +14,18 @@ import { MdxContent } from '@/components/mdx/mdx-content';
 import { getProjectSlugs, getProject, getAdjacentProjects } from '@/server/queries';
 
 export async function generateStaticParams() {
-  const slugs = await getProjectSlugs();
-  return slugs.map((slug) => ({ slug }));
+  // Best-effort pre-render: `next build` runs this with no guarantee the
+  // database is reachable (it never is inside the Docker build stage — no
+  // network access to a real Mongo, by design). `dynamicParams` defaults
+  // to true, so any slug missing from this list still renders correctly
+  // on its first request and is cached from there; an empty array here
+  // just means every slug takes that path instead of only the new ones.
+  try {
+    const slugs = await getProjectSlugs();
+    return slugs.map((slug) => ({ slug }));
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({
