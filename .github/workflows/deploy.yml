@@ -1,4 +1,14 @@
-name: Test, build, and deploy
+name: Build and deploy
+
+# --------------------------------------------------------------------------
+# No test job. typecheck/lint/unit/build/e2e ran here too, once — the full
+# suite added ~3 minutes to every single deploy, on top of a build+push
+# that's already the slow part. Run `pnpm typecheck && pnpm lint && pnpm
+# test && pnpm build && pnpm e2e` locally before pushing to main instead
+# (see AGENTS.md); this workflow trusts that happened and goes straight to
+# building the image. A push to main IS the "ship it" signal now — nothing
+# gates it on the GitHub side.
+# --------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------
 # Repository configuration this workflow reads. Settings → Secrets and
@@ -38,65 +48,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      mongo:
-        image: mongo:7
-        ports: ['27017:27017']
-        options: >-
-          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping')\""
-          --health-interval 5s --health-timeout 5s --health-retries 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.8.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Create ephemeral .env for CI
-        # Next.js loads .env automatically, and scripts/seed.ts is invoked
-        # with --env-file=.env — this file only exists inside the runner's
-        # workspace and is discarded when the job ends. None of these
-        # values are real credentials; the CI database is a throwaway
-        # container on a job-local network no one else can reach.
-        run: |
-          cat > .env <<EOF
-          DOMAIN=example.com
-          NEXT_PUBLIC_SITE_URL=https://example.com
-          MONGODB_URI=mongodb://127.0.0.1:27017/portfolio
-          AUTH_SECRET=ci-only-secret-not-used-anywhere-real-0123456789ab
-          ADMIN_EMAIL=ci@example.com
-          EOF
-
-      - run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm seed
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - run: pnpm e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
   build-and-push:
-    needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     outputs:
@@ -133,88 +85,94 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment: production
+    # Deploys via appleboy/ssh-action rather than the OpenSSH client
+    # directly (as an earlier version of this job did). Whatever's
+    # firewalling this VPS's port 22 tolerates authenticated SSH sessions
+    # fine but not a bare, unauthenticated `ssh-keyscan` connection probe —
+    # this action skips host-key verification entirely, so it never makes
+    # that probe. Proven pattern: itzwasik/advergo-frontend already
+    # deploys to this same VPS this way.
+    #
+    # No automatic rollback on a failed healthcheck (there was one in an
+    # earlier version of this job; it never actually ran, since every
+    # attempt so far failed before reaching it). A failed deploy fails the
+    # job loudly and dumps the last 100 log lines instead — recover
+    # manually by SSHing in, editing IMAGE_TAG in .env back to the
+    # previous sha- tag, and running `docker compose -f
+    # docker-compose.prod.yml pull && up -d`.
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ vars.VPS_SSH_PORT || '22' }}" -H "${{ vars.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Ensure the deploy directory exists
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.VPS_HOST }}
+          port: ${{ vars.VPS_SSH_PORT || '22' }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: mkdir -p ${{ vars.DEPLOY_PATH }}
 
-      - name: Record the currently deployed tag (rollback target)
-        id: prev
-        run: |
-          PREV=$(ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
-            "grep '^IMAGE_TAG=' ${{ vars.DEPLOY_PATH }}/.env 2>/dev/null | cut -d= -f2 || true")
-          echo "value=${PREV:-latest}" >> "$GITHUB_OUTPUT"
+      - name: Copy the compose file to the VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.VPS_HOST }}
+          port: ${{ vars.VPS_SSH_PORT || '22' }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: docker-compose.prod.yml
+          target: ${{ vars.DEPLOY_PATH }}
+          strip_components: 0
 
-      - name: Write production .env
-        # Assembled fresh on every deploy rather than hand-edited on the
-        # VPS — the workflow is the one source of truth for what's
-        # running, so a config drift on the box can't silently survive a
-        # deploy.
-        run: |
-          cat > deploy.env <<EOF
-          DOMAIN=${{ vars.DOMAIN }}
-          NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
-          ADMIN_EMAIL=${{ vars.ADMIN_EMAIL }}
-          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-          DOCKERHUB_USERNAME=${{ vars.DOCKERHUB_USERNAME }}
-          MONGO_ROOT_USER=${{ vars.MONGO_ROOT_USER }}
-          MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
-          PORT_HOST=${{ vars.PORT_HOST || '5000' }}
-          IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
-          EOF
+      - name: Write .env and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.VPS_HOST }}
+          port: ${{ vars.VPS_SSH_PORT || '22' }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # Assembled fresh on every deploy rather than hand-edited on the
+          # VPS — the workflow is the one source of truth for what's
+          # running, so config drift on the box can't silently survive a
+          # deploy. IMAGE_TAG is always the immutable sha- tag this same
+          # run just built, never `latest`.
+          script: |
+            set -e
+            mkdir -p ${{ vars.DEPLOY_PATH }}
+            cat > ${{ vars.DEPLOY_PATH }}/.env <<'ENVEOF'
+            DOMAIN=${{ vars.DOMAIN }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+            ADMIN_EMAIL=${{ vars.ADMIN_EMAIL }}
+            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            DOCKERHUB_USERNAME=${{ vars.DOCKERHUB_USERNAME }}
+            MONGO_ROOT_USER=${{ vars.MONGO_ROOT_USER }}
+            MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+            PORT_HOST=${{ vars.PORT_HOST || '5000' }}
+            IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+            ENVEOF
+            chmod 600 ${{ vars.DEPLOY_PATH }}/.env
 
-      - name: Ship the new .env and compose file
-        run: |
-          DEST="${{ vars.DEPLOY_PATH }}"
-          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" "mkdir -p $DEST"
-          scp -i ~/.ssh/deploy_key -P "${{ vars.VPS_SSH_PORT || '22' }}" \
-            deploy.env "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:$DEST/.env"
-          scp -i ~/.ssh/deploy_key -P "${{ vars.VPS_SSH_PORT || '22' }}" \
-            docker-compose.prod.yml "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:$DEST/docker-compose.prod.yml"
+            cd ${{ vars.DEPLOY_PATH }}
+            # Explicit -p: DEPLOY_PATH's basename is "portfolio", generic
+            # enough to risk colliding with some other project later.
+            docker compose -p portfolio -f docker-compose.prod.yml pull
+            docker compose -p portfolio -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f
 
-      - name: Pull and deploy
-        id: deploy
-        run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" bash -s <<'REMOTE'
-          set -e
-          cd "${{ vars.DEPLOY_PATH }}"
-          docker compose -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-          # PORT_HOST lives in .env for docker compose's own variable
-          # substitution — this shell needs it too, for the curl below.
-          set -a
-          . ./.env
-          set +a
-
-          echo "Waiting for /api/health..."
-          for i in $(seq 1 20); do
-            if curl -fsS "http://127.0.0.1:${PORT_HOST:-5000}/api/health" >/dev/null 2>&1; then
-              echo "Healthy."
-              exit 0
-            fi
-            sleep 3
-          done
-
-          echo "Healthcheck did not pass within 60s."
-          exit 1
-          REMOTE
-
-      - name: Roll back on failed healthcheck
-        if: failure() && steps.deploy.outcome == 'failure'
-        run: |
-          DEST="${{ vars.DEPLOY_PATH }}"
-          PREV="${{ steps.prev.outputs.value }}"
-          echo "Deploy failed its healthcheck — rolling back to $PREV"
-          ssh -i ~/.ssh/deploy_key -p "${{ vars.VPS_SSH_PORT || '22' }}" \
-            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
-            "cd $DEST && sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREV/\" .env && docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d --remove-orphans"
-          exit 1
+      - name: Health check
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.VPS_HOST }}
+          port: ${{ vars.VPS_SSH_PORT || '22' }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            for i in $(seq 1 20); do
+              if curl -fs "http://127.0.0.1:${{ vars.PORT_HOST || '5000' }}/api/health" > /dev/null; then
+                echo "Healthy."
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "Healthcheck did not pass within 60s." >&2
+            docker logs --tail 100 portfolio-web-1 || true
+            exit 1

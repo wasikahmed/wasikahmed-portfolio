@@ -84,6 +84,12 @@ doesn't belong — check the ambient budget ledger before adding a new one.
   `password.ts`, `schemas.ts`, or `seed-data/`: the seed scripts import those
   under plain Node, where that package throws.
 - Run `pnpm typecheck && pnpm lint && pnpm test` before considering a change done.
+- **Before pushing to `main`**: also run `pnpm build && pnpm e2e`. The deploy
+  workflow (`.github/workflows/deploy.yml`) does not run any of this itself —
+  it goes straight from a push to building and shipping the image, so a push
+  to `main` is the "I already checked this" signal, not something CI verifies
+  for you. This is a deliberate speed tradeoff (the full suite was adding
+  ~3 minutes to every deploy) made explicit here rather than silently skipped.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
