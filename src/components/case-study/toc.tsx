@@ -1,6 +1,6 @@
 'use client';
 
-import { useActiveSection } from '@/components/site/use-active-section';
+import { useActiveSection } from '@/components/layout/use-active-section';
 import { cn } from '@/lib/cn';
 
 /**

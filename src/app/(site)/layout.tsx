@@ -1,5 +1,5 @@
-import { SiteShell } from '@/components/site/site-shell';
-import { Footer } from '@/components/site/footer';
+import { SiteShell } from '@/components/layout/site-shell';
+import { Footer } from '@/components/layout/footer';
 import { getSettings, getProjects, getPosts } from '@/server/queries';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {

@@ -1,3 +1,7 @@
+// Importing this from a Client Component is a build error, not a silent
+// leak — see https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
+import 'server-only';
+
 import NextAuth, { CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';

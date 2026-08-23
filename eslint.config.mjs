@@ -12,9 +12,6 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    // Frozen pre-migration snapshot — read-only design reference, not
-    // part of the app being built. See PLAN.md §5 "Migration Strategy".
-    '_reference/**',
   ]),
 ]);
 

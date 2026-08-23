@@ -1,3 +1,7 @@
+// Importing this from a Client Component is a build error, not a silent
+// leak — see https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
+import 'server-only';
+
 import { evaluate } from 'next-mdx-remote-client/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import { Callout } from '@/components/mdx/callout';

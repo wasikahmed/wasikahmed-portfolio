@@ -5,34 +5,50 @@ deployed via Docker behind an existing Cloudflare Tunnel. See [PLAN.md](PLAN.md)
 for the full architecture, design language, and phased delivery plan — read it
 before making structural decisions.
 
-## Migration in progress
+## Status
 
-This repo was migrated from a Vite + React Router prototype (Figma Make scaffold).
-That prototype is frozen, read-only, at `_reference/` — the design source of
-truth until visual parity is reached, then deleted per PLAN.md §5. Do not add
-new work there; it has its own now-uninstalled dependencies and is excluded from
-lint/typecheck/build.
+Phases 0–4 are complete: design system, public site, data layer, and admin CMS.
+Phase 5 (leads pipeline) is next. See PLAN.md §6 for the full schedule.
+
+The Vite + React Router prototype this was migrated from lived at `_reference/`
+and was deleted once the rebuild reached visual parity, per PLAN.md §5. It
+remains in git history at commit `ad4c767` if it is ever needed again.
 
 ## Development server
 
 Not auto-started. Run `pnpm dev` (Next.js on port 3000 by default, or
 `pnpm dev -- -p <port>` to override). Hot reload via Turbopack.
 
+Docker Compose runs the full stack (`web` on 3300, `mongo`, `mongo-express`):
+`docker compose up -d`.
+
 ## Project structure
 
+`src/app` is routing only — every other concern lives in a sibling folder, which
+is the "store project files outside of `app`" layout from the Next.js docs.
+
 - `src/app/layout.tsx` — root layout: HTML shell, global metadata
-- `src/app/globals.css` — Tailwind v4 entrypoint + base tokens. Phase 1 owns the
-  full token layer (accent ramp, elevation scale, fluid type, density + motion
-  tokens) — see PLAN.md §2.8
-- `src/app/(site)/` — public site route group (Home, Work, Writing, About,
-  Contact land here through Phase 2)
-- `src/app/(admin)/admin/` — CMS route group, gated by Cloudflare Access +
-  Auth.js from Phase 4 onward
-- `src/app/api/` — route handlers (`/api/health` exists; contact, auth, and
-  admin CRUD endpoints land in later phases)
-- `src/lib/` — shared utilities; Mongo connection singleton and Zod schemas
-  land here in Phase 3
-- `_reference/` — frozen pre-migration snapshot, read-only
+- `src/app/globals.css` — Tailwind v4 entrypoint and the whole token layer
+  (accent ramp, elevation scale, fluid type, density + motion) — PLAN.md §2.8
+- `src/app/(site)/` — public route group
+- `src/app/(admin)/admin/` — CMS route group. `(dashboard)/` inside it is a
+  second group holding every authenticated page, so `login/` can opt out of the
+  authenticated chrome
+- `src/app/api/` — route handlers: `/api/health`, `/api/auth/*`, `/api/admin/*`
+- `src/components/ui/` — design-system primitives (Button, Card, Field, Section…)
+- `src/components/layout/` — app shell: nav, footer, command palette, rails
+- `src/components/motion/` — motion primitives; every one honours reduced motion
+- `src/components/ambient/` — the two budgeted decorative layers (PLAN.md §2.10)
+- `src/components/mdx/` — custom blocks available inside MDX content
+- `src/components/{home,work,case-study,contact}/` — page-specific composites
+- `src/components/admin/` — CMS-only components, incl. `forms/` per collection
+- `src/lib/` — isomorphic helpers only; safe to import from a Client Component
+- `src/server/` — server-only: Mongo connection, models, Zod schemas, queries,
+  auth, and the generic admin CRUD factory. The sensitive modules here open with
+  `import 'server-only'`, so importing one into a Client Component fails the
+  build instead of leaking
+- `src/proxy.ts` — Next 16's renamed middleware; gates `/admin` and `/api/admin`
+- `scripts/` — `seed.ts` (content) and `seed-admin.ts` (bootstrap admin user)
 - `PLAN.md` — governing architecture and design document
 
 ## Dependencies
@@ -60,7 +76,13 @@ doesn't belong — check the ambient budget ledger before adding a new one.
 - Use double quotes for strings containing apostrophes (`"We're here to help"`),
   or escape them in single-quoted strings.
 - Ensure JSX tags are closed and braces are balanced.
-- Export components as default exports.
+- **Named exports for components**, e.g. `export function Footer()`. Default
+  exports only where Next.js requires one — `page.tsx`, `layout.tsx`,
+  `error.tsx`, and friends.
+- Server-only modules (anything touching Mongo, secrets, or the session) open
+  with `import 'server-only'`. Do not add it to `src/server/models/`,
+  `password.ts`, `schemas.ts`, or `seed-data/`: the seed scripts import those
+  under plain Node, where that package throws.
 - Run `pnpm typecheck && pnpm lint && pnpm test` before considering a change done.
 
 <!-- BEGIN:nextjs-agent-rules -->

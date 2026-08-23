@@ -1,3 +1,7 @@
+// Importing this from a Client Component is a build error, not a silent
+// leak — see https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
+import 'server-only';
+
 import { cache } from 'react';
 import { connectToDatabase } from './db';
 import { Project } from './models/project';
@@ -29,8 +33,10 @@ import type {
  *   - `get*` — public, only content that is actually live right now
  *     (published, or scheduled with a `publishedAt` in the past). What
  *     the site renders.
- *   - `getAll*` / `get*ById` — admin, every record regardless of status.
- *     What the CMS list and edit views operate on.
+ *   - `getAll*` — admin, every record regardless of status. What the CMS
+ *     list views operate on. (Single-record admin reads don't live here:
+ *     the CMS edit views fetch through `/api/admin/*`, which goes to the
+ *     Mongoose model directly via the CRUD factory in `admin-crud.ts`.)
  * Conflating them would mean one missed status check away from a draft
  * leaking onto the public site.
  */
@@ -80,12 +86,6 @@ export const getAllProjects = cache(async (): Promise<ProjectType[]> => {
   return docs.map((d) => normalizeDoc(d)) as unknown as ProjectType[];
 });
 
-export const getProjectById = cache(async (id: string): Promise<ProjectType | undefined> => {
-  await connectToDatabase();
-  const doc = await Project.findById(id).lean();
-  return doc ? (normalizeDoc(doc) as unknown as ProjectType) : undefined;
-});
-
 // ── Posts — public ───────────────────────────────────────────────────────
 
 export const getPosts = cache(async (): Promise<PostType[]> => {
@@ -122,12 +122,6 @@ export const getAllPosts = cache(async (): Promise<PostType[]> => {
   await connectToDatabase();
   const docs = await Post.find().sort({ order: 1, date: -1 }).lean();
   return docs.map((d) => normalizeDoc(d)) as unknown as PostType[];
-});
-
-export const getPostById = cache(async (id: string): Promise<PostType | undefined> => {
-  await connectToDatabase();
-  const doc = await Post.findById(id).lean();
-  return doc ? (normalizeDoc(doc) as unknown as PostType) : undefined;
 });
 
 // ── Testimonials ────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Section, Container } from '@/components/ui/section';
 import { Tag } from '@/components/ui/tag';
 import { ArrowRight } from '@/components/ui/button';
-import { ReadingProgress } from '@/components/site/reading-progress';
+import { ReadingProgress } from '@/components/layout/reading-progress';
 import { MdxContent } from '@/components/mdx/mdx-content';
 import { formatDate } from '@/lib/format';
 import { getPostSlugs, getPost, getAdjacentPosts } from '@/server/queries';

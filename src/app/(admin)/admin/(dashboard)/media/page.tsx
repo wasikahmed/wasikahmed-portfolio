@@ -41,8 +41,6 @@ export default function MediaPage() {
       form.append('file', file);
       form.append('alt', alt);
       const res = await adminFetch('/api/admin/media', { method: 'POST', body: form });
-      // adminFetch always sets Content-Type: application/json — override
-      // for this one request so the browser sets its own multipart boundary.
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? 'Upload failed.');

@@ -6,7 +6,7 @@ import { Experience } from '@/components/home/experience';
 import { Process } from '@/components/home/process';
 import { Voices } from '@/components/home/voices';
 import { CtaBand } from '@/components/home/cta-band';
-import { SectionRail } from '@/components/site/section-rail';
+import { SectionRail } from '@/components/layout/section-rail';
 import { getSettings, getRoles } from '@/server/queries';
 
 export async function generateMetadata(): Promise<Metadata> {
