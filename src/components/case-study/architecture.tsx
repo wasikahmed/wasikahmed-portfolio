@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import { motion, useScroll, useTransform, type MotionValue } from 'motion/react';
-import type { ArchitectureNode } from '@/lib/content/types';
+import type { ArchitectureNode } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/components/motion/use-reduced-motion';
 
 /**

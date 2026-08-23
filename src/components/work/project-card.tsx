@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { Project } from '@/lib/content/types';
+import type { Project } from '@/lib/types';
 import { ViewTransition } from '@/components/motion/view-transition';
 import { TagList } from '@/components/ui/tag';
 import { cn } from '@/lib/cn';

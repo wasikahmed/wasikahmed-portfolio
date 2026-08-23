@@ -1,4 +1,4 @@
-import type { Post } from './types';
+import type { Post } from '@/lib/types';
 
 /** PLACEHOLDER CONTENT — replaced through the admin UI in Phase 8. */
 export const posts: Post[] = [
@@ -78,25 +78,3 @@ export const posts: Post[] = [
     ],
   },
 ];
-
-export function getPost(slug: string) {
-  return posts.find((p) => p.slug === slug);
-}
-
-export function adjacentPosts(slug: string) {
-  const index = posts.findIndex((p) => p.slug === slug);
-  if (index === -1) return { prev: undefined, next: undefined };
-  return {
-    prev: index > 0 ? posts[index - 1] : undefined,
-    next: index < posts.length - 1 ? posts[index + 1] : undefined,
-  };
-}
-
-export function formatDate(iso: string) {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}

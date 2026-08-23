@@ -5,10 +5,12 @@ import { Section, Container } from '@/components/ui/section';
 import { Tag } from '@/components/ui/tag';
 import { ArrowRight } from '@/components/ui/button';
 import { ReadingProgress } from '@/components/site/reading-progress';
-import { posts, getPost, adjacentPosts, formatDate } from '@/lib/content/posts';
+import { formatDate } from '@/lib/format';
+import { getPostSlugs, getPost, getAdjacentPosts } from '@/server/queries';
 
-export function generateStaticParams() {
-  return posts.map((post) => ({ slug: post.slug }));
+export async function generateStaticParams() {
+  const slugs = await getPostSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -17,17 +19,17 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
   if (!post) return {};
   return { title: `${post.title} — Wasik Ahmed`, description: post.excerpt };
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
   if (!post) notFound();
 
-  const { next } = adjacentPosts(slug);
+  const { next } = await getAdjacentPosts(slug);
 
   return (
     <>

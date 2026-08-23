@@ -1,6 +1,8 @@
 # Development stack, driven by `docker compose watch`.
-# Production compose (Cloudflare Tunnel topology, Mongo, backups) is
-# Phase 7 — see PLAN.md §4.
+# Production compose (Cloudflare Tunnel topology, backups) is Phase 7 —
+# see PLAN.md §4. Mongo here runs without auth, a named volume, and its
+# port published to the host — fine for a local-only dev database, not
+# how it runs in production.
 services:
   web:
     build:
@@ -14,12 +16,19 @@ services:
     environment:
       NODE_ENV: development
       PORT: '3000'
+      # Service name, not localhost — web reaches mongo over the compose
+      # network. A bare `pnpm build`/`pnpm dev` run on the host instead
+      # uses .env's MONGODB_URI (localhost, via the published port below).
+      MONGODB_URI: mongodb://mongo:27017/portfolio
       # Next's dev-resource origin check (see next.config.ts) — the browser
       # reaches the container as localhost, which is already the default
       # allowed origin, but WATCHPACK_POLLING below is what actually makes
       # file-change detection reliable across the VM boundary docker uses
       # on macOS/Windows.
       WATCHPACK_POLLING: 'true'
+    depends_on:
+      mongo:
+        condition: service_healthy
     develop:
       watch:
         # Source, content, and tests: synced straight into the running
@@ -34,6 +43,9 @@ services:
         - action: sync
           path: ./e2e
           target: /app/e2e
+        - action: sync
+          path: ./scripts
+          target: /app/scripts
 
         # Config that Next only reads at boot: sync the file, then restart
         # the dev server so the new config actually takes effect.
@@ -53,3 +65,38 @@ services:
           path: ./package.json
         - action: rebuild
           path: ./pnpm-lock.yaml
+
+  mongo:
+    image: mongo:7
+    ports:
+      # Published so host-side `pnpm build`/`pnpm dev`/`pnpm seed` can
+      # reach it too, not only the web container.
+      - '${MONGO_PORT_HOST:-27017}:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      # A generous window: mongo's first start on a fresh volume, especially
+      # on a machine under load (a concurrent image build, another Next.js
+      # build), can take longer than a quick healthcheck expects. Getting
+      # marked unhealthy here isn't just cosmetic — `web` depends on
+      # service_healthy and `docker compose watch` does not retry that wait,
+      # it fails outright.
+      retries: 20
+      start_period: 40s
+
+  mongo-express:
+    image: mongo-express:1
+    ports:
+      - '${MONGO_EXPRESS_PORT_HOST:-8081}:8081'
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
+      ME_CONFIG_BASICAUTH: 'false'
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:

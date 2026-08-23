@@ -10,10 +10,11 @@ import { Reveal } from '@/components/motion/reveal';
 import { ViewTransition } from '@/components/motion/view-transition';
 import { Architecture } from '@/components/case-study/architecture';
 import { Toc } from '@/components/case-study/toc';
-import { projects, getProject, adjacentProjects } from '@/lib/content/projects';
+import { getProjectSlugs, getProject, getAdjacentProjects } from '@/server/queries';
 
-export function generateStaticParams() {
-  return projects.map((project) => ({ slug: project.slug }));
+export async function generateStaticParams() {
+  const slugs = await getProjectSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -22,7 +23,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const project = getProject(slug);
+  const project = await getProject(slug);
   if (!project) return {};
 
   return {
@@ -33,10 +34,10 @@ export async function generateMetadata({
 
 export default async function CaseStudyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const project = getProject(slug);
+  const project = await getProject(slug);
   if (!project) notFound();
 
-  const { next } = adjacentProjects(slug);
+  const { next } = await getAdjacentProjects(slug);
   const toc = project.sections.map((s) => ({ id: s.id, title: s.title }));
 
   return (

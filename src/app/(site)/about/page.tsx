@@ -4,9 +4,7 @@ import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
-import { skillGroups } from '@/lib/content/tech';
-import { roles } from '@/lib/content/experience';
-import { site } from '@/lib/content/site';
+import { getSkillGroups, getRoles, getSettings } from '@/server/queries';
 
 export const metadata: Metadata = {
   title: 'About — Wasik Ahmed',
@@ -20,7 +18,13 @@ const STORY = [
   'I work as a senior engineer on product teams and take on consulting projects for people who need one specific system built well. Each keeps the other honest.',
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const [skillGroups, roles, settings] = await Promise.all([
+    getSkillGroups(),
+    getRoles(),
+    getSettings(),
+  ]);
+
   return (
     <>
       <Section density="spacious" ambient={['blob']} className="pt-10 sm:pt-16">
@@ -58,10 +62,10 @@ export default function AboutPage() {
             <Reveal delay={0.1}>
               <dl className="divide-border-subtle border-border-subtle bg-surface-1 flex flex-col divide-y rounded-lg border">
                 {[
-                  ['Based in', site.location],
-                  ['Timezone', site.timezone],
-                  ['Focus', site.discipline],
-                  ['Replies in', site.responseTime],
+                  ['Based in', settings.location],
+                  ['Timezone', settings.timezone],
+                  ['Focus', settings.discipline],
+                  ['Replies in', settings.responseTime],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-baseline justify-between gap-4 px-5 py-4">
                     <dt className="text-2xs text-fg-subtle font-mono tracking-wide uppercase">
@@ -70,10 +74,10 @@ export default function AboutPage() {
                     <dd className="text-fg text-right text-sm">{value}</dd>
                   </div>
                 ))}
-                {site.available ? (
+                {settings.available ? (
                   <div className="flex items-center gap-2 px-5 py-4">
                     <StatusDot />
-                    <span className="text-2xs text-accent font-mono">{site.availableFor}</span>
+                    <span className="text-2xs text-accent font-mono">{settings.availableFor}</span>
                   </div>
                 ) : null}
               </dl>

@@ -21,22 +21,31 @@ test.describe('Routes', () => {
 });
 
 test.describe('Responsive', () => {
+  /*
+   * One test per (viewport, route) pair rather than looping routes inside
+   * a single test. Every page now does a live query at request time
+   * (Phase 3), so a 7-route loop was sharing one 30s budget across seven
+   * separate page loads — a single slow one failed the whole batch and
+   * pointed at the wrong route. Splitting gives each navigation its own
+   * timeout and names the actual failing route directly, instead of
+   * reporting only whichever route the loop happened to be on.
+   */
   for (const [name, width] of [
     ['mobile', 375],
     ['tablet', 768],
     ['desktop', 1440],
     ['ultrawide', 2560],
   ] as const) {
-    test(`no horizontal overflow at ${name}`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 900 });
-      for (const route of ROUTES) {
+    for (const route of ROUTES) {
+      test(`no horizontal overflow at ${name} — ${route}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
         await page.goto(route);
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - window.innerWidth,
         );
-        expect(overflow, `${route} at ${width}px`).toBeLessThanOrEqual(0);
-      }
-    });
+        expect(overflow).toBeLessThanOrEqual(0);
+      });
+    }
   }
 });
 

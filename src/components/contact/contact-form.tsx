@@ -18,7 +18,7 @@ type Intent = 'project' | 'role';
  * Submission is wired in Phase 5 (Zod, Turnstile, rate limiting, Resend).
  * Until then this validates and reports honestly rather than faking success.
  */
-export function ContactForm() {
+export function ContactForm({ email }: { email: string }) {
   const [intent, setIntent] = useState<Intent | null>(null);
   const [sent, setSent] = useState(false);
 
@@ -36,7 +36,7 @@ export function ContactForm() {
           and pretending otherwise would lose your message. Email works today.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button href="mailto:hello@example.com">Email instead</Button>
+          <Button href={`mailto:${email}`}>Email instead</Button>
           <Button variant="ghost" onClick={() => setSent(false)}>
             Back to form
           </Button>

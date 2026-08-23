@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import { ProjectCard } from './project-card';
-import { projects } from '@/lib/content/projects';
-import type { Category } from '@/lib/content/types';
+import type { Category, Project } from '@/lib/types';
 import { cn } from '@/lib/cn';
 
 const FILTERS: (Category | 'All')[] = ['All', 'AI', 'Automation', 'Systems', 'Web'];
@@ -19,7 +18,7 @@ const FILTERS: (Category | 'All')[] = ['All', 'AI', 'Automation', 'Systems', 'We
  * `layout` is a transform animation, so reduced motion collapses it to an
  * instant reposition without losing a single card.
  */
-export function WorkIndex() {
+export function WorkIndex({ projects }: { projects: Project[] }) {
   const params = useSearchParams();
   // Set by the hero constellation: /work?tech=PostgreSQL
   const techFilter = params.get('tech');
@@ -31,7 +30,7 @@ export function WorkIndex() {
       const matchesTech = !techFilter || project.stack.includes(techFilter);
       return matchesCategory && matchesTech;
     });
-  }, [category, techFilter]);
+  }, [category, techFilter, projects]);
 
   return (
     <>

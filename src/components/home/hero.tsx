@@ -4,7 +4,7 @@ import { Magnetic } from '@/components/motion/magnetic';
 import { TextReveal } from '@/components/motion/text-reveal';
 import { Spotlight } from '@/components/ambient/spotlight';
 import { Constellation } from './constellation';
-import { site } from '@/lib/content/site';
+import { getSettings, getTech } from '@/server/queries';
 
 /**
  * The hero, per PLAN.md §2.9.
@@ -13,7 +13,9 @@ import { site } from '@/lib/content/site';
  * nine effects here. Everything else that moves is either responding to
  * the cursor or carrying information.
  */
-export function Hero() {
+export async function Hero() {
+  const [settings, tech] = await Promise.all([getSettings(), getTech()]);
+
   return (
     <Section
       id="top"
@@ -27,17 +29,17 @@ export function Hero() {
         <div className="flex flex-col gap-10 lg:gap-12">
           <div className="max-w-3xl">
             <p className="text-2xs text-accent flex items-center gap-3 font-mono tracking-widest uppercase">
-              {site.role}
+              {settings.role}
               <span aria-hidden className="bg-border-strong h-px w-8" />
-              {site.discipline}
+              {settings.discipline}
             </p>
 
             <h1 className="font-display mt-6 text-5xl font-bold tracking-tighter">
-              <TextReveal text={site.tagline} accentWords={[0, 1]} delay={0.1} />
+              <TextReveal text={settings.tagline} accentWords={[0, 1]} delay={0.1} />
             </h1>
 
             {/* The proof line. Concrete, not a slogan. */}
-            <p className="text-fg-muted mt-6 max-w-xl text-lg text-pretty">{site.proof}</p>
+            <p className="text-fg-muted mt-6 max-w-xl text-lg text-pretty">{settings.proof}</p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Magnetic>
@@ -52,7 +54,7 @@ export function Hero() {
             </div>
           </div>
 
-          <Constellation />
+          <Constellation tech={tech} />
         </div>
       </Container>
     </Section>

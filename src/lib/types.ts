@@ -1,9 +1,8 @@
 /**
- * Content types.
- *
- * Phase 3 replaces this module with Mongo + Mongoose, so these shapes are
- * deliberately close to the collection schemas in PLAN.md §3 — the swap
- * should change where the data comes from, not what consumers see.
+ * Content types — shared by the Mongoose models (`src/server/models/`),
+ * the query layer (`src/server/queries.ts`), and every component that
+ * renders content. This is the contract: components only ever see these
+ * shapes, never a Mongoose document.
  */
 
 export type Category = 'AI' | 'Automation' | 'Systems' | 'Web';
@@ -84,4 +83,26 @@ export interface Tech {
   /** Which projects use it — powers the constellation's "used in N projects". */
   projects: string[];
   group: 'Language' | 'Framework' | 'Data' | 'Infra' | 'AI';
+}
+
+export interface SkillGroup {
+  category: string;
+  items: string[];
+}
+
+/** The settings singleton — site-wide facts editable from the admin in Phase 4. */
+export interface Settings {
+  name: string;
+  initials: string;
+  role: string;
+  discipline: string;
+  tagline: string;
+  proof: string;
+  email: string;
+  location: string;
+  timezone: string;
+  available: boolean;
+  availableFor: string;
+  responseTime: string;
+  socials: { label: string; href: string }[];
 }

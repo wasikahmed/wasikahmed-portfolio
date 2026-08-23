@@ -1,4 +1,4 @@
-import type { Tech } from './types';
+import type { Tech } from '@/lib/types';
 
 /**
  * The constellation's data source. `projects` is what makes signature

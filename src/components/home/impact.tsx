@@ -1,14 +1,16 @@
 import { Section, Container } from '@/components/ui/section';
 import { Metric } from '@/components/motion/metric';
 import { Reveal } from '@/components/motion/reveal';
-import { projects } from '@/lib/content/projects';
+import { getProjects } from '@/server/queries';
 
 /**
  * Full-bleed statement moment — the second deliberate break from the card
  * grid (PLAN.md §2.7). No cards at all: just the numbers, large, on the
  * page ground, with the baseline that makes each one evidence.
  */
-export function Impact() {
+export async function Impact() {
+  const projects = await getProjects();
+
   return (
     <Section id="impact" density="spacious" bordered ambient={['noise']}>
       <Container>

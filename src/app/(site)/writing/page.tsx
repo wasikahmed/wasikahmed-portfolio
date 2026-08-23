@@ -4,7 +4,8 @@ import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
 import { Reveal } from '@/components/motion/reveal';
-import { posts, formatDate } from '@/lib/content/posts';
+import { formatDate } from '@/lib/format';
+import { getPosts } from '@/server/queries';
 
 export const metadata: Metadata = {
   title: 'Writing — Wasik Ahmed',
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
  * type and a hover-revealed excerpt; TIL notes sit in a denser secondary
  * column because they are shorter and scanned differently.
  */
-export default function WritingPage() {
+export default async function WritingPage() {
+  const posts = await getPosts();
   const articles = posts.filter((p) => p.kind === 'article');
   const tils = posts.filter((p) => p.kind === 'til');
 

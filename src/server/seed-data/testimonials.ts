@@ -1,4 +1,4 @@
-import type { Testimonial } from './types';
+import type { Testimonial } from '@/lib/types';
 
 /** PLACEHOLDER — replaced in Phase 8. */
 export const testimonials: Testimonial[] = [

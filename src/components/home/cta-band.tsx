@@ -3,17 +3,19 @@ import { Button, ArrowRight } from '@/components/ui/button';
 import { Magnetic } from '@/components/motion/magnetic';
 import { Reveal } from '@/components/motion/reveal';
 import { StatusDot } from '@/components/ui/eyebrow';
-import { site } from '@/lib/content/site';
+import { getSettings } from '@/server/queries';
 
-export function CtaBand() {
+export async function CtaBand() {
+  const settings = await getSettings();
+
   return (
     <Section id="contact" density="spacious" bordered ambient={['blob', 'noise']}>
       <Container className="text-center">
         <Reveal>
-          {site.available ? (
+          {settings.available ? (
             <p className="border-border bg-accent-whisper text-2xs text-accent mb-6 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono">
               <StatusDot />
-              {site.availableFor}
+              {settings.availableFor}
             </p>
           ) : null}
 
@@ -32,13 +34,13 @@ export function CtaBand() {
                 <ArrowRight />
               </Button>
             </Magnetic>
-            <Button href={`mailto:${site.email}`} variant="ghost" size="lg">
-              {site.email}
+            <Button href={`mailto:${settings.email}`} variant="ghost" size="lg">
+              {settings.email}
             </Button>
           </div>
 
           <p className="text-2xs text-fg-subtle mt-6 font-mono">
-            Replies in {site.responseTime} · {site.location} · {site.timezone}
+            Replies in {settings.responseTime} · {settings.location} · {settings.timezone}
           </p>
         </Reveal>
       </Container>

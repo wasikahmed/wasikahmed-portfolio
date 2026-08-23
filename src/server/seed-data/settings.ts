@@ -1,11 +1,10 @@
-/** Site-wide settings. Becomes the `settings` singleton collection in Phase 3. */
-export const site = {
+/** Seed data for the settings singleton. Edited live via the admin from Phase 4 onward. */
+export const settingsSeed = {
   name: 'Wasik Ahmed',
   initials: 'WA',
   role: 'Software Engineer',
   discipline: 'AI & Automation',
   tagline: 'I build systems that do the work for you.',
-  /** Concrete proof line for the hero — not a slogan. */
   proof: 'Document pipelines, schedulers, and internal tools — shipped to production, not demos.',
   email: 'hello@example.com',
   location: 'Toronto, CA',
@@ -19,10 +18,3 @@ export const site = {
     { label: 'Email', href: 'mailto:hello@example.com' },
   ],
 } as const;
-
-export const NAV_LINKS = [
-  { label: 'Work', href: '/work' },
-  { label: 'Writing', href: '/writing' },
-  { label: 'About', href: '/about' },
-  { label: 'Contact', href: '/contact' },
-] as const;

@@ -3,13 +3,16 @@ import { Suspense } from 'react';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { WorkIndex } from '@/components/work/work-index';
+import { getProjects } from '@/server/queries';
 
 export const metadata: Metadata = {
   title: 'Work — Wasik Ahmed',
   description: 'Case studies: AI pipelines, schedulers, and internal systems in production.',
 };
 
-export default function WorkPage() {
+export default async function WorkPage() {
+  const projects = await getProjects();
+
   return (
     <Section density="spacious" ambient={['grid']} className="pt-10 sm:pt-16">
       <Container>
@@ -24,7 +27,7 @@ export default function WorkPage() {
         <div className="mt-14">
           {/* useSearchParams needs a Suspense boundary during prerender. */}
           <Suspense fallback={<div className="h-10" />}>
-            <WorkIndex />
+            <WorkIndex projects={projects} />
           </Suspense>
         </div>
       </Container>

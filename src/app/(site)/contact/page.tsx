@@ -2,14 +2,16 @@ import type { Metadata } from 'next';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
-import { site } from '@/lib/content/site';
+import { getSettings } from '@/server/queries';
 
 export const metadata: Metadata = {
   title: 'Contact — Wasik Ahmed',
   description: 'Start a conversation about a project or a role.',
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const settings = await getSettings();
+
   return (
     <Section density="spacious" ambient={['blob']} className="pt-10 sm:pt-16">
       <Container>
@@ -24,7 +26,7 @@ export default function ContactPage() {
             </p>
 
             <div className="mt-12">
-              <ContactForm />
+              <ContactForm email={settings.email} />
             </div>
           </div>
 
@@ -34,10 +36,10 @@ export default function ContactPage() {
                 Direct
               </p>
               <a
-                href={`mailto:${site.email}`}
+                href={`mailto:${settings.email}`}
                 className="text-fg duration-fast hover:text-accent text-sm transition-colors"
               >
-                {site.email}
+                {settings.email}
               </a>
             </div>
 
@@ -46,7 +48,7 @@ export default function ContactPage() {
                 Elsewhere
               </p>
               <ul className="flex flex-col gap-2">
-                {site.socials.map((social) => (
+                {settings.socials.map((social) => (
                   <li key={social.label}>
                     <a
                       href={social.href}
@@ -65,11 +67,11 @@ export default function ContactPage() {
             <div className="border-border-subtle bg-surface-1 rounded-lg border p-5">
               <p className="text-2xs text-accent flex items-center gap-2 font-mono">
                 <StatusDot />
-                {site.available ? 'Available' : 'Booked up'}
+                {settings.available ? 'Available' : 'Booked up'}
               </p>
-              <p className="text-fg-muted mt-3 text-sm leading-relaxed">{site.availableFor}</p>
+              <p className="text-fg-muted mt-3 text-sm leading-relaxed">{settings.availableFor}</p>
               <p className="text-2xs text-fg-subtle mt-4 font-mono">
-                Replies in {site.responseTime} · {site.timezone}
+                Replies in {settings.responseTime} · {settings.timezone}
               </p>
             </div>
           </aside>

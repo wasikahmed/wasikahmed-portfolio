@@ -3,13 +3,28 @@
 import { useState } from 'react';
 import { Nav } from './nav';
 import { CommandPalette } from './command-palette';
+import type { Post, Project, Settings } from '@/lib/types';
 
 /**
  * Client boundary for the site chrome. Kept as thin as possible so every
  * page below it stays a Server Component — only the nav and palette need
  * interactivity, not the content they wrap.
+ *
+ * `settings`/`projects`/`posts` are fetched once by the Server Component
+ * layout and threaded down as props — Client Components cannot query
+ * Mongo directly.
  */
-export function SiteShell({ children }: { children: React.ReactNode }) {
+export function SiteShell({
+  children,
+  settings,
+  projects,
+  posts,
+}: {
+  children: React.ReactNode;
+  settings: Settings;
+  projects: Project[];
+  posts: Post[];
+}) {
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   return (
@@ -20,8 +35,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <Nav onOpenPalette={() => setPaletteOpen(true)} />
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <Nav onOpenPalette={() => setPaletteOpen(true)} settings={settings} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        settings={settings}
+        projects={projects}
+        posts={posts}
+      />
       {children}
     </>
   );

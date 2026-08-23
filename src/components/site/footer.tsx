@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { NAV_LINKS, site } from '@/lib/content/site';
+import { NAV_LINKS } from '@/lib/nav';
+import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
 import { Container } from '@/components/ui/section';
 
-export function Footer() {
+export function Footer({ settings }: { settings: Settings }) {
   return (
     <footer className="border-border-subtle relative border-t">
       <Container className="pt-density-compact px-6 pb-10 lg:px-10">
@@ -18,9 +19,9 @@ export function Footer() {
               aria-hidden
               className="font-display text-fg/[0.06] text-[clamp(3.5rem,11vw,7rem)] leading-[0.85] font-bold tracking-tighter select-none"
             >
-              {site.name.split(' ')[0].toUpperCase()}
+              {settings.name.split(' ')[0].toUpperCase()}
             </p>
-            <p className="text-fg-muted mt-4 max-w-sm text-sm">{site.proof}</p>
+            <p className="text-fg-muted mt-4 max-w-sm text-sm">{settings.proof}</p>
           </div>
 
           <div className="flex flex-wrap gap-x-16 gap-y-10">
@@ -55,7 +56,7 @@ export function Footer() {
                 Elsewhere
               </p>
               <ul className="flex flex-col gap-2.5">
-                {site.socials.map((social) => (
+                {settings.socials.map((social) => (
                   <li key={social.label}>
                     <a
                       href={social.href}
@@ -74,17 +75,17 @@ export function Footer() {
         </div>
 
         <div className="border-border-subtle text-2xs text-fg-subtle mt-14 flex flex-col gap-3 border-t pt-6 font-mono sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-          {site.available ? (
+          {settings.available ? (
             <span className="text-fg-muted flex items-center gap-2">
               <StatusDot />
-              {site.availableFor}
+              {settings.availableFor}
             </span>
           ) : null}
-          <span>Replies in {site.responseTime}</span>
-          <span>{site.location}</span>
-          <span>{site.timezone}</span>
+          <span>Replies in {settings.responseTime}</span>
+          <span>{settings.location}</span>
+          <span>{settings.timezone}</span>
           <span className="sm:ml-auto">
-            © {new Date().getFullYear()} {site.name}
+            © {new Date().getFullYear()} {settings.name}
           </span>
         </div>
       </Container>

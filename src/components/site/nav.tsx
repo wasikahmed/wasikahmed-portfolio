@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { NAV_LINKS, site } from '@/lib/content/site';
+import { NAV_LINKS } from '@/lib/nav';
+import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
 import { cn } from '@/lib/cn';
 
@@ -12,7 +13,13 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Nav({ onOpenPalette }: { onOpenPalette: () => void }) {
+export function Nav({
+  onOpenPalette,
+  settings,
+}: {
+  onOpenPalette: () => void;
+  settings: Settings;
+}) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -99,12 +106,14 @@ export function Nav({ onOpenPalette }: { onOpenPalette: () => void }) {
         <Link
           href="/"
           className="group flex shrink-0 items-center gap-2.5"
-          aria-label={`${site.name} — home`}
+          aria-label={`${settings.name} — home`}
         >
           <span className="from-accent to-accent-bright font-display text-bg grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br text-xs font-bold">
-            {site.initials}
+            {settings.initials}
           </span>
-          <span className="font-display hidden text-sm font-semibold sm:block">{site.name}</span>
+          <span className="font-display hidden text-sm font-semibold sm:block">
+            {settings.name}
+          </span>
         </Link>
 
         <nav aria-label="Primary" className="hidden md:block">
@@ -147,7 +156,7 @@ export function Nav({ onOpenPalette }: { onOpenPalette: () => void }) {
             <kbd className="text-2xs text-fg-subtle font-mono">⌘K</kbd>
           </button>
 
-          {site.available ? (
+          {settings.available ? (
             <span className="border-border bg-accent-whisper text-2xs text-accent hidden items-center gap-2 rounded-full border px-3 py-1.5 font-mono sm:flex">
               <StatusDot />
               Available
@@ -218,10 +227,10 @@ export function Nav({ onOpenPalette }: { onOpenPalette: () => void }) {
                   );
                 })}
               </ul>
-              {site.available ? (
+              {settings.available ? (
                 <p className="text-2xs text-accent mt-5 flex items-center gap-2 font-mono">
                   <StatusDot />
-                  {site.availableFor}
+                  {settings.availableFor}
                 </p>
               ) : null}
             </nav>

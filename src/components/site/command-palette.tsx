@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { NAV_LINKS, site } from '@/lib/content/site';
-import { projects } from '@/lib/content/projects';
-import { posts } from '@/lib/content/posts';
+import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/cn';
+import type { Post, Project, Settings } from '@/lib/types';
 
 interface Command {
   id: string;
@@ -26,9 +25,15 @@ interface Command {
 export function CommandPalette({
   open,
   onOpenChange,
+  settings,
+  projects,
+  posts,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  settings: Settings;
+  projects: Project[];
+  posts: Post[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -105,16 +110,16 @@ export function CommandPalette({
       {
         id: 'action-email',
         label: 'Copy email address',
-        hint: site.email,
+        hint: settings.email,
         group: 'Actions',
         keywords: 'email copy contact mail address',
         run: ({ close: c }) => {
-          void navigator.clipboard?.writeText(site.email);
+          void navigator.clipboard?.writeText(settings.email);
           c();
         },
       },
     ],
-    [],
+    [projects, posts, settings.email],
   );
 
   const results = useMemo(() => {

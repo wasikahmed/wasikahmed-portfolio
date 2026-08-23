@@ -1,4 +1,4 @@
-import type { Project } from './types';
+import type { Project } from '@/lib/types';
 
 /**
  * Seeded from the prototype's placeholder data, enriched with the fields the
@@ -359,16 +359,3 @@ export const projects: Project[] = [
     ],
   },
 ];
-
-export function getProject(slug: string) {
-  return projects.find((p) => p.slug === slug);
-}
-
-export function adjacentProjects(slug: string) {
-  const index = projects.findIndex((p) => p.slug === slug);
-  if (index === -1) return { prev: undefined, next: undefined };
-  return {
-    prev: index > 0 ? projects[index - 1] : projects[projects.length - 1],
-    next: index < projects.length - 1 ? projects[index + 1] : projects[0],
-  };
-}

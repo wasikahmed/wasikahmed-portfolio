@@ -3,7 +3,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { ProjectCard } from '@/components/work/project-card';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
-import { projects } from '@/lib/content/projects';
+import { getProjects } from '@/server/queries';
 
 /**
  * Asymmetric offset grid — one of the three sections that deliberately
@@ -11,7 +11,8 @@ import { projects } from '@/lib/content/projects';
  * larger tile and the second column is nudged down, so the eye moves
  * diagonally instead of scanning identical rows.
  */
-export function SelectedWork() {
+export async function SelectedWork() {
+  const projects = await getProjects();
   const [lead, ...rest] = projects;
 
   return (

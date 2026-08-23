@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
-import { roles } from '@/lib/content/experience';
+import type { Role } from '@/lib/types';
 import { cn } from '@/lib/cn';
 
 /**
@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn';
  * to one line; the shipped work expands on request. Zero ambient layers:
  * this section is pure content and earns none.
  */
-export function Experience() {
+export function Experience({ roles }: { roles: Role[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (

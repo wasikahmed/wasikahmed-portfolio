@@ -7,12 +7,15 @@ import { Process } from '@/components/home/process';
 import { Voices } from '@/components/home/voices';
 import { CtaBand } from '@/components/home/cta-band';
 import { SectionRail } from '@/components/site/section-rail';
-import { site } from '@/lib/content/site';
+import { getSettings, getRoles } from '@/server/queries';
 
-export const metadata: Metadata = {
-  title: `${site.name} — ${site.role}`,
-  description: site.proof,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: `${settings.name} — ${settings.role}`,
+    description: settings.proof,
+  };
+}
 
 const RAIL = [
   { id: 'top', label: 'Top' },
@@ -24,14 +27,16 @@ const RAIL = [
   { id: 'contact', label: 'Contact' },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const roles = await getRoles();
+
   return (
     <>
       <SectionRail sections={RAIL} />
       <Hero />
       <SelectedWork />
       <Impact />
-      <Experience />
+      <Experience roles={roles} />
       <Process />
       <Voices />
       <CtaBand />

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { tech } from '@/lib/content/tech';
+import type { Tech } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/components/motion/use-reduced-motion';
 import { cn } from '@/lib/cn';
 
@@ -42,7 +42,7 @@ function chipWidth(name: string) {
  * that share a project attract; everything repels; a weak pull toward
  * centre keeps the graph from drifting into the margins.
  */
-function computeLayout(): { nodes: Placed[]; edges: [number, number][] } {
+function computeLayout(tech: Tech[]): { nodes: Placed[]; edges: [number, number][] } {
   const random = makeRandom(20260823);
 
   /*
@@ -153,8 +153,6 @@ function computeLayout(): { nodes: Placed[]; edges: [number, number][] } {
   return { nodes, edges };
 }
 
-const LAYOUT = computeLayout();
-
 /**
  * Signature interaction #1 (PLAN.md §2.5, §2.9).
  *
@@ -163,7 +161,7 @@ const LAYOUT = computeLayout();
  * until the cursor approaches; hovering answers "where did you use this",
  * and clicking filters /work.
  */
-export function Constellation() {
+export function Constellation({ tech }: { tech: Tech[] }) {
   const router = useRouter();
   const prefersReduced = usePrefersReducedMotion();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -172,7 +170,11 @@ export function Constellation() {
   const frame = useRef<number>(0);
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const { nodes, edges } = LAYOUT;
+  // Computed once per mount from the tech prop delivered for this page
+  // load — the 320-iteration relaxation is too costly to redo on every
+  // render, but the data itself now comes from the database rather than
+  // a module-scope import, so it can no longer be precomputed at load time.
+  const { nodes, edges } = useMemo(() => computeLayout(tech), [tech]);
 
   /** Neighbours of the hovered node, for the highlight/dim pass. */
   const neighbours = useMemo(() => {
