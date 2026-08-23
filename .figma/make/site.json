@@ -1,0 +1,10 @@
+{
+  "description": "Showcases a software engineer's AI and automation projects with clear problem-solving case studies, dual CTAs for hiring or collaboration, and a sleek dark design.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
