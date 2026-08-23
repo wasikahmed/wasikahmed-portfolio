@@ -1,0 +1,10 @@
+.next/
+out/
+build/
+dist/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+_reference/
+pnpm-lock.yaml
