@@ -1,0 +1,55 @@
+# Development stack, driven by `docker compose watch`.
+# Production compose (Cloudflare Tunnel topology, Mongo, backups) is
+# Phase 7 — see PLAN.md §4.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      # Host 3300, not 3000 — this machine already has another project's
+      # container bound to 3000. Override with PORT_HOST=xxxx if 3300 is
+      # also taken.
+      - '${PORT_HOST:-3300}:3000'
+    environment:
+      NODE_ENV: development
+      PORT: '3000'
+      # Next's dev-resource origin check (see next.config.ts) — the browser
+      # reaches the container as localhost, which is already the default
+      # allowed origin, but WATCHPACK_POLLING below is what actually makes
+      # file-change detection reliable across the VM boundary docker uses
+      # on macOS/Windows.
+      WATCHPACK_POLLING: 'true'
+    develop:
+      watch:
+        # Source, content, and tests: synced straight into the running
+        # container. Turbopack's own watcher (backed by polling, above)
+        # picks up the change and hot-reloads — no container restart.
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./e2e
+          target: /app/e2e
+
+        # Config that Next only reads at boot: sync the file, then restart
+        # the dev server so the new config actually takes effect.
+        - action: sync+restart
+          path: ./next.config.ts
+          target: /app/next.config.ts
+        - action: sync+restart
+          path: ./tsconfig.json
+          target: /app/tsconfig.json
+        - action: sync+restart
+          path: ./postcss.config.mjs
+          target: /app/postcss.config.mjs
+
+        # Dependency manifests: rebuild the image so `pnpm install` reruns
+        # inside the cached layer rather than drifting from node_modules.
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./pnpm-lock.yaml
