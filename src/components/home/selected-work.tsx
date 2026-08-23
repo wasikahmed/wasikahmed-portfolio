@@ -33,20 +33,29 @@ export async function SelectedWork() {
           </div>
         </Reveal>
 
-        <Stagger className="mt-12 grid gap-5 lg:grid-cols-2" gap={0.08}>
-          <StaggerItem className="lg:row-span-2">
-            <ProjectCard project={lead} size="feature" className="h-full" />
-          </StaggerItem>
+        {lead ? (
+          <Stagger className="mt-12 grid gap-5 lg:grid-cols-2" gap={0.08}>
+            <StaggerItem className="lg:row-span-2">
+              <ProjectCard project={lead} size="feature" className="h-full" />
+            </StaggerItem>
 
-          {/* Offset pushes the right column out of lockstep with the left. */}
-          <div className="flex flex-col gap-5 lg:mt-12">
-            {rest.map((project) => (
-              <StaggerItem key={project.slug}>
-                <ProjectCard project={project} />
-              </StaggerItem>
-            ))}
-          </div>
-        </Stagger>
+            {/* Offset pushes the right column out of lockstep with the left. */}
+            <div className="flex flex-col gap-5 lg:mt-12">
+              {rest.map((project) => (
+                <StaggerItem key={project.slug}>
+                  <ProjectCard project={project} />
+                </StaggerItem>
+              ))}
+            </div>
+          </Stagger>
+        ) : (
+          // No published projects yet — a real, reachable state (a fresh
+          // install before seeding, or every project unpublished from the
+          // CMS), not something to crash on.
+          <p className="text-fg-muted mt-16 text-center text-sm">
+            Nothing published yet — check back soon.
+          </p>
+        )}
       </Container>
     </Section>
   );
