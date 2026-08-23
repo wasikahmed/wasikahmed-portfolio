@@ -1,14 +1,40 @@
-export default function Home() {
+import type { Metadata } from 'next';
+import { Hero } from '@/components/home/hero';
+import { SelectedWork } from '@/components/home/selected-work';
+import { Impact } from '@/components/home/impact';
+import { Experience } from '@/components/home/experience';
+import { Process } from '@/components/home/process';
+import { Voices } from '@/components/home/voices';
+import { CtaBand } from '@/components/home/cta-band';
+import { SectionRail } from '@/components/site/section-rail';
+import { site } from '@/lib/content/site';
+
+export const metadata: Metadata = {
+  title: `${site.name} — ${site.role}`,
+  description: site.proof,
+};
+
+const RAIL = [
+  { id: 'top', label: 'Top' },
+  { id: 'work', label: 'Work' },
+  { id: 'impact', label: 'Impact' },
+  { id: 'experience', label: 'Experience' },
+  { id: 'process', label: 'Process' },
+  { id: 'voices', label: 'Clients' },
+  { id: 'contact', label: 'Contact' },
+];
+
+export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="font-mono text-xs tracking-widest text-[#0FBF7A] uppercase">
-        Phase 0 — Foundations
-      </p>
-      <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Rebuild in progress.</h1>
-      <p className="max-w-md text-sm text-[#7C8B84]">
-        The Next.js + MongoDB + Docker migration is underway. The design system lands in Phase 1,
-        the full site in Phase 2.
-      </p>
-    </main>
+    <>
+      <SectionRail sections={RAIL} />
+      <Hero />
+      <SelectedWork />
+      <Impact />
+      <Experience />
+      <Process />
+      <Voices />
+      <CtaBand />
+    </>
   );
 }
