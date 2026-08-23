@@ -5,6 +5,7 @@ import { Section, Container } from '@/components/ui/section';
 import { Tag } from '@/components/ui/tag';
 import { ArrowRight } from '@/components/ui/button';
 import { ReadingProgress } from '@/components/site/reading-progress';
+import { MdxContent } from '@/components/mdx/mdx-content';
 import { formatDate } from '@/lib/format';
 import { getPostSlugs, getPost, getAdjacentPosts } from '@/server/queries';
 
@@ -70,13 +71,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
       <Section density="compact">
         <Container size="prose">
-          <div className="flex flex-col gap-5">
-            {post.body.map((paragraph, i) => (
-              <p key={i} className="text-fg-muted text-lg leading-relaxed text-pretty">
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          <MdxContent source={post.bodyMdx} className="text-lg" />
         </Container>
       </Section>
 

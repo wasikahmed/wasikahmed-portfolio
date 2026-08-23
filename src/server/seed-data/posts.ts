@@ -1,7 +1,7 @@
 import type { Post } from '@/lib/types';
 
 /** PLACEHOLDER CONTENT — replaced through the admin UI in Phase 8. */
-export const posts: Post[] = [
+export const posts: Omit<Post, 'id'>[] = [
   {
     slug: 'when-to-build-vs-buy-ai',
     kind: 'article',
@@ -11,12 +11,11 @@ export const posts: Post[] = [
     date: '2024-11-14',
     readTime: '8 min',
     tags: ['AI', 'Architecture'],
-    body: [
-      'Every founder asks this within the first twenty minutes of a discovery call, and the honest answer is that the question is usually framed wrong. "Build or buy" implies two options. In practice there are three, and the third one is where most projects should land.',
-      'You can buy a finished product, build the whole thing yourself, or — most often correctly — buy the model and build the system around it. The model is the commodity. The system is where the value is.',
-      'The useful test is not capability, it is coupling. If the thing you need is genuinely generic, buy it. If it touches your data model, your compliance posture, or your existing tooling in any non-trivial way, you are going to end up building the integration anyway, and a bought product will fight you the entire time.',
-      'The second test is failure behaviour. Ask what happens when the tool is wrong. If a vendor cannot tell you how their confidence scoring works, you cannot build a review process around it, and without a review process you cannot put it anywhere that matters.',
-    ],
+    bodyMdx:
+      'Every founder asks this within the first twenty minutes of a discovery call, and the honest answer is that the question is usually framed wrong. "Build or buy" implies two options. In practice there are three, and the third one is where most projects should land.\n\nYou can buy a finished product, build the whole thing yourself, or — most often correctly — buy the model and build the system around it. The model is the commodity. The system is where the value is.\n\nThe useful test is not capability, it is coupling. If the thing you need is genuinely generic, buy it. If it touches your data model, your compliance posture, or your existing tooling in any non-trivial way, you are going to end up building the integration anyway, and a bought product will fight you the entire time.\n\nThe second test is failure behaviour. Ask what happens when the tool is wrong. If a vendor cannot tell you how their confidence scoring works, you cannot build a review process around it, and without a review process you cannot put it anywhere that matters.',
+    status: 'published',
+    publishedAt: '2024-01-01T00:00:00.000Z',
+    order: 0,
   },
   {
     slug: 'constraint-solving-business-software',
@@ -27,12 +26,11 @@ export const posts: Post[] = [
     date: '2024-10-02',
     readTime: '12 min',
     tags: ['Systems', 'Algorithms'],
-    body: [
-      'A surprising share of the problems that get labelled "we need AI for this" are actually constraint satisfaction problems with a known, exact solution method that predates the current wave by about fifty years.',
-      'Scheduling, assignment, routing, resource allocation, timetabling — these have hard constraints and an objective function. That is not a learning problem. That is a solver problem.',
-      'The practical advantage is explainability. When a constraint solver says no, it can tell you exactly which constraints conflict. When a model says no, you get a number.',
-      'The tell is whether your rules are written down somewhere or inferred from examples. If a domain expert can state the rules — even messily, even incompletely — you probably want a solver.',
-    ],
+    bodyMdx:
+      'A surprising share of the problems that get labelled "we need AI for this" are actually constraint satisfaction problems with a known, exact solution method that predates the current wave by about fifty years.\n\nScheduling, assignment, routing, resource allocation, timetabling — these have hard constraints and an objective function. That is not a learning problem. That is a solver problem.\n\nThe practical advantage is explainability. When a constraint solver says no, it can tell you exactly which constraints conflict. When a model says no, you get a number.\n\nThe tell is whether your rules are written down somewhere or inferred from examples. If a domain expert can state the rules — even messily, even incompletely — you probably want a solver.',
+    status: 'published',
+    publishedAt: '2024-01-01T00:00:00.000Z',
+    order: 0,
   },
   {
     slug: 'n8n-production-lessons',
@@ -42,11 +40,11 @@ export const posts: Post[] = [
     date: '2024-09-18',
     readTime: '4 min',
     tags: ['Automation', 'DevOps'],
-    body: [
-      'Retries are not idempotent by default. A workflow that partially completed and then retried happily created duplicate records for about a day before anyone noticed.',
-      'Execution history grows without bound and will fill the disk. Set a retention policy on day one rather than discovering this at 2am.',
-      'Credentials are stored encrypted but the encryption key defaults to something derived from the install. Back it up separately, or a restore gives you a working instance with no working credentials.',
-    ],
+    bodyMdx:
+      'Retries are not idempotent by default. A workflow that partially completed and then retried happily created duplicate records for about a day before anyone noticed.\n\nExecution history grows without bound and will fill the disk. Set a retention policy on day one rather than discovering this at 2am.\n\nCredentials are stored encrypted but the encryption key defaults to something derived from the install. Back it up separately, or a restore gives you a working instance with no working credentials.',
+    status: 'published',
+    publishedAt: '2024-01-01T00:00:00.000Z',
+    order: 0,
   },
   {
     slug: 'postgres-listen-notify',
@@ -56,11 +54,11 @@ export const posts: Post[] = [
     date: '2024-09-05',
     readTime: '3 min',
     tags: ['PostgreSQL', 'Backend'],
-    body: [
-      'If you already run Postgres and need to push updates to connected clients, LISTEN/NOTIFY handles a genuinely large amount of load before it becomes the bottleneck.',
-      'The catch worth knowing: notifications are not durable. A listener that is disconnected when the notify fires never receives it. For a live dashboard that is fine. For anything that must not be missed, it is not.',
-      'The other catch is the 8000-byte payload limit. Send an identifier and let the client fetch, rather than sending the row.',
-    ],
+    bodyMdx:
+      'If you already run Postgres and need to push updates to connected clients, LISTEN/NOTIFY handles a genuinely large amount of load before it becomes the bottleneck.\n\nThe catch worth knowing: notifications are not durable. A listener that is disconnected when the notify fires never receives it. For a live dashboard that is fine. For anything that must not be missed, it is not.\n\nThe other catch is the 8000-byte payload limit. Send an identifier and let the client fetch, rather than sending the row.',
+    status: 'published',
+    publishedAt: '2024-01-01T00:00:00.000Z',
+    order: 0,
   },
   {
     slug: 'shipping-fast-vs-right',
@@ -71,10 +69,10 @@ export const posts: Post[] = [
     date: '2024-08-20',
     readTime: '7 min',
     tags: ['Engineering', 'Process'],
-    body: [
-      'The "move fast and break things" framing was coined by a company that owned its own distribution and could absorb the breakage. Most custom software has neither property.',
-      'What actually makes projects fast is not lower standards, it is smaller scope and shorter feedback loops. Those are different levers, and only one of them costs you anything later.',
-      'The version of speed I trust is: ship the smallest thing that is genuinely finished, to real users, early. The version I do not trust is shipping something unfinished and calling the remainder a phase two that never gets funded.',
-    ],
+    bodyMdx:
+      'The "move fast and break things" framing was coined by a company that owned its own distribution and could absorb the breakage. Most custom software has neither property.\n\nWhat actually makes projects fast is not lower standards, it is smaller scope and shorter feedback loops. Those are different levers, and only one of them costs you anything later.\n\nThe version of speed I trust is: ship the smallest thing that is genuinely finished, to real users, early. The version I do not trust is shipping something unfinished and calling the remainder a phase two that never gets funded.',
+    status: 'published',
+    publishedAt: '2024-01-01T00:00:00.000Z',
+    order: 0,
   },
 ];

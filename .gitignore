@@ -42,3 +42,7 @@ next-env.d.ts
 
 # docker
 docker-data/
+
+# media library uploads — local disk in dev; Phase 7 swaps this for S3/R2
+# without changing the Media model, which already only stores a URL.
+/public/uploads/

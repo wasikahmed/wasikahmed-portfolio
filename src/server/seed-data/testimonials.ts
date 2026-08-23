@@ -1,7 +1,7 @@
 import type { Testimonial } from '@/lib/types';
 
 /** PLACEHOLDER — replaced in Phase 8. */
-export const testimonials: Testimonial[] = [
+export const testimonials: Omit<Testimonial, 'id'>[] = [
   {
     quote:
       'Wasik understood the problem faster than I could explain it, and delivered something that actually fixed it. Six months of daily use, no incidents.',
@@ -10,6 +10,8 @@ export const testimonials: Testimonial[] = [
     company: 'LegalFlow',
     initials: 'SC',
     projectSlug: 'docflow-ai',
+    featured: true,
+    order: 0,
   },
   {
     quote:
@@ -19,6 +21,8 @@ export const testimonials: Testimonial[] = [
     company: 'AutoStack',
     initials: 'MW',
     projectSlug: 'pipelineos',
+    featured: true,
+    order: 1,
   },
   {
     quote:
@@ -28,5 +32,7 @@ export const testimonials: Testimonial[] = [
     company: 'Fieldforce',
     initials: 'PN',
     projectSlug: 'autoschedule',
+    featured: true,
+    order: 2,
   },
 ];

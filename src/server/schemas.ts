@@ -4,8 +4,9 @@ import { z } from 'zod';
  * Zod schemas — the validation boundary for every content collection.
  *
  * The seed script validates against these before writing to Mongo, and
- * Phase 4's admin API routes reuse them for the same purpose, so content
- * cannot reach the database in a shape the site doesn't expect.
+ * the admin API routes (src/app/api/admin/**) reuse them for the same
+ * purpose, so content cannot reach the database in a shape the site
+ * doesn't expect — whether it arrived via the seed script or a CMS form.
  *
  * Kept in `src/server/` (never bundled to the client) since these mirror
  * the Mongoose schemas 1:1 by hand — there is no single source of truth
@@ -29,7 +30,7 @@ export const architectureNodeSchema = z.object({
 export const caseStudySectionSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
-  body: z.array(z.string().min(1)).min(1),
+  bodyMdx: z.string().min(1),
 });
 
 export const linkSchema = z.object({
@@ -38,6 +39,21 @@ export const linkSchema = z.object({
 });
 
 export const categorySchema = z.enum(['AI', 'Automation', 'Systems', 'Web']);
+
+/** Shared across every content collection — PLAN.md §3. */
+export const statusSchema = z.enum(['draft', 'scheduled', 'published']);
+
+export const seoSchema = z.object({
+  title: z.string().max(70).optional(),
+  description: z.string().max(200).optional(),
+  ogImage: z.string().optional(),
+});
+
+const publishFields = {
+  status: statusSchema.default('draft'),
+  publishedAt: z.string().datetime().optional(),
+  seo: seoSchema.optional(),
+};
 
 export const projectSchema = z.object({
   slug: z
@@ -59,6 +75,7 @@ export const projectSchema = z.object({
   sections: z.array(caseStudySectionSchema).min(1),
   links: z.array(linkSchema).optional(),
   order: z.number().int().default(0),
+  ...publishFields,
 });
 
 export const postSchema = z.object({
@@ -72,8 +89,9 @@ export const postSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),
   readTime: z.string().min(1),
   tags: z.array(z.string().min(1)),
-  body: z.array(z.string().min(1)).min(1),
+  bodyMdx: z.string().min(1),
   order: z.number().int().default(0),
+  ...publishFields,
 });
 
 export const testimonialSchema = z.object({
@@ -135,4 +153,9 @@ export const leadSchema = z.object({
   company: z.string().max(200).optional(),
   budget: z.string().max(100).optional(),
   message: z.string().min(1).max(5000),
+});
+
+/** Media library upload metadata — the file itself arrives as multipart form data. */
+export const mediaSchema = z.object({
+  alt: z.string().min(1).max(300),
 });

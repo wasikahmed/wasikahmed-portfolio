@@ -10,6 +10,7 @@ import { Reveal } from '@/components/motion/reveal';
 import { ViewTransition } from '@/components/motion/view-transition';
 import { Architecture } from '@/components/case-study/architecture';
 import { Toc } from '@/components/case-study/toc';
+import { MdxContent } from '@/components/mdx/mdx-content';
 import { getProjectSlugs, getProject, getAdjacentProjects } from '@/server/queries';
 
 export async function generateStaticParams() {
@@ -106,12 +107,8 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
                     <h2 className="font-display text-2xl font-bold tracking-tight">
                       {section.title}
                     </h2>
-                    <div className="mt-5 flex flex-col gap-4">
-                      {section.body.map((paragraph, i) => (
-                        <p key={i} className="text-fg-muted text-base leading-relaxed text-pretty">
-                          {paragraph}
-                        </p>
-                      ))}
+                    <div className="mt-5">
+                      <MdxContent source={section.bodyMdx} />
                     </div>
                   </Reveal>
 

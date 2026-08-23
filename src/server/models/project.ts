@@ -22,13 +22,24 @@ const caseStudySectionSchema = new Schema(
   {
     id: { type: String, required: true },
     title: { type: String, required: true },
-    body: { type: [String], required: true },
+    // MDX source, not an array of paragraphs — PLAN.md's locked editor
+    // decision ("Bodies stored as MDX text"), materialized in Phase 4.
+    bodyMdx: { type: String, required: true },
   },
   { _id: false },
 );
 
 const linkSchema = new Schema(
   { label: { type: String, required: true }, href: { type: String, required: true } },
+  { _id: false },
+);
+
+const seoSchema = new Schema(
+  {
+    title: { type: String },
+    description: { type: String },
+    ogImage: { type: String },
+  },
   { _id: false },
 );
 
@@ -56,8 +67,10 @@ const projectSchema = new Schema(
     status: {
       type: String,
       enum: ['draft', 'scheduled', 'published'],
-      default: 'published',
+      default: 'draft',
     },
+    publishedAt: { type: Date },
+    seo: { type: seoSchema, default: undefined },
     order: { type: Number, default: 0 },
   },
   { timestamps: true },

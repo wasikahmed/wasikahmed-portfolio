@@ -1,6 +1,6 @@
 import type { Role } from '@/lib/types';
 
-export const roles: Role[] = [
+export const roles: Omit<Role, 'id'>[] = [
   {
     title: 'Senior Software Engineer',
     company: 'Meridian AI',
@@ -12,6 +12,7 @@ export const roles: Role[] = [
       'Led a monolith-to-services migration without a single outage',
       'Replaced a 3,000-line rules engine with an LLM classification layer',
     ],
+    order: 0,
   },
   {
     title: 'Software Engineer',
@@ -24,6 +25,7 @@ export const roles: Role[] = [
       'Shipped a public REST API used by eight third-party integrations',
       'Mentored two junior engineers, both promoted within a year',
     ],
+    order: 1,
   },
   {
     title: 'Backend Engineer',
@@ -35,6 +37,7 @@ export const roles: Role[] = [
       'Built a shared API gateway used by every agency product',
       'Introduced automated testing — coverage went from 0% to 74%',
     ],
+    order: 2,
   },
   {
     title: 'Independent',
@@ -47,5 +50,6 @@ export const roles: Role[] = [
       'Inventory platform for a twelve-store retail chain',
       'Deployment automation for a growing SaaS team',
     ],
+    order: 3,
   },
 ];

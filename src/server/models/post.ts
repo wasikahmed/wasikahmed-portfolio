@@ -1,5 +1,14 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
+const seoSchema = new Schema(
+  {
+    title: { type: String },
+    description: { type: String },
+    ogImage: { type: String },
+  },
+  { _id: false },
+);
+
 const postSchema = new Schema(
   {
     slug: { type: String, required: true, unique: true, index: true },
@@ -9,8 +18,11 @@ const postSchema = new Schema(
     date: { type: String, required: true },
     readTime: { type: String, required: true },
     tags: { type: [String], default: [] },
-    body: { type: [String], required: true },
-    status: { type: String, enum: ['draft', 'scheduled', 'published'], default: 'published' },
+    // MDX source — see project.ts's caseStudySectionSchema comment.
+    bodyMdx: { type: String, required: true },
+    status: { type: String, enum: ['draft', 'scheduled', 'published'], default: 'draft' },
+    publishedAt: { type: Date },
+    seo: { type: seoSchema, default: undefined },
     order: { type: Number, default: 0 },
   },
   { timestamps: true },

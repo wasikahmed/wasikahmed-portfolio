@@ -13,6 +13,11 @@ services:
       # container bound to 3000. Override with PORT_HOST=xxxx if 3300 is
       # also taken.
       - '${PORT_HOST:-3300}:3000'
+    # Everything in .env (AUTH_SECRET, ADMIN_EMAIL, and future Resend/
+    # Turnstile keys) flows into the container automatically — new secrets
+    # never need a matching line added here.
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       PORT: '3000'
@@ -26,6 +31,11 @@ services:
       # file-change detection reliable across the VM boundary docker uses
       # on macOS/Windows.
       WATCHPACK_POLLING: 'true'
+    volumes:
+      # Uploaded media survives container recreation. Also bind-mountable
+      # to the host if you want to browse/back up files directly — not
+      # done by default since it isn't needed for the dev workflow.
+      - media-uploads:/app/public/uploads
     depends_on:
       mongo:
         condition: service_healthy
@@ -100,3 +110,4 @@ services:
 
 volumes:
   mongo-data:
+  media-uploads:

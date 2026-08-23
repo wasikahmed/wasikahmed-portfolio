@@ -1,14 +1,18 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
-/** Phase 4 — admin change history. Schema only for now. */
+/**
+ * Admin change history. `userEmail` is denormalized rather than an
+ * ObjectId ref to `User` — with exactly one admin account (PLAN.md's
+ * single-admin design), a join buys nothing and costs a populate() on
+ * every read of the log.
+ */
 const auditLogSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    action: { type: String, required: true },
+    userEmail: { type: String, required: true },
+    action: { type: String, enum: ['create', 'update', 'delete'], required: true },
     entityType: { type: String, required: true },
     entityId: { type: String, required: true },
-    before: { type: Schema.Types.Mixed },
-    after: { type: Schema.Types.Mixed },
+    summary: { type: String, required: true },
   },
   { timestamps: true },
 );

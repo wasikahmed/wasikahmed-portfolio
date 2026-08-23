@@ -1,6 +1,6 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
-/** Phase 4 — media library. Schema only for now. */
+/** The media library — uploaded assets, stored on local disk in dev (see /api/admin/media). */
 const mediaSchema = new Schema(
   {
     key: { type: String, required: true, unique: true },
@@ -8,7 +8,8 @@ const mediaSchema = new Schema(
     alt: { type: String, required: true },
     width: { type: Number },
     height: { type: Number },
-    blurhash: { type: String },
+    size: { type: Number, required: true },
+    contentType: { type: String, required: true },
   },
   { timestamps: true },
 );

@@ -6,6 +6,7 @@
  */
 
 export type Category = 'AI' | 'Automation' | 'Systems' | 'Web';
+export type ContentStatus = 'draft' | 'scheduled' | 'published';
 
 export interface Metric {
   value: string;
@@ -24,10 +25,19 @@ export interface ArchitectureNode {
 export interface CaseStudySection {
   id: string;
   title: string;
-  body: string[];
+  /** MDX source. PLAN.md's locked editor decision — "Bodies stored as MDX text". */
+  bodyMdx: string;
+}
+
+export interface Seo {
+  title?: string;
+  description?: string;
+  ogImage?: string;
 }
 
 export interface Project {
+  /** Mongo's `_id`, as a string — the stable key admin CRUD targets. */
+  id: string;
   slug: string;
   title: string;
   tagline: string;
@@ -47,9 +57,14 @@ export interface Project {
   sections: CaseStudySection[];
   /** Optional external links. Absent means "not public", not "missing". */
   links?: { label: string; href: string }[];
+  status: ContentStatus;
+  publishedAt?: string;
+  seo?: Seo;
+  order: number;
 }
 
 export interface Post {
+  id: string;
   slug: string;
   kind: 'article' | 'til';
   title: string;
@@ -57,10 +72,16 @@ export interface Post {
   date: string;
   readTime: string;
   tags: string[];
-  body: string[];
+  /** MDX source. */
+  bodyMdx: string;
+  status: ContentStatus;
+  publishedAt?: string;
+  seo?: Seo;
+  order: number;
 }
 
 export interface Testimonial {
+  id: string;
   quote: string;
   name: string;
   title: string;
@@ -68,29 +89,37 @@ export interface Testimonial {
   initials: string;
   /** Ties the quote to the project it came from. */
   projectSlug?: string;
+  featured: boolean;
+  order: number;
 }
 
 export interface Role {
+  id: string;
   title: string;
   company: string;
   period: string;
   type: string;
   shipped: string[];
+  order: number;
 }
 
 export interface Tech {
+  id: string;
   name: string;
   /** Which projects use it — powers the constellation's "used in N projects". */
   projects: string[];
   group: 'Language' | 'Framework' | 'Data' | 'Infra' | 'AI';
+  order: number;
 }
 
 export interface SkillGroup {
+  id: string;
   category: string;
   items: string[];
+  order: number;
 }
 
-/** The settings singleton — site-wide facts editable from the admin in Phase 4. */
+/** The settings singleton — site-wide facts editable from the admin. */
 export interface Settings {
   name: string;
   initials: string;
@@ -105,4 +134,39 @@ export interface Settings {
   availableFor: string;
   responseTime: string;
   socials: { label: string; href: string }[];
+}
+
+export interface Media {
+  id: string;
+  key: string;
+  url: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  size: number;
+  contentType: string;
+  createdAt: string;
+}
+
+export interface Lead {
+  id: string;
+  intent: 'project' | 'role';
+  name: string;
+  email: string;
+  company?: string;
+  budget?: string;
+  message: string;
+  status: 'new' | 'read' | 'replied' | 'archived';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  userEmail: string;
+  action: 'create' | 'update' | 'delete';
+  entityType: string;
+  entityId: string;
+  summary: string;
+  createdAt: string;
 }
