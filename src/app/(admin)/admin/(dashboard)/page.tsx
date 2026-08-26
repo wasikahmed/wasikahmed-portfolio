@@ -59,7 +59,7 @@ export default async function AdminDashboardPage() {
     {
       label: 'Leads',
       count: leadCount,
-      note: leadCount === 0 ? 'pipeline lands in Phase 5' : 'unread',
+      note: '',
       href: '/admin/leads',
     },
   ];

@@ -1,6 +1,6 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
-/** Phase 5 — contact submissions. Schema only for now; no writes until the API route lands. */
+/** Contact form submissions — written by POST /api/contact. */
 const leadSchema = new Schema(
   {
     intent: { type: String, enum: ['project', 'role'], required: true },

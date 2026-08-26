@@ -145,7 +145,7 @@ export const settingsSchema = z.object({
   socials: z.array(linkSchema),
 });
 
-/** Phase 5 — contact submissions. Validated here already so the API route just imports this. */
+/** The public submission contract for POST /api/contact. */
 export const leadSchema = z.object({
   intent: z.enum(['project', 'role']),
   name: z.string().min(1).max(200),
@@ -153,6 +153,13 @@ export const leadSchema = z.object({
   company: z.string().max(200).optional(),
   budget: z.string().max(100).optional(),
   message: z.string().min(1).max(5000),
+  turnstileToken: z.string().optional(),
+});
+
+/** Admin-only fields on an existing lead — status transitions and notes. */
+export const leadUpdateSchema = z.object({
+  status: z.enum(['new', 'read', 'replied', 'archived']).optional(),
+  notes: z.string().max(5000).optional(),
 });
 
 /** Media library upload metadata — the file itself arrives as multipart form data. */

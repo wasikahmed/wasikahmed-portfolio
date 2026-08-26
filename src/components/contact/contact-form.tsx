@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Field, Input, Textarea, Select } from '@/components/ui/field';
 import { Button, ArrowRight } from '@/components/ui/button';
+import { TurnstileWidget } from '@/components/contact/turnstile-widget';
 import { cn } from '@/lib/cn';
 
 type Intent = 'project' | 'role';
+type Status = 'idle' | 'pending' | 'sent' | 'error';
 
 /**
  * Progressive form (PLAN.md §2.7).
@@ -14,31 +16,62 @@ type Intent = 'project' | 'role';
  * Three fields are visible on arrival. The rest appear once you have shown
  * intent by choosing what this is about — a long form on first sight is the
  * fastest way to lose someone who was only half-decided.
- *
- * Submission is wired in Phase 5 (Zod, Turnstile, rate limiting, Resend).
- * Until then this validates and reports honestly rather than faking success.
  */
 export function ContactForm({ email }: { email: string }) {
   const [intent, setIntent] = useState<Intent | null>(null);
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState<Status>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSent(true);
+    if (!intent) return;
+
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      intent,
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? ''),
+      company: form.get('company') ? String(form.get('company')) : undefined,
+      budget: form.get('budget') ? String(form.get('budget')) : undefined,
+      message: String(form.get('message') ?? ''),
+      turnstileToken,
+    };
+
+    setStatus('pending');
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? 'Something went wrong. Please try again.');
+      }
+      setStatus('sent');
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
+      setStatus('error');
+    }
   };
 
-  if (sent) {
+  if (status === 'sent') {
     return (
       <div className="border-border bg-surface-1 rounded-lg border p-8">
-        <p className="font-display text-2xl font-bold tracking-tight">Not connected yet.</p>
+        <p className="font-display text-2xl font-bold tracking-tight">Sent.</p>
         <p className="text-fg-muted mt-3 text-sm leading-relaxed">
-          The form validates, but there is no backend behind it until Phase 5 — so nothing was sent,
-          and pretending otherwise would lose your message. Email works today.
+          Thanks — I&apos;ll get back to you soon.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button href={`mailto:${email}`}>Email instead</Button>
-          <Button variant="ghost" onClick={() => setSent(false)}>
-            Back to form
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setStatus('idle');
+              setIntent(null);
+            }}
+          >
+            Send another
           </Button>
         </div>
       </div>
@@ -142,9 +175,20 @@ export function ContactForm({ email }: { email: string }) {
                 <Textarea id="message" name="message" required rows={6} />
               </Field>
 
+              <TurnstileWidget onVerify={setTurnstileToken} />
+
+              {status === 'error' ? (
+                <p className="text-signal-rose text-sm">
+                  {errorMessage}{' '}
+                  <a href={`mailto:${email}`} className="underline underline-offset-4">
+                    Email me directly instead.
+                  </a>
+                </p>
+              ) : null}
+
               <div>
-                <Button type="submit" size="lg" className="group">
-                  Send it
+                <Button type="submit" size="lg" className="group" disabled={status === 'pending'}>
+                  {status === 'pending' ? 'Sending…' : 'Send it'}
                   <ArrowRight />
                 </Button>
               </div>
