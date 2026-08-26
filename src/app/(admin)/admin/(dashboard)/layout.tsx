@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/server/session';
 import { getSettings } from '@/server/queries';
 import { Sidebar } from '@/components/admin/sidebar';
-import { SignOutButton } from '@/components/admin/sign-out-button';
+import { AdminProfile } from '@/components/admin/admin-profile';
 import { TotpNag } from '@/components/admin/totp-nag';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -27,9 +27,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex-1 overflow-y-auto">
             <Sidebar />
           </div>
-          <div className="border-border-subtle flex items-center justify-between border-t px-3 pt-4">
-            <span className="text-2xs text-fg-subtle truncate font-mono">{session.email}</span>
-            <SignOutButton />
+          <div className="border-border-subtle border-t px-3 pt-4">
+            <AdminProfile
+              email={session.email}
+              initials={settings.initials}
+              totpEnabled={session.totpEnabled}
+              align="up"
+            />
           </div>
         </aside>
 
@@ -37,7 +41,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {/* Mobile top bar — the sidebar is desktop-only above lg. */}
           <div className="border-border-subtle flex items-center justify-between border-b px-4 py-3 lg:hidden">
             <span className="font-display text-sm font-semibold">Admin</span>
-            <SignOutButton />
+            <AdminProfile
+              email={session.email}
+              initials={settings.initials}
+              totpEnabled={session.totpEnabled}
+              align="down"
+            />
           </div>
           <nav
             aria-label="Admin"

@@ -7,7 +7,7 @@ export function Tag({
 }: {
   children: React.ReactNode;
   className?: string;
-  tone?: 'default' | 'accent';
+  tone?: 'default' | 'accent' | 'amber' | 'rose' | 'muted';
 }) {
   return (
     <span
@@ -15,6 +15,11 @@ export function Tag({
         'text-2xs inline-flex items-center rounded-xs border px-2 py-0.5 font-mono whitespace-nowrap',
         tone === 'default' && 'border-border-subtle bg-accent-whisper text-fg-muted',
         tone === 'accent' && 'border-border-strong bg-accent-soft text-accent',
+        tone === 'amber' &&
+          'border-signal-amber/30 text-signal-amber bg-[color-mix(in_oklab,var(--color-signal-amber)_12%,transparent)]',
+        tone === 'rose' &&
+          'border-signal-rose/30 text-signal-rose bg-[color-mix(in_oklab,var(--color-signal-rose)_12%,transparent)]',
+        tone === 'muted' && 'border-border-subtle text-fg-subtle bg-transparent',
         className,
       )}
     >

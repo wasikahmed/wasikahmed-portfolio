@@ -1,6 +1,6 @@
 import { Lead } from '@/server/models/lead';
 import { leadUpdateSchema } from '@/server/schemas';
-import { updateHandler } from '@/server/admin-crud';
+import { getOneHandler, updateHandler } from '@/server/admin-crud';
 
 const config = {
   entityType: 'lead',
@@ -9,4 +9,5 @@ const config = {
     l.status ? `Marked lead as ${l.status}` : 'Updated lead notes',
 };
 
+export const GET = getOneHandler(Lead);
 export const PATCH = updateHandler(Lead, config);
