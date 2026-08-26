@@ -1,597 +1,252 @@
-# Portfolio Rebuild — Master Plan
+# PLAN.md
 
-**Owner:** Wasik Ahmed
-**Date:** 2026-08-23
-**Goal:** Rebuild the Figma Make / Vite prototype into a production-grade Next.js
-portfolio with a MongoDB-backed admin CMS, Dockerized, served through Cloudflare
-Tunnel on a self-hosted VPS.
+Forward plan, written 2026-08-27 from a full review of the codebase as it stands.
+This supersedes the original build plan; nothing here is inherited from it.
 
-**Design thesis:** _Signal over noise._ Creative and interactive, but every effect
-must earn its place by carrying information.
+Ordering below is a recommendation based on impact, not a contract. Reorder freely.
 
 ---
 
-## 1. Current State Assessment
+## Where the project actually is
 
-### Stack today
+**Done and deployed.** Seven public pages rendering entirely from MongoDB; a
+complete design token system with an enforced ambient budget and a tested
+reduced-motion contract; the typed query layer with a published/draft split; a
+full admin CMS with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag
+reordering, an MDX editor with live preview, and a media library; a production
+Docker image and a push-to-main deploy pipeline to the VPS. The contact form
+pipeline (W1) is now real and deployed — see below.
 
-Vite 8 + React 19 + react-router 8, Tailwind v4, TypeScript, wrapped in Figma Make
-tooling (`.figma/make/*`, custom Vite plugins). Not a git repository.
-`node_modules` not installed.
+**Verified healthy.** `typecheck`, `lint`, `build`, and `test` all pass clean.
+No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
 
-### Blocking defect
+**The two things that matter most, in order.**
 
-`src/routes.tsx:10` imports `./pages/DesignSystem` — file does not exist. Build fails.
-Irrelevant after migration; recorded as a known pre-existing defect.
-
-### What we keep — the design DNA
-
-| Element | Value                                                            |
-| ------- | ---------------------------------------------------------------- |
-| Base    | `#0A0E0C` near-black; `#0F1410` / `#111916` / `#162019` surfaces |
-| Accent  | `#0FBF7A` emerald → `#7CE86A` lime                               |
-| Support | `#0B5C4E` teal, `#F5A524` amber                                  |
-| Text    | `#EAF2ED` primary, `#7C8B84` muted                               |
-| Display | Space Grotesk, tight tracking (−0.02 / −0.03em)                  |
-| Body    | Inter · **Mono** JetBrains Mono (eyebrows, tags, metadata)       |
-| IA      | Home / Work / Case Study / Writing / Article / About / Contact   |
-
-### What we fix
-
-1. **Tokens bypassed** — `@theme` declares color vars; ~400 inline `style={{ color: '#0FBF7A' }}` ignore them.
-2. **No content layer** — case-study and article bodies are hardcoded in components; every `:slug` renders identical text.
-3. **Placeholder content** — fictional companies, testimonials, metrics; Unsplash stock imagery.
-4. **Contact form is inert** — sets local state, submits nowhere.
-5. **No SEO** — CSR-only, no per-route metadata, `robots.index: false`, no sitemap / OG / structured data.
-6. **Accessibility** — zero `prefers-reduced-motion` handling; bypass links off; mobile menu lacks focus trap and `aria-expanded`.
-7. **Performance** — 12+ runtime icon fetches to a third-party CDN, 3 render-blocking font imports, unoptimized images, full-viewport `mix-blend-mode` noise layer.
-8. **Missing infrastructure** — no tests, lint, CI, Docker, backend.
-9. **Visual noise** — quantified in §2 below. This is the primary UX problem.
+1. **`/admin` is protected by password + TOTP only.** TOTP itself works and has
+   been verified end to end in dev (enroll → confirm → sign out → sign back in
+   with a code). Cloudflare Access verification is written and correct, but
+   `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` are not in the deploy workflow's
+   `.env`, so `verifyCloudflareAccess` returns `true` unconditionally in
+   production. And `/api/auth/*` is outside `proxy.ts`'s matcher, so
+   credential sign-in has no rate limiting at all.
+2. **The site has no SEO surface.** No sitemap, robots, OG images, RSS, or
+   JSON-LD. `metadataBase` is unset, so any share URL that does get generated
+   will be relative. `NEXT_PUBLIC_SITE_URL` is written into production `.env` by
+   CI and read by exactly zero lines of code.
 
 ---
 
-## 2. Design Language — "Quiet Confidence"
+## W1 — Make the contact form real — Done
 
-### 2.1 The noise problem, measured
+Shipped across two pushes: the API route, then an admin-side pass on top of it.
 
-The current Home hero runs **nine** simultaneous ambient effects before a single
-word of content is read:
+- `POST /api/contact` — Zod validation, Cloudflare Turnstile verification, and
+  rate limiting by IP hash. Persists to the `Lead` model, including
+  `source`/`ipHash`/`userAgent`.
+- Notification email via Gmail SMTP (an app password, not Resend — simpler for
+  a single-admin CMS; see `src/server/email.ts` and `.env.example`).
+- `ContactForm`'s `onSubmit` submits for real, with pending/success/error
+  states. The "Not connected yet" panel is gone.
+- `/admin/leads` is a full pipeline now, not just a status dropdown:
+  - The list view (`/admin/leads`) is a compact, scannable row-per-lead list —
+    name, email, intent, timestamp, one-line message preview, a status tag,
+    and an inline status shortcut. Clicking a row opens the detail page.
+  - `/admin/leads/[id]` shows the full submission (message, company, budget,
+    notes) and auto-transitions a `new` lead to `read` the moment it's opened
+    — no separate "mark as read" action to remember.
+  - Status changes on both pages go through `LeadStatusControl`, a shared
+    segmented control (not a `<select>`) that persists on click and
+    colour-codes by status using existing design tokens (amber = new,
+    accent = replied, muted = archived).
+  - Added the missing `GET /api/admin/leads/[id]` route (`getOneHandler`,
+    already generic — just wasn't wired up for leads).
+- Replaced the bare sign-out link in the admin shell with `AdminProfile`, a
+  popover (desktop sidebar + mobile bar) showing who's signed in, live 2FA
+  status, a link to Security, and sign out.
+- Dashboard card's "pipeline lands in Phase 5" note is gone.
 
-1. Film noise overlay (fixed, full-viewport, `mix-blend-mode: overlay`)
-2. Grid texture at 40% opacity
-3. Gradient blob #1 (drifting, 14s loop)
-4. Gradient blob #2 (drifting, 20s reverse)
-5. Gradient blob #3 (drifting, offset)
-6. Cursor-following radial glow
-7. Twelve tech tiles, each floating on an independent 2.7–4.1s loop
-8. Pulsing availability dot
-9. Bouncing scroll hint — with a marquee scrolling directly below
-
-Nothing here is badly built. The problem is that it is all running _at once, forever,
-carrying no information_. The eye has no resting place and no focal point.
-
-### 2.2 The three rules
-
-**Rule 1 — Motion must earn its place.**
-Every animation must do one of three things:
-
-- **(a) Reveal information** — a diagram drawing itself in the order the system executes
-- **(b) Confirm an interaction** — a button responding to your press
-- **(c) Establish spatial continuity** — a card becoming the page it opens
-
-Motion that does none of the three is decoration, and gets cut.
-
-**Rule 2 — Ambient effects are a budget, not a palette.**
-Maximum **two** ambient layers visible in any viewport. Currently: nine.
-
-**Rule 3 — Motion on demand, not motion forever.**
-Things respond when engaged; they do not loop perpetually in the periphery. The one
-exception is state that is genuinely live (the availability dot), slowed down.
-
-### 2.3 Applying the rules
-
-| Current                                  | Change                                                             | Rationale                                                             |
-| ---------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Film noise, fixed full-viewport, blended | Hero + CTA band only; static; no blend mode                        | Was a full-screen repaint layer for a texture nobody consciously sees |
-| Grid texture 40%, most sections          | Two sections only, 15%, as a spatial anchor                        | Texture that is everywhere reads as flat, not textured                |
-| 3 drifting blobs + cursor glow together  | 1 blob; cursor glow in hero only                                   | Four soft-light sources cancel each other into grey wash              |
-| 12 perpetually floating tech tiles       | Constellation at rest; responds to cursor only                     | Rule 3 — the biggest single noise reduction on the page               |
-| Marquee always scrolling                 | Cut from Home; kept on `/about` as a static wrap                   | Duplicated the tech grid directly above it                            |
-| Bouncing scroll hint                     | Cut                                                                | Redundant with the scroll rail; users know how to scroll              |
-| Pulsing availability dot                 | Keep — slowed 2s → 3.5s                                            | Carries live information. Rule 1(a)                                   |
-| Every card is glass                      | Glass reserved for interactive/elevated; flat surfaces for content | Uniform treatment destroys hierarchy                                  |
-| Uniform `rgba(15,191,122,0.11)` border   | 4-step elevation scale with matched borders and shadows            | Everything currently sits on the same visual plane                    |
-| Uniform `py-28` on every section         | Density tokens: `compact` / `default` / `spacious` / `full-bleed`  | Even rhythm is monotonous rhythm                                      |
-| Unlimited tag chips                      | Max 3 visible, then `+2`                                           | Chip walls are the classic portfolio noise-maker                      |
-
-**Net result:** hero ambient layers go from **nine to two** — one blob and the
-constellation — while the page becomes _more_ interactive, not less.
-
-### 2.4 Progressive disclosure — how to show more with less
-
-This is the mechanism that resolves "show information / reduce noise". Density
-becomes available on demand rather than dumped on arrival.
-
-| Surface            | Default state                            | On demand                                                                           |
-| ------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------- |
-| Work card          | Title, one outcome metric, 3 stack chips | Hover reveals the problem statement; click opens the full case study                |
-| Case study         | Prose with sticky TOC                    | "At a glance" metric bar pins on scroll; architecture diagram expands to full-bleed |
-| Experience         | All roles collapsed (one line each)      | Click expands shipped-work bullets. Already the right pattern — kept                |
-| Tech constellation | Nodes at rest, unlabelled                | Hover → tool name + "used in 3 projects"; click → filters `/work`                   |
-| Article            | Body + reading progress                  | Footnotes and code blocks expand inline                                             |
-| Whole site         | Nothing on screen                        | **⌘K** — full navigation, project and article search, copy email, download resume   |
-
-The ⌘K palette is the purest expression of the thesis: complete information access
-occupying zero pixels until requested.
-
-### 2.5 The signature interactions — six, each justified
-
-Deliberately few. Each one is listed with the information it carries; if that column
-were empty, it would not be on this list.
-
-| #   | Interaction                                                                                                                                                                                    | Information carried                                                                                  |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | **Tech constellation** (hero) — nodes at rest, faint proximity edges; the cursor acts as a gentle gravitational lens. Hover a node for the tool and its project count; click to filter `/work` | What I use, _and proof of where I used it_ — replaces a decorative float grid with a navigable index |
-| 2   | **Shared-element transition** — work card image and title morph into the case-study hero via View Transitions                                                                                  | Spatial continuity: you always know where you came from                                              |
-| 3   | **Self-drawing architecture diagram** — SVG `stroke-dashoffset` bound to scroll; each stage labels itself as it enters                                                                         | The system explanation _is_ the animation — sequenced so it is legible instead of dumped at once     |
-| 4   | **Metrics that show their work** — "92%" counts up, then a sub-caption reveals the baseline: "3.1 hrs/day → 14 min/day"                                                                        | A percentage without a baseline is marketing. With one, it is evidence                               |
-| 5   | **⌘K command palette**                                                                                                                                                                         | The entire site map, at zero screen cost                                                             |
-| 6   | **Section rail** — the existing left progress bar becomes a section index; labels appear on hover, click to jump                                                                               | Upgrades a decorative element into a functional one — where am I, and how do I get elsewhere         |
-
-### 2.6 What I recommend cutting — and why
-
-Applying the thesis honestly means cutting things that would otherwise be on a
-"cool effects" list:
-
-- **Custom cursor** — replaces a native, perfectly-tuned OS affordance with a
-  laggy imitation. Hurts usability, adds a permanent moving element, carries zero
-  information. **Cut.** Subtle magnetic pull on the two primary CTAs only, which
-  qualifies under Rule 1(b).
-- **Scroll-jacking / Lenis smooth scroll** — fights the user's input device and
-  breaks trackpad momentum expectations. **Cut.** Native scroll, tuned CSS.
-- **Preloader / intro animation** — a delay tax on every visit, and recruiters
-  bounce. **Cut.**
-- **Parallax on more than one section** — the third instance stops reading as
-  depth and starts reading as jitter. **One section only.**
-- **Animated gradient text on every heading** — reserved for the hero headline.
-
-Interactivity should feel like _responsiveness_, not like _performance_.
-
-### 2.7 Page-by-page direction
-
-**Home** — Currently nine ambient layers and one CTA. Becomes the hero specified in
-§2.9, then a genuinely varied rhythm —
-selected work in an _asymmetric offset grid_ rather than a uniform card grid, a
-full-bleed impact statement, the experience accordion, an editorial two-column
-process section, and a calm CTA band. Testimonials fold into the work cards as
-inline quotes rather than occupying their own carousel.
-
-**Work** — Filter chips drive a `layout`-animated reflow (motion's `layout` prop),
-so cards move to their new positions rather than popping. Relationships are
-preserved through the change — Rule 1(a).
-
-**Case study** — The strongest page and the one that converts. Pinned "at a glance"
-metric bar, sticky TOC, self-drawing architecture diagram, before/after code
-comparison, and an honest "what broke" section (already present — it is the most
-credible thing on the site).
-
-**Writing** — Editorial layout, not cards. Article list with generous type,
-hover-reveal excerpts, TIL notes in a denser secondary column.
-
-**About** — The one place a marquee and a portrait belong. Keep the timeline;
-replace stock imagery.
-
-**Contact** — Two clear paths (project enquiry / role enquiry) instead of one long
-form. Progressive form: three fields visible, the rest appear on intent.
-
-### 2.8 Foundations
-
-- **Accent ramp** — `#0FBF7A` becomes five steps: `subtle → default → strong → glow → gradient`
-- **Elevation scale** — four surfaces with matched border and shadow tokens
-- **Fluid type scale** — one token ramp replacing 20+ per-element `clamp()` calls
-- **Density tokens** — `compact` / `default` / `spacious` / `full-bleed`
-- **Motion tokens** — three durations, three easings; nothing bespoke per component
-- **Dark only** — no light mode, no toggle, no `dark:` variants. `color-scheme: dark` global. The token layer earns its place through maintainability, not theming.
-
-### 2.9 Hero specification — locked
-
-```
-SOFTWARE ENGINEER · AI & AUTOMATION          ← eyebrow, mono, accent
-
-I build systems that do                      ← Space Grotesk, clamp(52-96px)
-the work for you.                              gradient on line 1 only
-
-Document pipelines, schedulers, and internal ← NEW. Inter, fg-muted, max 52ch
-tools — shipped to production, not demos.      concrete proof, not a slogan
-
-[ View work → ]   [ Get in touch ]           ← NEW second CTA
-
-     ○───○        ○
-    ╱ ╲   ╲      ╱ ╲                         ← constellation AT REST
-   ○   ○───○───○   ○                           cursor bends locally
-    ╲ ╱     ╲   ╱ ╱                            hover → name + project count
-     ○───────○───○                             click → filters /work
-```
-
-**Constellation behaviour**
-
-- **Rest state.** Nodes are static. No float loops, no idle animation. This single
-  change removes twelve perpetual animations from the page.
-- **Cursor lens.** Nodes within ~160px displace along the cursor vector, magnitude
-  falling off with distance. Local, subtle, and it stops the instant the cursor leaves.
-- **Edges.** Drawn between nodes under a proximity threshold, opacity scaled by
-  distance. Recomputed only on cursor move, not on a RAF loop.
-- **Hover.** Node scales, brand color resolves from monochrome, tooltip shows the
-  tool name and _"used in 3 projects"_.
-- **Click.** Navigates to `/work?tech=<slug>` with the filter pre-applied.
-- **Layout.** Force-relaxed once at mount, then frozen and cached — deterministic
-  across reloads, no layout thrash.
-- **Reduced motion.** Renders as a static labelled grid. Still hoverable, still
-  clickable — the _information_ survives; only the movement is dropped.
-- **Mobile.** No pointer, so no lens. Falls back to a static two-row icon grid,
-  tap-to-filter.
-- **Cost.** Single SVG, no canvas, no physics library, bundled icons. Under 8KB.
-
-**Why this hero.** It answers "what do you use" and "where did you use it" in the
-same element, and turns the site's most decorative region into its most navigable
-one — Rule 1(a), on the most valuable pixels on the site.
-
-### 2.10 Ambient budget ledger — locked at 2
-
-Enforced per viewport, audited section by section in Phase 2.
-
-| Section       | Layer 1           | Layer 2        | Cut from today                                                  |
-| ------------- | ----------------- | -------------- | --------------------------------------------------------------- |
-| Hero          | Single blob       | Cursor glow    | 2 blobs, grid texture, 12 float loops, scroll hint, noise blend |
-| Selected work | Grid texture @15% | —              | Blobs, noise                                                    |
-| Impact        | Noise (static)    | —              | Grid, blobs                                                     |
-| Experience    | —                 | —              | Everything — pure content                                       |
-| Process       | Grid texture @15% | —              | Blobs                                                           |
-| Writing       | —                 | —              | Everything                                                      |
-| CTA band      | Single blob       | Noise (static) | Grid                                                            |
-| Footer        | —                 | —              | Everything                                                      |
-
-Four of eight sections carry **zero** ambient layers. That contrast is what makes
-the two that do land.
-
-Site-wide constants that do not count against the budget, because each carries
-information: the availability dot (live state, slowed 2s → 3.5s) and the section
-rail (position + navigation).
+**Verified:** a real submission from the public form lands in `/admin/leads`,
+shows as "new," opening it marks it "read" automatically, and status/notes
+changes persist. TOTP enrollment and login enforcement verified end to end
+locally (see AGENTS.md §11).
 
 ---
 
-## 3. Target Architecture
+## W2 — Close the security gaps
 
-```
-                    ┌─────────────────────────┐
-   Internet ───────▶│   Cloudflare Edge       │  TLS · WAF · Turnstile
-                    │   Access · Rate limits  │  Cache rules · Bot mgmt
-                    └───────────┬─────────────┘
-                                │  outbound-only QUIC tunnel
-                    ═══════════ ▼ ═══════════════════════════
-                     VPS — no inbound ports open (ufw deny all)
-                    ┌─────────────────────────┐
-                    │  cloudflared  (existing)│
-                    └───────────┬─────────────┘
-                                │ 127.0.0.1 loopback only
-              ┌─────────────────┼──────────────────┐
-              ▼                 ▼                  ▼
-      ┌───────────────┐  ┌─────────────┐   ┌──────────────┐
-      │ Next.js       │  │ Umami       │   │ (future svc) │
-      │ standalone    │  │ analytics   │   └──────────────┘
-      │ :3000         │  │ :3001       │
-      └───────┬───────┘  └──────┬──────┘
-              │                 │
-      ┌───────▼─────────────────▼───────┐    ┌──────────────────┐
-      │ MongoDB — auth on, no host port │───▶│ mongodump backup │
-      │ named volume                    │    │ cron → R2/S3     │
-      └─────────────────────────────────┘    └──────────────────┘
-```
+Ordered by exposure.
 
-### Framework
-
-Next.js (latest stable, App Router). RSC by default; Client Components only where
-interaction demands. Route groups: `app/(site)`, `app/(admin)`, `app/api`.
-`next/font` self-hosts all three families — removes three render-blocking requests
-and eliminates layout shift. `next/image` for AVIF/WebP. Metadata API for SEO,
-`next/og` for social cards. ISR + on-demand revalidation so CMS edits publish
-without a rebuild.
-
-### Styling
-
-Tailwind v4, token-first. Every color, radius, shadow, spacing step, duration and
-easing lives in `@theme`. **Zero hardcoded hex in components.** Semantic layer:
-`--color-bg`, `--color-surface-{1..4}`, `--color-border-{subtle,default,strong}`,
-`--color-accent-{subtle,default,strong,glow}`, `--color-fg`, `--color-fg-muted`.
-`cva` + `tailwind-merge` for variants.
-
-### Motion
-
-`motion` (Framer Motion successor) for orchestration; View Transitions API for page
-continuity; CSS keyframes for the few cheap always-on loops. A `<MotionProvider>`
-reads `prefers-reduced-motion` once and collapses every animation to an instant
-state change — **non-negotiable, and tested in the E2E suite.**
-
-### Data layer
-
-MongoDB + Mongoose; Zod at every boundary; hot-reload-safe connection singleton.
-
-| Collection     | Purpose                                                                    |
-| -------------- | -------------------------------------------------------------------------- |
-| `projects`     | Case studies — metadata + MDX body, gallery, metrics with baselines, stack |
-| `posts`        | Articles and TIL — MDX body, tags, reading time                            |
-| `testimonials` | Quote, author, role, company, featured, order                              |
-| `experience`   | Role, company, period, type, shipped bullets, order                        |
-| `skills`       | Grouped entries with category — drives the constellation                   |
-| `leads`        | Contact submissions: payload, status, notes, source, hashed IP, UA         |
-| `settings`     | Singleton: availability, contact email, socials, resume URL, hero copy     |
-| `media`        | Asset metadata: key, url, alt, dimensions, blurhash                        |
-| `users`        | Admin accounts — argon2id hash, TOTP secret, role                          |
-| `auditLog`     | Who changed what, when, before/after diff                                  |
-| `pageViews`    | First-party view counts per slug                                           |
-
-Every content collection carries `slug`, `status` (`draft|scheduled|published`),
-`publishedAt`, `seo`, `order`, `createdAt`, `updatedAt`.
-
-### Admin CMS (`/admin`)
-
-Dashboard (leads inbox, view counts, publish queue) · content CRUD · **MDX editor
-with live side-by-side preview rendering in the real site components**, with custom
-blocks `<Callout>` `<Metric>` `<Architecture>` `<CodeCompare>` · media library with
-enforced alt text and automatic blurhash · leads workflow (new → read → replied →
-archived) with CSV export · settings (availability toggle drives the live site
-pill) · drag-to-reorder · full audit log.
-
-### Auth — defense in depth (three layers, locked)
-
-1. **Cloudflare Access** at the edge — `/admin` never reaches the origin unauthenticated.
-   The app additionally verifies the `CF-Access-Jwt-Assertion` header against
-   Cloudflare's JWKS, so the origin trusts the edge cryptographically rather than
-   by assumption
-2. **Auth.js (NextAuth v5)** — Credentials, argon2id, single CLI-seeded admin, no signup route
-3. **TOTP 2FA** required
-4. `middleware.ts` guards `/admin/*` and `/api/admin/*`; httpOnly `SameSite=Lax` `Secure` cookies; login rate-limited with lockout
-
-### Contact pipeline
-
-Zod → honeypot → **Cloudflare Turnstile** → rate limit (IP + email) → persist →
-**Resend** owner notification → auto-reply → optional webhook ping.
-
-### Security
-
-Strict CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`
-via `next.config` headers. CSRF on admin mutations. MDX sanitized on render.
-Secrets server-only. Mongo bound to the compose network with auth, never published.
-Dependabot + `pnpm audit` in CI.
-
-> **Cloudflare-specific:** cloudflared connects over loopback, so `request.ip` is
-> always `127.0.0.1`. **Real client IP must be read from `CF-Connecting-IP`** — this
-> is mandatory, not optional, and it gates rate limiting and lead IP hashing. A
-> single `getClientIp()` helper owns this, with the header trusted only because
-> nothing but cloudflared can reach the origin.
-
-### SEO
-
-Per-route `generateMetadata` + canonicals · JSON-LD (`Person`, `WebSite`,
-`BlogPosting`, `CreativeWork`, `BreadcrumbList`) · dynamic OG images ·
-`sitemap.ts` / `robots.ts` with **indexing enabled** (currently disabled) · RSS +
-JSON Feed.
-
-### Accessibility — WCAG 2.2 AA
-
-Skip link on · semantic landmarks · visible focus rings · mobile menu focus trap,
-`aria-expanded`, Escape, scroll lock · full reduced-motion support · contrast audit
-(`#7C8B84` on `#0A0E0C` is marginal at the 11–12px sizes it is currently used at —
-the muted token gets lightened) · axe assertions in E2E.
-
-### Performance budget
-
-| Metric                     | Budget       |
-| -------------------------- | ------------ |
-| LCP                        | < 2.0s       |
-| CLS                        | < 0.05       |
-| INP                        | < 200ms      |
-| First-load JS per route    | < 130KB gzip |
-| Lighthouse, all categories | ≥ 95         |
-
-Tactics: RSC-first · self-hosted subset fonts · **bundled SVG tech icons** (removes
-12 third-party CDN requests) · `next/image` · route-level splitting · noise overlay
-demoted to a cheap non-blending pseudo-element on two sections.
-
-### Testing
-
-**Vitest** — schemas, utils, mappers, API handler logic.
-**Playwright** — nav, contact submit, admin login + CRUD round-trip,
-reduced-motion rendering, axe scans.
-**Lighthouse CI** — budget above enforced in the pipeline.
+1. **Rate-limit authentication.** `/api/auth/*` is currently unguarded — argon2
+   makes each guess slow but nothing makes them finite. Add per-IP and
+   per-account throttling with progressive backoff, plus a temporary lockout.
+   This needs a store that survives a request; Mongo with a TTL index is enough
+   at this scale, no Redis required.
+2. **Turn on Cloudflare Access in production.** The verification code is done.
+   Add `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` to the deploy workflow's
+   heredoc and configure the Access policy over `/admin`. Consider failing
+   closed in production rather than no-opping when unset — a silent no-op is
+   fine for local dev and dangerous for a deployment.
+3. **Stop accepting SVG uploads,** or stop serving uploads from the site's
+   origin. An SVG is an HTML document; `image/svg+xml` is in `ALLOWED_TYPES`,
+   files land in `public/uploads/`, and navigating to one executes its script
+   under the site's origin with an admin session live. Simplest fix: drop SVG
+   from the allowlist. Better fix: serve uploads through a route handler that
+   sets `Content-Disposition` and a restrictive `Content-Type`.
+4. **Add security headers.** No CSP, `X-Content-Type-Options`,
+   `Referrer-Policy`, or `frame-ancestors` exist anywhere. `.env.example` even
+   references a CSP report-uri that was never implemented. This also contains
+   the blast radius of (3).
+5. **Validate uploaded files by content, not by claim.** `file.type` is
+   client-supplied and `path.extname(file.name)` is taken straight from the
+   client filename into the stored key. Not exploitable for traversal today
+   (the key is a random hex prefix), but the extension is attacker-chosen and
+   never checked against the actual bytes. `probe-image-size` is already a
+   dependency and already reads the buffer — use its detected type.
+6. **Set an explicit session `maxAge`.** Auth.js defaults to 30 days; for a
+   single-admin CMS that should be much shorter.
+7. Minor: `verifyCsrf` compares tokens with `!==`. Use a constant-time compare.
 
 ---
 
-## 4. Docker & Deployment — Cloudflare Tunnel
+## W3 — SEO, sharing, and discoverability
 
-### Why this topology
+Currently absent in full. Everything here is standard App Router surface area.
 
-`cloudflared` already runs on the VPS and dials _outbound_ to Cloudflare. That means:
-
-- **No inbound ports.** `ufw default deny incoming` — including 80 and 443. The
-  origin is unreachable from the public internet by design.
-- **No reverse proxy container.** Caddy/nginx are unnecessary — Cloudflare terminates
-  TLS at the edge and the tunnel handles origin routing.
-- **Origin IP never exposed.** No DNS record points at the VPS.
-- **WAF, rate limiting, bot management and Turnstile** are available at the edge,
-  in front of the app's own protections.
-
-### Image
-
-Multi-stage `Dockerfile` on `node:22-alpine`: `deps → builder → runner`, Next
-`output: 'standalone'`, non-root `nextjs` user, `tini` as PID 1, `HEALTHCHECK`
-hitting `/api/health`.
-
-### Compose
-
-- **`docker-compose.yml`** — dev: `web` (hot reload, bind mount), `mongo`, `mongo-express`
-- **`docker-compose.prod.yml`** — `web`, `mongo` (auth, named volume, **no host port**),
-  `umami`, `backup` (mongodump cron → R2/S3 with retention)
-
-Production services bind **loopback only**:
-
-```yaml
-web:
-  ports: ['127.0.0.1:3000:3000'] # reachable by cloudflared, by nothing else
-```
-
-### Tunnel ingress
-
-Added to the existing `cloudflared` config — no new tunnel required. `${DOMAIN}` is
-an env-substituted placeholder throughout; it is supplied once at deploy time and
-never hardcoded in the repo.
-
-```yaml
-ingress:
-  - hostname: ${DOMAIN}
-    service: http://localhost:3000
-  - hostname: www.${DOMAIN}
-    service: http://localhost:3000
-  - hostname: analytics.${DOMAIN}
-    service: http://localhost:3001
-  - service: http_status:404
-```
-
-**Placeholder convention.** `DOMAIN` lives in `.env` and flows into
-`NEXT_PUBLIC_SITE_URL` (canonicals, sitemap, OG image URLs, RSS), the Access policy,
-the CSP `report-uri`, and Resend's from-address. A single `pnpm verify:env` script
-fails loudly if it is still unset at build time, so a placeholder can never reach
-production silently.
-
-### Cloudflare edge configuration
-
-| Setting          | Value                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------- |
-| Cache rules      | Aggressive on `/_next/static/*` and `/fonts/*`; **bypass** on `/admin/*` and `/api/*` |
-| Access           | **Locked on** — self-hosted app policy on `/admin*`, email OTP or Google SSO          |
-| WAF rate limits  | `/api/contact` and `/api/auth/*`                                                      |
-| Turnstile        | Contact form widget                                                                   |
-| Polish / Mirage  | **Off** — `next/image` already emits AVIF/WebP; double compression degrades quality   |
-| Always Use HTTPS | On · **Min TLS** 1.2 · **HSTS** on                                                    |
-
-### CI/CD — GitHub Actions
-
-```
-lint → typecheck → unit → build → e2e → Lighthouse CI
-  → build image once, push to BOTH registries
-  → SSH to VPS → docker compose pull && up -d --wait
-  → healthcheck → auto-rollback to previous tag on failure
-```
-
-**Dual registry publish** — one build, two destinations via `docker/metadata-action`:
-
-```yaml
-images:
-  - ghcr.io/${{ github.repository }}
-  - docker.io/${{ secrets.DOCKERHUB_USERNAME }}/portfolio
-tags:
-  - type=raw,value=latest,enable={{is_default_branch}}
-  - type=sha,format=short # immutable deploy target
-  - type=ref,event=branch
-  - type=semver,pattern={{version}}
-```
-
-Secrets required: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (access token, not password),
-`GHCR` uses the built-in `GITHUB_TOKEN`.
-
-> **Practical note:** the VPS pulls from **GHCR** — unlimited for public images and
-> already authenticated by the deploy workflow. Docker Hub is the _public showcase
-> mirror_; its free tier rate-limits pulls (200 per 6h authenticated) and is a poor
-> choice for the deploy hot path. Both stay in sync automatically since it is one
-> build with two tag sets.
-
-Deploys pin the **`sha-` tag**, never `latest`, so a rollback is a one-line tag change.
-
-### Operations
-
-Nightly `mongodump` with retention and a **documented, rehearsed restore drill** ·
-uptime monitoring · Sentry (self-hostable) · structured JSON logging ·
-Cloudflare Tunnel health visible in the Zero Trust dashboard.
-
-> **Known limitation — deploy gap.** A single `web` container means `compose up -d`
-> causes a ~5–10s outage while the container restarts. Acceptable for a portfolio.
-> If it is not, the mitigation is two replicas behind a tiny internal proxy, which
-> adds a container and real complexity for a few seconds of uptime. Flagging rather
-> than silently choosing.
+- `metadataBase` in the root layout, sourced from `NEXT_PUBLIC_SITE_URL` — which
+  means actually reading that variable for the first time.
+- `app/sitemap.ts` and `app/robots.ts`, both generated from the query layer so
+  drafts stay out. **Exclude `/design-system`.**
+- `opengraph-image.tsx` — a static one for the site, dynamic per case study and
+  per post. The `seo` field (`title`, `description`, `ogImage`) already exists on
+  Project and Post and is edited in the CMS but is read nowhere.
+- RSS feed for `/writing`.
+- JSON-LD: `Person` on the homepage, `Article` on posts.
+- Canonical URLs on every page.
+- Replace the four pages that hardcode `— Wasik Ahmed` in their title with
+  `settings.name`, matching what the homepage already does.
+- Decide what `/design-system` is. It is linked from the public footer and
+  crawlable today. Either move it behind `/admin`, or keep it public as a
+  deliberate showcase — but not by default. Note `e2e/motion-contract.spec.ts`
+  depends on the route, so a move means updating those tests.
 
 ---
 
-## 5. Migration Strategy
+## W4 — Put a gate back in front of `main`
 
-The current repo is a Figma Make scaffold with bespoke Vite plugins. Converting in
-place would fight that tooling the whole way.
+Today a push to `main` deploys unverified. That the working tree currently fails
+`pnpm format:check` on two files is the evidence that local-discipline-only does
+not hold.
 
-1. **`git init` + initial commit first** — there is currently no version control and no safety net
-2. Move `src/` → `_reference/`, read-only design source of truth
-3. Scaffold Next.js fresh at the repo root
-4. Port section by section, converting inline styles to tokens as each lands
-5. Delete `_reference/`, `.figma/`, and the Vite config once parity is reached
-
----
-
-## 6. Phased Delivery
-
-| Phase                 | Scope                                                                                                                        | Exit criteria                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **0. Foundations**    | `git init`, Next.js scaffold, TS strict, ESLint + Prettier, Vitest + Playwright, folder architecture                         | `build` and `test` green                                                        |
-| **1. Design system**  | Token layer, accent ramp, elevation scale, fluid type, density + motion tokens, primitives, `/design-system` route           | Every primitive documented; zero hardcoded hex                                  |
-| **2. Public site**    | All seven pages rebuilt as RSC, §2 noise reductions applied, signature interactions 1–6                                      | Ambient budget ≤ 2 per viewport; responsive 320→2560px; reduced-motion verified |
-| **3. Data layer**     | Mongo, Mongoose models, Zod schemas, seed from existing `src/data`, typed query layer                                        | Site renders entirely from the database                                         |
-| **4. Admin CMS**      | Auth.js + TOTP, middleware, dashboard, CRUD, MDX editor + live preview, media library, audit log                             | Full content round-trip through the UI                                          |
-| **5. Leads pipeline** | Contact API, Turnstile, rate limiting, `CF-Connecting-IP` handling, Resend, admin inbox                                      | Submission lands in inbox and email; abuse paths blocked                        |
-| **6. Polish**         | SEO, OG, RSS, sitemap, JSON-LD, Umami, a11y pass, perf pass                                                                  | Lighthouse ≥ 95 all categories; axe clean                                       |
-| **7. Ship**           | Dockerfile, both compose files, tunnel ingress, Cloudflare Access + WAF, Actions → GHCR + Docker Hub, backups, restore drill | One-command deploy; verified restore                                            |
-| **8. Content**        | Real copy, screenshots, diagrams, metrics with baselines, resume, testimonials                                               | Zero placeholder text or stock imagery                                          |
+- Add a `verify` job to `deploy.yml` — `typecheck`, `lint`, `format:check`,
+  `test`, `build` — and make `build-and-push` depend on it. The original job was
+  removed because it added ~3 minutes; that cost is worth it, and most of it can
+  be recovered with a pnpm store cache.
+- Run E2E on a schedule or on PRs rather than in the deploy path, so it doesn't
+  gate a hotfix.
+- Automate rollback on a failed healthcheck: capture the previous `IMAGE_TAG`
+  before writing the new `.env`, and restore it if the health loop times out.
+- **Back up the data.** Neither the `mongo-data` nor the `media-uploads` volume
+  is backed up anywhere. A `mongodump` + uploads tarball on a cron, shipped off
+  the box, is the whole task — and right now a volume loss is total content loss.
+- Pin the Node version: add `.nvmrc` / `engines` and bump `@types/node` from `^20`
+  to `^22`. Local Node is 24, Docker is 22, and the types say 20.
 
 ---
 
-## 7. Locked Decisions
+## W5 — Consistency and code health
 
-| #   | Decision       | Choice                                                                                                        |
-| --- | -------------- | ------------------------------------------------------------------------------------------------------------- |
-| 1   | Deployment     | Self-hosted VPS, **Cloudflare Tunnel** (existing `cloudflared`), no inbound ports, no reverse-proxy container |
-| 2   | Registries     | **Both** — GHCR (deploy path) and Docker Hub (public mirror), one build, dual push                            |
-| 3   | Content        | CMS first — seed placeholders, populate through admin later                                                   |
-| 4   | Editor         | MDX + live side-by-side preview, custom blocks                                                                |
-| 5   | Visual         | Elevate the emerald/dark identity                                                                             |
-| 6   | Theme          | **Dark only** — no light mode, no toggle                                                                      |
-| 7   | Design thesis  | **Signal over noise** — ambient budget of 2; motion must reveal, confirm, or connect                          |
-| 8   | Cut list       | Custom cursor, scroll-jacking, preloader, multi-section parallax                                              |
-| 9   | Hero           | **Constellation as the proof** — headline + proof line + two CTAs + interactive tech constellation (§2.9)     |
-| 10  | Ambient budget | **2 per viewport**, ledger fixed in §2.10; four of eight sections carry zero                                  |
-| 11  | Admin auth     | **Cloudflare Access + Auth.js + TOTP** — three layers, JWT assertion verified at origin                       |
-| 12  | Domain         | `${DOMAIN}` placeholder throughout; `verify:env` gate blocks an unset value at build                          |
+None of this is urgent; all of it is cheap and reduces future bug surface.
+
+- **Type the Mongoose models.** `mongoose.models.X ?? mongoose.model('X', schema)`
+  loses the generic, which is why `queries.ts` carries twelve `as unknown as`
+  casts. Passing the document type removes all of them.
+- **Reconcile Zod and Mongoose schemas.** They are hand-maintained in parallel and
+  have already drifted: `publishedAt` is `z.string().datetime()` in Zod but
+  `Date` in Mongoose; the `Lead` model has `source`/`ipHash`/`userAgent` that
+  `leadSchema` doesn't. Either generate one from the other or add a test that
+  fails when they disagree.
+- **Audit-log reorder operations.** `reorderHandler` is the only mutation that
+  writes no audit entry. It also issues N sequential `findByIdAndUpdate` calls
+  where one `bulkWrite` would do.
+- **Settle the Role/Experience/Post/Writing naming.** `/api/admin/experience` →
+  `Role` model → `entityType: 'role'`, and `/admin/posts` is labelled "Writing"
+  in the nav. Pick one name per concept.
+- **Fix `getAdjacentProjects`.** It wraps around, so a site with one published
+  project links to itself as "Next project". `getAdjacentPosts` doesn't wrap —
+  make them agree.
+- **Move hardcoded copy into the CMS,** or accept it explicitly. `SelectedWork`'s
+  "Four systems, still in production." is a literal above a dynamic grid and will
+  be wrong the moment a fifth ships. `Process.STEPS` and About's `STORY` are
+  hardcoded arrays on an otherwise fully CMS-driven site.
+- `formatDate` hardcodes `en-GB`.
+- Run `pnpm format` — `docker-compose.prod.yml` and `src/server/csrf.ts` are
+  currently unformatted.
+- Drop the stale `_reference/**` exclude from `vitest.config.ts`; that directory
+  no longer exists.
+- Write a `README.md`. There isn't one.
 
 ---
 
-## 8. Status — Plan Complete
+## W6 — Testing
 
-All architectural and design decisions are resolved. Nothing blocks Phase 0.
+Three unit tests exist and all three cover `clamp()`. The E2E suite is genuinely
+good — route sweep, horizontal-overflow checks at four viewports, command
+palette, and a real reduced-motion contract — but it stops at the public site.
 
-### Inputs needed from you later (none block the build)
+Priority order, by what would actually catch a costly bug:
 
-| When              | What                                                                                                                                 | Why it can wait                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Phase 7 (deploy)  | Your domain, `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`, VPS SSH deploy key, `RESEND_API_KEY`, Turnstile site/secret keys              | Everything is written against placeholders and gated by `verify:env`                  |
-| Phase 8 (content) | Real project write-ups, metrics **with baselines**, screenshots/diagrams, employment history, testimonials, resume PDF, social links | The CMS ships seeded with the current placeholders; you populate through the admin UI |
+1. **`queries.ts` visibility rules.** A regression in `visibleNow()` publishes
+   drafts. This is the highest-value test in the repo and does not exist.
+2. **`admin-crud.ts`** — auth rejection, CSRF rejection, Zod rejection, duplicate
+   key → 409, audit entry written.
+3. **`totp.ts`** encrypt/decrypt round-trip and drift window; `password.ts`
+   hash/verify.
+4. **Zod schemas** — that each one rejects the shapes it is supposed to.
+5. **An admin E2E path**: log in, create a project, publish it, confirm it
+   appears on the public site, delete it.
+6. Make E2E seed its own fixtures. It currently navigates to hardcoded slugs
+   (`docflow-ai`, `when-to-build-vs-buy-ai`) and fails outright against a fresh
+   database.
 
-### Two content notes worth acting on early
+---
 
-1. **Metrics need baselines.** Signature interaction #4 renders "92%" alongside
-   "3.1 hrs/day → 14 min/day". The baseline is what makes it evidence rather than
-   marketing — so capture the _before_ number for each project, not just the gain.
-2. **Stock imagery is the single largest credibility leak on the site.** Real
-   screenshots, or abstract renders of the actual architecture, beat Unsplash by a
-   wide margin. Worth queuing before Phase 8 arrives.
+## Dependencies
 
-### Next step
+In good shape overall. Patch-level drift only on the things that matter:
+`next` and `eslint-config-next` 16.3.2 → 16.3.3, `mongoose` 9.9.3 → 9.9.4,
+`@types/react-dom`. Take these routinely.
 
-**Phase 0 — Foundations.** `git init` + initial commit, move `src/` → `_reference/`,
-scaffold Next.js at the root with TS strict / ESLint / Prettier / Vitest /
-Playwright, establish the folder architecture. Exit criteria: `build` and `test`
-green. Nothing from the current design is deleted until Phase 2 reaches parity.
+Majors available, none urgent, each its own small piece of work:
+`eslint` 9 → 10, `typescript` 5 → 7, `vitest` 3 → 4, `@vitejs/plugin-react` 5 → 6,
+`prettier-plugin-tailwindcss` 0.6 → 0.8. `@types/node` 20 → 22 belongs to W4.
+
+`next-auth` is pinned at `5.0.0-beta.32` — a beta in production. Auth.js v5 has
+been beta for a long time and there is no v4 path back worth taking; the risk is
+real but accepted. Pin it exactly (it already is) and read the changelog before
+any bump.
+
+---
+
+## Appendix — decoding the old phase numbers
+
+41 comments across 37 source files reference a `PLAN.md` section or a "Phase N"
+that no longer exists. They are not wrong, just unresolvable. Rather than
+rewrite all of them, here is the mapping; clean the references up opportunistically
+as you touch each file.
+
+| Old reference         | What it meant                                          | Status                    |
+| --------------------- | ------------------------------------------------------ | ------------------------- |
+| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                      |
+| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                      |
+| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                      |
+| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                      |
+| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                      |
+| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**             |
+| Phase 6               | Polish — SEO, OG, RSS, analytics                       | **Not started → W3**      |
+| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Partial — W2/W4 finish it |
+| Phase 8               | Real photography and final content                     | Not started               |
+| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced       |
+| §3 "defense in depth" | The three auth layers                                  | Layer 1 inactive → W2     |
+
+The `AGENTS.md` reference in `.github/workflows/deploy.yml:8` is valid again —
+the local pre-push gate lives in AGENTS.md §2.
