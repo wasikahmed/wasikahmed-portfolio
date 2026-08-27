@@ -2,6 +2,20 @@ import 'server-only';
 
 import nodemailer from 'nodemailer';
 
+/** Shared Gmail SMTP transporter, or null when credentials aren't configured. */
+function getTransporter() {
+  const user = process.env.GMAIL_USER;
+  const appPassword = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !appPassword) return null;
+  return {
+    user,
+    transporter: nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass: appPassword },
+    }),
+  };
+}
+
 /**
  * Notification email for a new lead, sent via Gmail SMTP with an app
  * password (not OAuth — simplest option for a single-recipient inbox).
@@ -21,10 +35,8 @@ export async function sendLeadNotification(
   },
   to: string,
 ): Promise<void> {
-  const user = process.env.GMAIL_USER;
-  const appPassword = process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !appPassword) {
+  const smtp = getTransporter();
+  if (!smtp) {
     console.log('[email] GMAIL_USER/GMAIL_APP_PASSWORD unset — skipping send', {
       name: lead.name,
       email: lead.email,
@@ -32,13 +44,8 @@ export async function sendLeadNotification(
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass: appPassword },
-  });
-
-  await transporter.sendMail({
-    from: user,
+  await smtp.transporter.sendMail({
+    from: smtp.user,
     to,
     replyTo: lead.email,
     subject: `New ${lead.intent === 'project' ? 'project inquiry' : 'role inquiry'} from ${lead.name}`,
@@ -52,5 +59,29 @@ export async function sendLeadNotification(
     ]
       .filter((line) => line !== null)
       .join('\n'),
+  });
+}
+
+/**
+ * Password-reset OTP for the single admin account. Same Gmail transporter
+ * and no-op-if-unset guard as sendLeadNotification — see its comment.
+ * The code itself is never logged; only the fact that a send was skipped.
+ */
+export async function sendPasswordResetOtp(to: string, code: string): Promise<void> {
+  const smtp = getTransporter();
+  if (!smtp) {
+    console.log('[email] GMAIL_USER/GMAIL_APP_PASSWORD unset — skipping password reset send');
+    return;
+  }
+
+  await smtp.transporter.sendMail({
+    from: smtp.user,
+    to,
+    subject: 'Your password reset code',
+    text: [
+      `Your password reset code is: ${code}`,
+      '',
+      'This code expires in 10 minutes. If you did not request a password reset, you can ignore this email.',
+    ].join('\n'),
   });
 }

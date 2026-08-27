@@ -5,10 +5,15 @@ import type { NextRequest } from 'next/server';
 import { connectToDatabase } from './db';
 import { RateLimit } from './models/rate-limit';
 
+/** Salted sha256, keyed on AUTH_SECRET — for rate-limit keys, never for storing the raw value. */
+export function saltedHash(value: string): string {
+  const salt = process.env.AUTH_SECRET ?? 'dev-only-salt';
+  return createHash('sha256').update(`${salt}:${value}`).digest('hex');
+}
+
 /** Never store a raw IP — a salted hash is enough to rate-limit without keeping PII around. */
 export function hashIp(ip: string): string {
-  const salt = process.env.AUTH_SECRET ?? 'dev-only-salt';
-  return createHash('sha256').update(`${salt}:${ip}`).digest('hex');
+  return saltedHash(ip);
 }
 
 /** Best-effort client IP from the headers a reverse proxy (Cloudflare, Docker) sets. */

@@ -12,7 +12,7 @@ import { ensureCsrfCookie } from '@/server/csrf';
 // bundle and fail the build outright, since neither runs in Edge.
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_ADMIN_PATHS = ['/admin/login'];
+const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password'];
 
 export default auth(async (request: NextAuthRequest) => {
   const { pathname } = request.nextUrl;

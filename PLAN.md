@@ -15,7 +15,8 @@ reduced-motion contract; the typed query layer with a published/draft split; a
 full admin CMS with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag
 reordering, an MDX editor with live preview, and a media library; a production
 Docker image and a push-to-main deploy pipeline to the VPS. The contact form
-pipeline (W1) is now real and deployed — see below.
+pipeline (W1) is now real and deployed, and admin password recovery (email OTP)
+is built and verified — see below.
 
 **Verified healthy.** `typecheck`, `lint`, `build`, and `test` all pass clean.
 No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
@@ -69,6 +70,64 @@ Shipped across two pushes: the API route, then an admin-side pass on top of it.
 shows as "new," opening it marks it "read" automatically, and status/notes
 changes persist. TOTP enrollment and login enforcement verified end to end
 locally (see AGENTS.md §11).
+
+---
+
+## Admin password recovery (email OTP) — Done, 2026-08-27
+
+The admin account had no recovery path at all — a lost password meant a manual
+`pnpm seed:admin` from the VPS. Added a self-serve "forgot password" flow.
+
+- **Email OTP, deliberately not TOTP.** Reusing the TOTP 2FA code as the reset
+  mechanism was considered and rejected: it collapses two independent factors
+  (password, TOTP secret) into one, and it permanently locks the account out if
+  the authenticator device itself is what's lost — the actual common case for
+  needing recovery. Email is an independent recovery channel; TOTP still gates
+  login afterward regardless of how the password was changed, so the account
+  keeps its two factors.
+- `POST /api/auth/forgot-password` — public, pre-auth (no session, no CSRF
+  cookie exists yet, same reasoning as `/api/contact`). Generates a 6-digit
+  code, stores only a salted SHA-256 hash of it (`PasswordReset` model,
+  TTL-indexed, 10-minute expiry — same pattern as `RateLimit`), and emails it
+  via a new `sendPasswordResetOtp()` in `src/server/email.ts` (same Gmail
+  transporter, same no-op-if-unset guard as `sendLeadNotification`). Always
+  returns `{ ok: true }` whether or not the email matches an account — no
+  enumeration.
+- `POST /api/auth/reset-password` — verifies the code with a constant-time
+  compare, requires a 12-char-minimum new password, hashes it with the
+  existing argon2id `hashPassword()`, deletes the used code (single-use), and
+  writes an audit log entry. TOTP is untouched, so 2FA-enabled accounts still
+  need a code to sign in after a reset.
+- **Both routes are outside `proxy.ts`'s matcher** (`/api/auth/*` — the known
+  gap in AGENTS.md §9), so they implement their own rate limiting by reusing
+  `checkRateLimit`/`hashIp`: 5 req/hour per IP and 3 req/hour per targeted
+  email on the request endpoint, 10/hour per IP and 8/hour per email on the
+  verify endpoint (the real brute-force boundary, since a 6-digit code is only
+  1e6 possibilities). Added a general-purpose `saltedHash()` to
+  `src/server/rate-limit.ts` (alongside the existing IP-specific `hashIp()`)
+  for hashing the email and the OTP itself.
+- `/admin/forgot-password` — new public admin page (added to
+  `PUBLIC_ADMIN_PATHS` in `proxy.ts`, which was the one non-obvious step: the
+  page would otherwise 302 straight back to `/admin/login` before an
+  unauthenticated visitor could ever reach it). Two-step form matching
+  `LoginForm`'s progressive-disclosure pattern; `LoginForm` now links to it.
+
+**Verified in the Docker dev stack:** requested a real OTP, confirmed the
+request endpoint responds identically for an existing vs. non-existent email,
+confirmed a wrong code is rejected, decoded the stored hash with the dev
+`AUTH_SECRET` to complete a real reset, confirmed the same code can't be reused
+(single-use), confirmed the audit log entry was written, confirmed the new
+password is accepted by the credentials provider and TOTP is still required
+afterward (`TOTP_REQUIRED` on the next sign-in), and confirmed both rate limits
+trip after their configured thresholds. `pnpm seed:admin` was rerun afterward
+to restore a real credential for local dev, since the test exercised the
+actual seeded admin account rather than a disposable fixture.
+
+**Not done as part of this:** Turnstile on these two routes (contact form has
+it; forgot-password relies on rate limiting alone — revisit if abuse shows
+up), and session invalidation on reset (existing JWT sessions elsewhere stay
+valid until they expire — same accepted gap as the rest of W2 item 6's
+`maxAge` question).
 
 ---
 

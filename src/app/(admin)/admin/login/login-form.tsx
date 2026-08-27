@@ -113,6 +113,12 @@ export function LoginForm() {
           {submitting ? 'Checking…' : needsCode ? 'Verify' : 'Sign in'}
           {!submitting ? <ArrowRight /> : null}
         </Button>
+
+        {!needsCode ? (
+          <Button href="/admin/forgot-password" variant="link" size="sm" className="mx-auto">
+            Forgot password?
+          </Button>
+        ) : null}
       </form>
     </Card>
   );
