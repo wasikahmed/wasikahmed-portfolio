@@ -15,25 +15,29 @@ reduced-motion contract; the typed query layer with a published/draft split; a
 full admin CMS with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag
 reordering, an MDX editor with live preview, and a media library; a production
 Docker image and a push-to-main deploy pipeline to the VPS. The contact form
-pipeline (W1) is now real and deployed, and admin password recovery (email OTP)
-is built and verified — see below.
+pipeline (W1) is now real and deployed, admin password recovery (email OTP) is
+built and verified, and the security hardening pass (W2) is done — see below.
+A real logomark, favicon, and OG image now exist too (`metadataBase` is set),
+though the rest of W3's SEO surface is still open.
 
 **Verified healthy.** `typecheck`, `lint`, `build`, and `test` all pass clean.
 No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
 
 **The two things that matter most, in order.**
 
-1. **`/admin` is protected by password + TOTP only.** TOTP itself works and has
-   been verified end to end in dev (enroll → confirm → sign out → sign back in
-   with a code). Cloudflare Access verification is written and correct, but
-   `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` are not in the deploy workflow's
-   `.env`, so `verifyCloudflareAccess` returns `true` unconditionally in
-   production. And `/api/auth/*` is outside `proxy.ts`'s matcher, so
-   credential sign-in has no rate limiting at all.
-2. **The site has no SEO surface.** No sitemap, robots, OG images, RSS, or
-   JSON-LD. `metadataBase` is unset, so any share URL that does get generated
-   will be relative. `NEXT_PUBLIC_SITE_URL` is written into production `.env` by
-   CI and read by exactly zero lines of code.
+1. **Cloudflare Access is still inactive in production.** The verification
+   code is correct and `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` now flow
+   through the deploy workflow's `.env` (W2 item 2), but nothing has set them
+   yet — that requires creating the actual Access application in the
+   Cloudflare dashboard, a manual step outside this repo. Until then
+   `verifyCloudflareAccess` keeps no-opping, deliberately (see W2 below for
+   why fail-closed wasn't flipped on yet). Everything else in W2 — auth rate
+   limiting, CSP, the SVG upload hole, session `maxAge`, constant-time CSRF —
+   is done.
+2. **The site has no SEO surface.** No sitemap, robots, RSS, or JSON-LD.
+   `NEXT_PUBLIC_SITE_URL` is written into production `.env` by CI and now
+   read by exactly one thing (`metadataBase`) — everything else in W3 is
+   still open.
 
 ---
 
@@ -131,39 +135,60 @@ valid until they expire — same accepted gap as the rest of W2 item 6's
 
 ---
 
-## W2 — Close the security gaps
+## W2 — Close the security gaps — Done, 2026-08-27
 
-Ordered by exposure.
+Ordered by exposure in the original plan; all seven items addressed.
 
-1. **Rate-limit authentication.** `/api/auth/*` is currently unguarded — argon2
-   makes each guess slow but nothing makes them finite. Add per-IP and
-   per-account throttling with progressive backoff, plus a temporary lockout.
-   This needs a store that survives a request; Mongo with a TTL index is enough
-   at this scale, no Redis required.
-2. **Turn on Cloudflare Access in production.** The verification code is done.
-   Add `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` to the deploy workflow's
-   heredoc and configure the Access policy over `/admin`. Consider failing
-   closed in production rather than no-opping when unset — a silent no-op is
-   fine for local dev and dangerous for a deployment.
-3. **Stop accepting SVG uploads,** or stop serving uploads from the site's
-   origin. An SVG is an HTML document; `image/svg+xml` is in `ALLOWED_TYPES`,
-   files land in `public/uploads/`, and navigating to one executes its script
-   under the site's origin with an admin session live. Simplest fix: drop SVG
-   from the allowlist. Better fix: serve uploads through a route handler that
-   sets `Content-Disposition` and a restrictive `Content-Type`.
-4. **Add security headers.** No CSP, `X-Content-Type-Options`,
-   `Referrer-Policy`, or `frame-ancestors` exist anywhere. `.env.example` even
-   references a CSP report-uri that was never implemented. This also contains
-   the blast radius of (3).
-5. **Validate uploaded files by content, not by claim.** `file.type` is
-   client-supplied and `path.extname(file.name)` is taken straight from the
-   client filename into the stored key. Not exploitable for traversal today
-   (the key is a random hex prefix), but the extension is attacker-chosen and
-   never checked against the actual bytes. `probe-image-size` is already a
-   dependency and already reads the buffer — use its detected type.
-6. **Set an explicit session `maxAge`.** Auth.js defaults to 30 days; for a
-   single-admin CMS that should be much shorter.
-7. Minor: `verifyCsrf` compares tokens with `!==`. Use a constant-time compare.
+1. **Rate-limited authentication.** `/api/auth/*` isn't in `proxy.ts`'s
+   matcher (AGENTS.md §9), so — same pattern as `/api/auth/forgot-password` —
+   the limit lives inside `authorize()` in `src/server/auth.ts` itself,
+   checked before the DB lookup: 20 attempts/15min per IP, 8/15min per email
+   hash, using the existing `checkRateLimit`/Mongo-TTL machinery. A new
+   `RateLimitedError` (code `RATE_LIMITED`) surfaces a distinct message in
+   `login-form.tsx`. **Deliberately a fixed window, not progressive
+   backoff/lockout** — consistent with the same trade-off already accepted
+   for the password-reset endpoints above, and simple enough to reason about
+   for a single-admin account. Verified by scripting 9 rapid attempts against
+   one email in the Docker dev stack: the first 8 return the normal
+   `CredentialsSignin` error, the 9th returns `RATE_LIMITED`; a legitimate
+   login with correct credentials for a fresh email still reaches
+   `TOTP_REQUIRED` normally.
+2. **Cloudflare Access wiring, not yet activated.** `CF_ACCESS_TEAM_DOMAIN`
+   and `CF_ACCESS_AUD` now flow through `deploy.yml`'s heredoc from repo
+   variables. **Left fail-open on purpose** — flipping `verifyCloudflareAccess`
+   to fail closed when unset would lock `/admin` out entirely on the next
+   deploy, since no Access application exists in the Cloudflare dashboard yet
+   (that's a manual step, outside what this repo can do). Revisit fail-closed
+   once the Access application is actually configured and `CF_ACCESS_TEAM_DOMAIN`/
+   `CF_ACCESS_AUD` are set as real repo variables.
+3. **SVG uploads dropped.** Removed from `ALLOWED_TYPES` in
+   `/api/admin/media` and the upload input's `accept`.
+4. **Security headers, CSP included.** Added in `proxy.ts` — CSP (nonce-based
+   per Next's documented middleware pattern, `strict-dynamic`, `frame-ancestors
+'none'`), `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`.
+   Required broadening the matcher off `/admin/*`+`/api/admin/*` to
+   (almost) everything — the admin-only session/CSRF/Cloudflare Access gating
+   is untouched and still scoped exactly as before; every other route now
+   only gets headers added. `style-src 'unsafe-inline'` is a deliberate,
+   documented trade-off (Framer Motion and Shiki both write the `style`
+   attribute directly, which CSP has no nonce mechanism for). Verified in the
+   Docker dev stack: every `<script>` tag Next renders carries a matching
+   nonce (checked programmatically, zero without one) across the homepage,
+   `/admin/login`, and other pages; unauthenticated `/admin` and
+   `/api/admin/*` still redirect/401 correctly; the full local gate
+   (`typecheck`/`lint`/`format:check`/`test`/`build`) stayed green throughout.
+   Not verified: live browser console CSP-violation checking — the Chrome
+   extension wasn't connected this session, so this fell back to server-side
+   HTML inspection instead. Worth a real browser pass before relying on it
+   further, especially for the Turnstile widget and TOTP QR code.
+5. **Uploads validated by content.** `/api/admin/media` now rejects a file
+   `probe-image-size` can't read or whose detected `mime` isn't in
+   `ALLOWED_TYPES`, and derives the stored extension from that detected type
+   instead of the client-supplied filename — `file.type`/filename are no
+   longer trusted for anything.
+6. **Session `maxAge` set to 7 days,** down from Auth.js's 30-day default.
+7. **`verifyCsrf` now uses a constant-time compare** (manual XOR loop — Edge
+   runtime has no `node:crypto.timingSafeEqual`).
 
 ---
 
@@ -293,19 +318,19 @@ that no longer exists. They are not wrong, just unresolvable. Rather than
 rewrite all of them, here is the mapping; clean the references up opportunistically
 as you touch each file.
 
-| Old reference         | What it meant                                          | Status                    |
-| --------------------- | ------------------------------------------------------ | ------------------------- |
-| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                      |
-| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                      |
-| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                      |
-| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                      |
-| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                      |
-| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**             |
-| Phase 6               | Polish — SEO, OG, RSS, analytics                       | **Not started → W3**      |
-| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Partial — W2/W4 finish it |
-| Phase 8               | Real photography and final content                     | Not started               |
-| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced       |
-| §3 "defense in depth" | The three auth layers                                  | Layer 1 inactive → W2     |
+| Old reference         | What it meant                                          | Status                                                                          |
+| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                                                                            |
+| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                                                                            |
+| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                                                                            |
+| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                            |
+| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                            |
+| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                   |
+| Phase 6               | Polish — SEO, OG, RSS, analytics                       | **Not started → W3**                                                            |
+| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Partial — W2/W4 finish it                                                       |
+| Phase 8               | Real photography and final content                     | Not started                                                                     |
+| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                             |
+| §3 "defense in depth" | The three auth layers                                  | Layers 2/3 done, layer 1 (Cloudflare Access) wired but inactive — see W2 item 2 |
 
 The `AGENTS.md` reference in `.github/workflows/deploy.yml:8` is valid again —
 the local pre-push gate lives in AGENTS.md §2.
