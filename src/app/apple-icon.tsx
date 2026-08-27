@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { BRAND_COLORS, MARK_SMALL, markDataUri } from '@/lib/brand';
+import { BRAND_COLORS, markDataUri } from '@/lib/brand';
 
 /*
  * Apple touch icon — 180×180, generated rather than committed as a PNG.
@@ -7,6 +7,10 @@ import { BRAND_COLORS, MARK_SMALL, markDataUri } from '@/lib/brand';
  * iOS ignores `icon.svg` and squares off whatever it gets, so this needs its
  * own route: a solid ground (no transparency, or iOS composites it on black)
  * with the mark inset to roughly 60% so it survives the home-screen mask.
+ *
+ * Default weights, not `MARK_SMALL` — the mark lands at 112px here, nowhere
+ * near the tab-strip sizes the thickened variant exists for. Using it made the
+ * nodes read as blobs.
  */
 
 export const size = { width: 180, height: 180 };
@@ -24,7 +28,7 @@ export default function AppleIcon() {
         background: BRAND_COLORS.bg,
       }}
     >
-      <img src={markDataUri({ size: 112, weights: MARK_SMALL })} width={112} height={112} alt="" />
+      <img src={markDataUri({ size: 112 })} width={112} height={112} alt="" />
     </div>,
     size,
   );
