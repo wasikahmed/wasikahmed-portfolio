@@ -8,6 +8,7 @@ import { authConfig } from './auth.config';
 import { connectToDatabase } from './db';
 import { User } from './models/user';
 import { verifyPassword } from './password';
+import { checkRateLimit, getClientIp, hashIp, saltedHash } from './rate-limit';
 import { decryptTotpSecret, verifyTotpCode } from './totp';
 
 /**
@@ -27,6 +28,16 @@ export class TotpRequiredError extends CredentialsSignin {
   code = 'TOTP_REQUIRED';
 }
 
+/**
+ * Thrown when either the per-IP or per-email sign-in rate limit trips. See
+ * the `authorize` comment below for why this lives here rather than in
+ * `proxy.ts` — this is the one code the login form branches on to show a
+ * distinct message; see `src/app/(admin)/admin/login/login-form.tsx`.
+ */
+export class RateLimitedError extends CredentialsSignin {
+  code = 'RATE_LIMITED';
+}
+
 export const {
   handlers: { GET, POST },
   auth,
@@ -41,12 +52,32 @@ export const {
         password: {},
         code: {},
       },
-      async authorize(raw) {
+      // `authorize()` is the actual code path for POST /api/auth/callback/
+      // credentials — `/api/auth/*` isn't in proxy.ts's matcher (AGENTS.md
+      // §9), so this route has no rate limiting unless it's self-implemented,
+      // same reasoning and pattern as /api/auth/forgot-password. Checked
+      // before the DB lookup so a rate-limited request costs one Mongo
+      // round trip, not an argon2 hash comparison too.
+      async authorize(raw, request) {
         const email = typeof raw?.email === 'string' ? raw.email.trim().toLowerCase() : '';
         const password = typeof raw?.password === 'string' ? raw.password : '';
         const code = typeof raw?.code === 'string' ? raw.code : '';
 
         if (!email || !password) throw new CredentialsSignin('Email and password are required.');
+
+        const ipOk = await checkRateLimit(`login-ip:${hashIp(getClientIp(request))}`, {
+          limit: 20,
+          windowMs: 15 * 60 * 1000,
+        });
+        if (!ipOk) throw new RateLimitedError();
+
+        // Second limit keyed by the targeted email, independent of IP, so a
+        // rotating-IP attacker still can't brute-force one account.
+        const emailOk = await checkRateLimit(`login-email:${saltedHash(email)}`, {
+          limit: 8,
+          windowMs: 15 * 60 * 1000,
+        });
+        if (!emailOk) throw new RateLimitedError();
 
         await connectToDatabase();
         const user = await User.findOne({ email }).lean();

@@ -51,6 +51,10 @@ export function LoginForm() {
       setNeedsCode(true);
       return;
     }
+    if (result?.code === 'RATE_LIMITED') {
+      setError('Too many attempts. Try again in a few minutes.');
+      return;
+    }
     if (!result?.ok) {
       setError(
         needsCode

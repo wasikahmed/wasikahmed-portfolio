@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import type { NextRequest } from 'next/server';
 import { connectToDatabase } from './db';
 import { RateLimit } from './models/rate-limit';
 
@@ -16,8 +15,12 @@ export function hashIp(ip: string): string {
   return saltedHash(ip);
 }
 
-/** Best-effort client IP from the headers a reverse proxy (Cloudflare, Docker) sets. */
-export function getClientIp(request: NextRequest): string {
+/**
+ * Best-effort client IP from the headers a reverse proxy (Cloudflare, Docker)
+ * sets. Typed as the base `Request` (not `NextRequest`) so it also accepts
+ * the plain `Request` Auth.js's Credentials `authorize()` is handed.
+ */
+export function getClientIp(request: Request): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) return forwardedFor.split(',')[0].trim();
   return request.headers.get('x-real-ip') ?? 'unknown';
