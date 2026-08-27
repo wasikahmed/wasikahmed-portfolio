@@ -7,3 +7,6 @@ coverage/
 playwright-report/
 test-results/
 pnpm-lock.yaml
+
+# Prettier has no SVG parser, so `--check .` errors out rather than skipping.
+*.svg
