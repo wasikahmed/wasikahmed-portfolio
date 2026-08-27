@@ -17,7 +17,10 @@ import type { NextAuthConfig } from 'next-auth';
  */
 export const authConfig: NextAuthConfig = {
   trustHost: true,
-  session: { strategy: 'jwt' },
+  // Auth.js defaults to 30 days; for a single-admin CMS that's a long time
+  // for a stolen or shared-device session to stay valid. See PLAN.md W2
+  // item 6.
+  session: { strategy: 'jwt', maxAge: 60 * 60 * 24 * 7 },
   pages: { signIn: '/admin/login' },
   providers: [],
   callbacks: {

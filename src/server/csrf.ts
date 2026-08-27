@@ -48,12 +48,25 @@ export function ensureCsrfCookie(request: NextRequest, response: NextResponse): 
   });
 }
 
+/**
+ * `node:crypto.timingSafeEqual` isn't available here — this module is
+ * imported by middleware, which runs in the Edge runtime. XORing every
+ * character keeps comparison time independent of where the first mismatch
+ * falls, rather than short-circuiting on `!==` at the first differing byte.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 /** Call at the top of every admin mutation route handler (POST/PATCH/DELETE). */
 export function verifyCsrf(request: NextRequest): NextResponse | null {
   const cookieToken = request.cookies.get(COOKIE_NAME)?.value;
   const headerToken = request.headers.get(HEADER_NAME);
 
-  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+  if (!cookieToken || !headerToken || !timingSafeEqual(cookieToken, headerToken)) {
     return NextResponse.json({ error: 'CSRF token missing or invalid.' }, { status: 403 });
   }
   return null;
