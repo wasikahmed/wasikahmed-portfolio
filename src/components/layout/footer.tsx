@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogoMark, Wordmark } from '@/components/brand/logo';
 import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
@@ -54,18 +55,16 @@ export function Footer({ settings }: { settings: Settings }) {
          * the full width until there is room for all four columns.
          */}
         <div className="grid grid-cols-2 gap-x-8 gap-y-10 lg:grid-cols-[1.6fr_1fr_1fr_1.3fr] lg:gap-x-10 lg:gap-y-12">
-          {/* Identity — the monogram matches the nav badge so the two ends of
-              the page read as the same brand. */}
+          {/* Identity — the same lockup as the nav, so the two ends of the page
+              read as one brand. */}
           <div className="col-span-2 min-w-0 sm:col-span-1">
             <Link
               href="/"
               className="inline-flex items-center gap-2.5"
               aria-label={`${settings.name} — home`}
             >
-              <span className="from-accent to-accent-bright font-display text-bg grid h-8 w-8 shrink-0 place-items-center rounded-md bg-gradient-to-br text-xs font-bold">
-                {settings.initials}
-              </span>
-              <span className="font-display text-sm font-semibold">{settings.name}</span>
+              <LogoMark className="text-accent h-7 w-7 shrink-0" />
+              <Wordmark name={settings.name} className="text-sm" />
             </Link>
 
             <p className="text-fg-muted mt-4 max-w-xs text-sm text-pretty">{settings.proof}</p>

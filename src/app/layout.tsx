@@ -25,9 +25,24 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+/*
+ * `metadataBase` is what turns the generated `opengraph-image` into an absolute
+ * URL — social crawlers reject relative ones. Falls back to localhost so `next
+ * build` (which runs with no env in Docker) does not warn on every route.
+ */
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
   title: 'Wasik Ahmed',
   description: 'Software engineer building AI and automation systems.',
+  openGraph: {
+    type: 'website',
+    siteName: 'Wasik Ahmed',
+    title: 'Wasik Ahmed',
+    description: 'Software engineer building AI and automation systems.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

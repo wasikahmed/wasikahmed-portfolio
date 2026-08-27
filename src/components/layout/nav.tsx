@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
+import { LogoMark, Wordmark } from '@/components/brand/logo';
 import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
@@ -108,12 +109,10 @@ export function Nav({
           className="group flex shrink-0 items-center gap-2.5"
           aria-label={`${settings.name} — home`}
         >
-          <span className="from-accent to-accent-bright font-display text-bg grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br text-xs font-bold">
-            {settings.initials}
-          </span>
-          <span className="font-display hidden text-sm font-semibold sm:block">
-            {settings.name}
-          </span>
+          {/* Hover brightens the terminal node — confirms the lockup is a link
+              without adding a transform. Motion rule: confirm, not decorate. */}
+          <LogoMark className="text-accent group-hover:text-accent-bright duration-fast h-7 w-7 transition-colors" />
+          <Wordmark name={settings.name} className="hidden text-sm sm:block" />
         </Link>
 
         <nav aria-label="Primary" className="hidden md:block">
