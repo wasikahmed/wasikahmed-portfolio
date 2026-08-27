@@ -6,47 +6,146 @@ import { verifyCloudflareAccess } from '@/server/cloudflare-access';
 import { ensureCsrfCookie } from '@/server/csrf';
 
 // Edge-safe instance — built from auth.config.ts (no providers, no argon2,
-// no Mongoose), not the full config in auth.ts. See auth.config.ts's
-// comment: importing the full config here would pull the Credentials
-// provider's argon2/Mongoose dependency graph into the Edge Middleware
-// bundle and fail the build outright, since neither runs in Edge.
+// no Mongoose). See auth.config.ts's comment: importing the full config
+// here would pull the Credentials provider's argon2/Mongoose dependency
+// graph into the Edge Middleware bundle and fail the build outright, since
+// neither runs in Edge.
 const { auth } = NextAuth(authConfig);
 
 const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password'];
 
+/**
+ * Nonce-based CSP, wired up per Next.js's documented middleware pattern
+ * (https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy):
+ * the nonce is set on both the outgoing *request* headers (so App Router's
+ * renderer sees it and stamps its own RSC/hydration `<script>` tags with a
+ * matching `nonce` attribute — see `getScriptNonceFromHeader` in Next's
+ * source) and the *response* headers (so the browser actually enforces it).
+ * `strict-dynamic` means a script loaded by an already-trusted script (e.g.
+ * the Turnstile widget inserting its own `<script>` tag at runtime) is
+ * trusted too, regardless of host — the explicit Cloudflare host entry
+ * below is the fallback for browsers old enough not to support
+ * `strict-dynamic`.
+ *
+ * `style-src 'unsafe-inline'` is a deliberate, known trade-off: Framer
+ * Motion and Shiki both write the `style` attribute directly (motion for
+ * every animated frame, Shiki per syntax token), and CSP has no nonce
+ * mechanism for the `style` HTML attribute itself — only for `<style>`
+ * blocks. Style-attribute injection can't execute script on its own, which
+ * is the meaningfully dangerous case `script-src`'s nonce is closing.
+ *
+ * `'unsafe-eval'` is added to `script-src` outside production only —
+ * Turbopack/webpack's HMR client relies on it in dev, and there is no
+ * tunnel or real attacker surface in front of `pnpm dev`.
+ */
+function buildCsp(nonce: string): string {
+  const scriptSrc = [
+    "'self'",
+    `'nonce-${nonce}'`,
+    "'strict-dynamic'",
+    'https://challenges.cloudflare.com',
+    ...(process.env.NODE_ENV === 'production' ? [] : ["'unsafe-eval'"]),
+  ].join(' ');
+
+  return [
+    `default-src 'self'`,
+    `script-src ${scriptSrc}`,
+    `style-src 'self' 'unsafe-inline'`,
+    `img-src 'self' data:`,
+    `font-src 'self'`,
+    `connect-src 'self' https://challenges.cloudflare.com`,
+    `frame-src https://challenges.cloudflare.com`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+    `frame-ancestors 'none'`,
+  ].join('; ');
+}
+
+/** Applied to every response this middleware runs on — page or API. */
+function applySecurityHeaders(response: NextResponse, nonce: string): void {
+  response.headers.set('Content-Security-Policy', buildCsp(nonce));
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Belt-and-braces alongside frame-ancestors above — older browsers that
+  // predate CSP2's frame-ancestors still respect this header.
+  response.headers.set('X-Frame-Options', 'DENY');
+}
+
+/** Web Crypto, not `node:crypto` — this runs in the Edge runtime, same reasoning as csrf.ts. */
+function randomNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes));
+}
+
 export default auth(async (request: NextAuthRequest) => {
   const { pathname } = request.nextUrl;
+
+  const nonce = randomNonce();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('Content-Security-Policy', buildCsp(nonce));
+
+  const isAdminArea = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   const isApi = pathname.startsWith('/api/admin');
+
+  // Everything outside /admin and /api/admin (the public site, /api/auth/*,
+  // /api/contact, the generated icon/OG routes) only needs the security
+  // headers — none of the session/CSRF/Cloudflare Access gating below
+  // applies to it.
+  if (!isAdminArea) {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    applySecurityHeaders(response, nonce);
+    return response;
+  }
+
   const isPublicAdminPage = PUBLIC_ADMIN_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 
-  if (isPublicAdminPage) return NextResponse.next();
+  if (isPublicAdminPage) {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    applySecurityHeaders(response, nonce);
+    return response;
+  }
 
   // Layer 1 — edge trust. No-ops until CF_ACCESS_* is configured (Phase 7).
   const accessOk = await verifyCloudflareAccess(request);
   if (!accessOk) {
-    return isApi
+    const response = isApi
       ? NextResponse.json({ error: 'Access denied.' }, { status: 403 })
       : NextResponse.redirect(new URL('/', request.url));
+    applySecurityHeaders(response, nonce);
+    return response;
   }
 
   // Layer 2 — app session. `auth()` wrapping this handler populates
   // `request.auth` from the JWT session cookie; no DB call needed here.
   if (!request.auth?.user) {
-    if (isApi) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-    const loginUrl = new URL('/admin/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
-    return NextResponse.redirect(loginUrl);
+    let response: NextResponse;
+    if (isApi) {
+      response = NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+    } else {
+      const loginUrl = new URL('/admin/login', request.url);
+      loginUrl.searchParams.set('from', pathname);
+      response = NextResponse.redirect(loginUrl);
+    }
+    applySecurityHeaders(response, nonce);
+    return response;
   }
 
-  const response = NextResponse.next();
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   // Only page requests need the cookie *set*; mutation routes only need
   // to *verify* it (see verifyCsrf in each route handler).
   if (!isApi) ensureCsrfCookie(request, response);
+  applySecurityHeaders(response, nonce);
   return response;
 });
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*'],
+  // Broad on purpose — the security headers above should land on every
+  // response. `_next/static`/`_next/image`/`favicon.ico` are excluded
+  // because they're immutable build assets and Next's own image
+  // optimizer, neither of which render anything a CSP applies to.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
