@@ -13,13 +13,17 @@ import { normalizeDoc } from '@/server/mongo-utils';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 const MAX_SIZE = 8 * 1024 * 1024; // 8MB
-const ALLOWED_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/svg+xml',
-]);
+// SVG is deliberately excluded — it's an XHTML document, not a raster format,
+// and uploads are served from the site's own origin (public/uploads), so an
+// SVG with an embedded <script> would execute under an admin session. See
+// PLAN.md W2 item 3.
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+};
 
 export async function GET() {
   const session = await getAdminSession();
@@ -55,36 +59,35 @@ export async function POST(request: NextRequest) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const ext = path.extname(file.name) || '';
-  const key = `${randomBytes(12).toString('hex')}${ext}`;
+
+  // The authoritative type check: `file.type` and the client filename's
+  // extension are both attacker-controlled claims, not facts. probe reads
+  // the actual magic bytes, so a mismatch (or an unrecognizable payload
+  // wearing an allowed content-type) is rejected outright rather than
+  // stored — the extension used on disk is derived from what probe found,
+  // never from the client-supplied filename.
+  const dimensions = probe.sync(bytes);
+  if (!dimensions || !ALLOWED_TYPES.has(dimensions.mime)) {
+    return NextResponse.json(
+      { error: 'File content does not match a supported image format.' },
+      { status: 422 },
+    );
+  }
+
+  const key = `${randomBytes(12).toString('hex')}${EXT_BY_MIME[dimensions.mime]}`;
 
   await mkdir(UPLOAD_DIR, { recursive: true });
   await writeFile(path.join(UPLOAD_DIR, key), bytes);
-
-  // Dimensions extracted from the actual bytes rather than trusted from the
-  // client, so next/image always has a correct aspect ratio to reserve.
-  let width: number | undefined;
-  let height: number | undefined;
-  try {
-    const dimensions = probe.sync(bytes);
-    if (dimensions) {
-      width = dimensions.width;
-      height = dimensions.height;
-    }
-  } catch {
-    // Non-fatal — some formats (plain SVG without a viewBox) probe can't
-    // read; the upload still succeeds, just without reserved dimensions.
-  }
 
   await connectToDatabase();
   const created = await Media.create({
     key,
     url: `/uploads/${key}`,
     alt: altResult.data.alt,
-    width,
-    height,
+    width: dimensions.width,
+    height: dimensions.height,
     size: file.size,
-    contentType: file.type,
+    contentType: dimensions.mime,
   });
 
   await writeAuditLog({

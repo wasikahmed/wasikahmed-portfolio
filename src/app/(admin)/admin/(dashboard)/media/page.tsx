@@ -64,11 +64,11 @@ export default function MediaPage() {
 
       <Card variant="raised" padding="md" className="mt-8 max-w-lg">
         <form onSubmit={onUpload} className="flex flex-col gap-4">
-          <Field label="File" htmlFor="file" hint="JPEG, PNG, WebP, GIF, or SVG — up to 8MB.">
+          <Field label="File" htmlFor="file" hint="JPEG, PNG, WebP, or GIF — up to 8MB.">
             <input
               id="file"
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="text-fg-muted file:bg-surface-3 file:text-fg text-sm file:mr-3 file:rounded-sm file:border-0 file:px-3 file:py-1.5 file:text-sm"
             />
