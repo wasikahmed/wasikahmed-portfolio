@@ -1,0 +1,75 @@
+name: E2E
+
+# --------------------------------------------------------------------------
+# Deliberately NOT in deploy.yml's path (PLAN.md W4) — a slow browser suite
+# should never gate a hotfix. Runs against a real MongoDB service container,
+# seeded the same way local dev is, and drives the actual standalone-output
+# server shape the production Dockerfile ships (see playwright.config.ts's
+# webServer command) rather than a plain `next start`.
+# --------------------------------------------------------------------------
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Daily, off-hours UTC — catches drift between scheduled runs without
+    # gating anything on the GitHub side.
+    - cron: '17 4 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/portfolio
+      # A throwaway secret — this run's data never leaves the runner. Real
+      # base64 because src/server/totp.ts derives an AES-256-GCM key from
+      # it, same shape `node -e "console.log(require('crypto')...` produces.
+      AUTH_SECRET: ZTJlLWNpLW9ubHktc2VjcmV0LWRvLW5vdC1yZXVzZQ==
+      ADMIN_EMAIL: e2e@example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Not installed by default (confirmed 2026-08-30) — see AGENTS.md §2.
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # scripts/seed.ts runs via `tsx --env-file=.env`, which errors if the
+      # file doesn't exist at all — a plain `env:` block on the job isn't
+      # enough. This CI-only .env never leaves the runner.
+      - name: Write CI .env
+        run: |
+          cat > .env <<EOF
+          MONGODB_URI=${{ env.MONGODB_URI }}
+          AUTH_SECRET=${{ env.AUTH_SECRET }}
+          ADMIN_EMAIL=${{ env.ADMIN_EMAIL }}
+          EOF
+
+      - run: pnpm seed
+
+      - run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

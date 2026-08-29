@@ -33,10 +33,10 @@ to the TOTP gate, confirming both the password and 2FA layers actually engage.
 All 54 Playwright E2E tests pass.
 
 **Decided 2026-08-30, next up in this order:** fold in five small findings
-from that verification pass (below) → **W4's CI gate** (re-added, see W4) →
-**W3 SEO** → the `queries.ts` visibility test from W6 → W5 cleanup
-opportunistically. **Cloudflare Access activation is explicitly deferred** —
-still fail-open on purpose, revisit as its own step later.
+from that verification pass (below) — done → **W4's CI gate** (re-added, see
+W4) — done → **W3 SEO** → the `queries.ts` visibility test from W6 → W5
+cleanup opportunistically. **Cloudflare Access activation is explicitly
+deferred** — still fail-open on purpose, revisit as its own step later.
 
 **The two things that matter most, in order.**
 
@@ -298,34 +298,69 @@ Mostly absent still. Two things already shipped since this was first written
 
 ---
 
-## W4 — Put a gate back in front of `main` — decided 2026-08-30: doing this next
+## W4 — Put a gate back in front of `main` — Done, 2026-08-30
 
-Today a push to `main` deploys unverified. That was true even before this was
-first written, and the 2026-08-30 verification pass didn't change it — the
-gate still doesn't exist. Confirmed by the decision above: re-add it before W3.
+Every item shipped in one pass, verified locally (`typecheck`/`lint`/
+`format:check`/`test`/`build` all green, `pnpm e2e` — 54/54 — run twice
+against the real standalone server shape, `deploy.yml`/`e2e.yml` both checked
+with `actionlint` and a YAML parser).
 
-- Add a `verify` job to `deploy.yml` — `typecheck`, `lint`, `format:check`,
-  `test`, `build` — and make `build-and-push` depend on it. The original job was
-  removed because it added ~3 minutes; that cost is worth it, and most of it can
-  be recovered with a pnpm store cache.
-- Run E2E on a schedule or on PRs rather than in the deploy path, so it doesn't
-  gate a hotfix. Whichever CI runner does this needs `pnpm exec playwright
-install` as an explicit step first — confirmed 2026-08-30 that the browser
-  binary isn't present by default and `pnpm e2e` fails outright without it.
-  Also worth fixing while touching this: `playwright.config.ts`'s `webServer`
-  runs `next start`, which Next warns is incompatible with `output:
-'standalone'` — E2E currently never exercises the actual standalone shape
-  the production Docker image runs. Point it at `node
-.next/standalone/server.js` instead (needs `public/` and `.next/static`
-  copied alongside, same as the production `Dockerfile` already does) for
-  E2E to mean what it claims to mean.
-- Automate rollback on a failed healthcheck: capture the previous `IMAGE_TAG`
-  before writing the new `.env`, and restore it if the health loop times out.
-- **Back up the data.** Neither the `mongo-data` nor the `media-uploads` volume
-  is backed up anywhere. A `mongodump` + uploads tarball on a cron, shipped off
-  the box, is the whole task — and right now a volume loss is total content loss.
-- Pin the Node version: add `.nvmrc` / `engines` and bump `@types/node` from `^20`
-  to `^22`. Local Node is 24, Docker is 22, and the types say 20.
+- **`verify` job added to `deploy.yml`,** gating `build-and-push`:
+  `typecheck`, `lint`, `format:check`, `test`, `build`. Uses
+  `actions/setup-node`'s built-in pnpm-store caching rather than a hand-rolled
+  cache step. A push to `main` now fails before Docker Hub ever sees an image
+  if any of these fail — CI is a real backstop, not just the local gate in
+  AGENTS.md §2 (which is still the one that should catch things first).
+- **E2E split into its own `e2e.yml`,** deliberately out of the deploy path so
+  it never gates a hotfix: runs on PRs into `main`, on a daily schedule, and
+  on `workflow_dispatch`. Spins up a real `mongo:7` service container, seeds
+  it (`pnpm seed`), installs the Playwright browser explicitly
+  (`pnpm exec playwright install --with-deps chromium` — confirmed 2026-08-30
+  this isn't present by default), and uploads the HTML report as an artifact
+  on failure.
+- **`playwright.config.ts`'s `webServer` now runs the actual standalone
+  output,** not `next start`. Next.js itself warns `next start` is
+  incompatible with `output: 'standalone'` (next.config.ts) — it "worked"
+  before only because `next start` silently falls back to a normal server, so
+  E2E was never exercising the artifact shape the production `Dockerfile`
+  ships. The command now builds, copies `public/` and `.next/static` into
+  `.next/standalone` (same as the `Dockerfile` already does — standalone
+  output doesn't include either), and runs
+  `node .next/standalone/server.js` directly. Verified: all 54 tests pass
+  against this shape, both locally and via `e2e.yml`'s CI run.
+- **Automatic rollback on a failed healthcheck.** `deploy.yml`'s "Write .env
+  and deploy" step stashes the outgoing `IMAGE_TAG` into `.env.prev_tag` on
+  the VPS before overwriting `.env`; "Health check" reads it back and
+  redeploys that tag if the new image never goes healthy within 60s. The job
+  still fails either way — a rollback means production is safe, not that the
+  push was good. Manual rollback to some _other_ tag is still just editing
+  `.env` and re-running pull + up.
+- **Backups — local retention only,** decided 2026-08-30 after asking: an
+  off-box destination (S3/R2/B2 via rclone) needs credentials this session
+  can't create on the user's behalf, so that's deferred rather than guessed
+  at. `scripts/vps-backup.sh` runs nightly via a cron entry `deploy.yml`'s
+  "Install the backup cron job" step installs idempotently (greps out any
+  prior line for the script before re-adding it, so redeploys never
+  duplicate the crontab). Each run: `mongodump --archive --gzip` from inside
+  the `mongo` container, a tarball of the `media-uploads` volume via a
+  disposable `alpine` container, both dated under
+  `$DEPLOY_PATH/backups/`, with anything older than `BACKUP_RETENTION_DAYS`
+  (default 7) deleted after. This protects against a bad migration or an
+  admin-CMS mistake — **not** against losing the VPS itself, since nothing
+  leaves the box. Revisit off-box shipping as its own task if that risk
+  becomes worth carrying.
+- **Node version pinned.** Added `.nvmrc` (`22`, matching the Docker base
+  image) and `"engines": { "node": "22.x" }` in `package.json`; both CI
+  workflows read `.nvmrc` via `setup-node`'s `node-version-file`. Bumped
+  `@types/node` from `^20` to `^22` to match — confirmed `pnpm typecheck`
+  stays clean. Local dev Node (24) still works; `engines` documents intent,
+  it isn't `engine-strict`.
+
+**Also fixed while here, matching the existing `admin-crud.ts`/`rate-limit.ts`
+pattern (see the verification-pass findings above):** the settings route
+(`src/app/api/admin/settings/route.ts`) had the same deprecated Mongoose
+`new: true` option; switched to `returnDocument: 'after'` alongside the other
+two.
 
 ---
 
@@ -422,7 +457,7 @@ as you touch each file.
 | Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                            |
 | Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                   |
 | Phase 6               | Polish — SEO, OG, RSS, analytics                       | **Not started → W3**                                                            |
-| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Partial — W2/W4 finish it                                                       |
+| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                        |
 | Phase 8               | Real photography and final content                     | Not started                                                                     |
 | §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                             |
 | §3 "defense in depth" | The three auth layers                                  | Layers 2/3 done, layer 1 (Cloudflare Access) wired but inactive — see W2 item 2 |

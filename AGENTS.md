@@ -223,15 +223,28 @@ and there must not be one.
 
 ## 10. Deployment
 
-Push to `main` → GitHub Actions builds a `linux/amd64` image, pushes it to Docker
-Hub tagged `sha-<short>`, SSHes to the VPS, writes `.env` from repo
-secrets/variables, and runs `docker compose -f docker-compose.prod.yml pull && up -d`.
+Push to `main` → `deploy.yml`'s `verify` job runs `typecheck`/`lint`/`format:check`/
+`test`/`build`, then (only if that passes) `build-and-push` builds a `linux/amd64`
+image and pushes it to Docker Hub tagged `sha-<short>`, then `deploy` SSHes to the
+VPS, writes `.env` from repo secrets/variables, and runs `docker compose -f
+docker-compose.prod.yml pull && up -d`. E2E runs separately, in `e2e.yml`, on a
+daily schedule and on PRs — not in this path, so a slow browser suite never gates
+a hotfix. The local gate in §2 is still worth running before pushing; CI is a
+backstop, not a substitute for running it yourself first.
 
-**CI runs no tests, lint, or typecheck.** A push to `main` is the ship signal.
-The local gate in §2 is the only gate that exists.
+Rollback on a failed healthcheck is automatic (`deploy.yml`'s `deploy` job stashes
+the outgoing `IMAGE_TAG` before overwriting `.env` and restores it if the new
+image never goes healthy) — the job still fails either way, since a rollback
+means production is safe, not that the push was good. To roll back to some
+_other_ tag manually: SSH in, set `IMAGE_TAG` in `.env`, re-run pull + up.
 
-Rollback is manual: SSH in, set `IMAGE_TAG` in `.env` to the previous `sha-` tag,
-re-run pull + up.
+**Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
+backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump` plus a
+tarball of the `media-uploads` volume, both dated and rotated locally under
+`$DEPLOY_PATH/backups` (default 7-day retention). Local retention only,
+deliberately, decided 2026-08-30 (PLAN.md W4) — it protects against a bad
+migration or an admin-CMS mistake, not against losing the VPS itself. Revisit
+shipping these off-box as its own task if that risk becomes worth carrying.
 
 ---
 

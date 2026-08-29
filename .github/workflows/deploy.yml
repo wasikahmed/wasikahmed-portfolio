@@ -1,13 +1,13 @@
 name: Build and deploy
 
 # --------------------------------------------------------------------------
-# No test job. typecheck/lint/unit/build/e2e ran here too, once — the full
-# suite added ~3 minutes to every single deploy, on top of a build+push
-# that's already the slow part. Run `pnpm typecheck && pnpm lint && pnpm
-# test && pnpm build && pnpm e2e` locally before pushing to main instead
-# (see AGENTS.md); this workflow trusts that happened and goes straight to
-# building the image. A push to main IS the "ship it" signal now — nothing
-# gates it on the GitHub side.
+# `verify` gates `build-and-push`: typecheck, lint, format:check, unit tests,
+# build. Re-added 2026-08-30 (PLAN.md W4) after being removed once for
+# costing ~3 minutes per deploy — that cost is worth it now that CI is the
+# only thing standing between a push and production. E2E is deliberately
+# NOT in this path (see e2e.yml) so a slow browser suite never gates a
+# hotfix; this job trusts `pnpm e2e` was run locally per AGENTS.md, or
+# recently by the scheduled e2e.yml run.
 # --------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------
@@ -56,7 +56,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      # generateStaticParams() catches the unreachable-DB case by design
+      # (see the Dockerfile's comment) — no MONGODB_URI needed here either.
+      - run: pnpm build
+
   build-and-push:
+    needs: verify
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     outputs:
@@ -101,13 +124,12 @@ jobs:
     # that probe. Proven pattern: itzwasik/advergo-frontend already
     # deploys to this same VPS this way.
     #
-    # No automatic rollback on a failed healthcheck (there was one in an
-    # earlier version of this job; it never actually ran, since every
-    # attempt so far failed before reaching it). A failed deploy fails the
-    # job loudly and dumps the last 100 log lines instead — recover
-    # manually by SSHing in, editing IMAGE_TAG in .env back to the
-    # previous sha- tag, and running `docker compose -f
-    # docker-compose.prod.yml pull && up -d`.
+    # Rollback on a failed healthcheck, re-added 2026-08-30 (PLAN.md W4).
+    # "Write .env and deploy" stashes the outgoing IMAGE_TAG in
+    # .env.prev_tag on the VPS before overwriting .env; "Health check"
+    # reads it back and redeploys that tag if the new one never goes
+    # healthy. The job still fails either way — a rollback means production
+    # is safe, not that the push was fine.
     steps:
       - uses: actions/checkout@v4
 
@@ -120,16 +142,34 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: mkdir -p ${{ vars.DEPLOY_PATH }}
 
-      - name: Copy the compose file to the VPS
+      - name: Copy the compose file and backup script to the VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ vars.VPS_HOST }}
           port: ${{ vars.VPS_SSH_PORT || '22' }}
           username: ${{ vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: docker-compose.prod.yml
+          source: docker-compose.prod.yml,scripts/vps-backup.sh
           target: ${{ vars.DEPLOY_PATH }}
           strip_components: 0
+
+      - name: Install the backup cron job
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.VPS_HOST }}
+          port: ${{ vars.VPS_SSH_PORT || '22' }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          # scp above lands the script at DEPLOY_PATH/scripts/vps-backup.sh
+          # (strip_components: 0 preserves the source's scripts/ prefix).
+          # Idempotent: strips any prior line referencing this script before
+          # re-adding it, so re-running the workflow never duplicates the
+          # crontab entry. Local retention only — see the script's header.
+          script: |
+            chmod +x ${{ vars.DEPLOY_PATH }}/scripts/vps-backup.sh
+            mkdir -p ${{ vars.DEPLOY_PATH }}/backups
+            CRON_LINE="0 3 * * * ${{ vars.DEPLOY_PATH }}/scripts/vps-backup.sh >> ${{ vars.DEPLOY_PATH }}/backups/backup.log 2>&1"
+            (crontab -l 2>/dev/null | grep -vF "vps-backup.sh"; echo "$CRON_LINE") | crontab -
 
       - name: Write .env and deploy
         uses: appleboy/ssh-action@v1.2.0
@@ -146,6 +186,13 @@ jobs:
           script: |
             set -e
             mkdir -p ${{ vars.DEPLOY_PATH }}
+            cd ${{ vars.DEPLOY_PATH }}
+
+            # Stash the outgoing tag for the health-check step's rollback.
+            # Empty on a first-ever deploy (no .env yet) — the rollback step
+            # treats that as "nothing to roll back to" rather than an error.
+            grep '^IMAGE_TAG=' .env 2>/dev/null | cut -d= -f2 > .env.prev_tag || true
+
             cat > ${{ vars.DEPLOY_PATH }}/.env <<'ENVEOF'
             DOMAIN=${{ vars.DOMAIN }}
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
@@ -165,7 +212,6 @@ jobs:
             ENVEOF
             chmod 600 ${{ vars.DEPLOY_PATH }}/.env
 
-            cd ${{ vars.DEPLOY_PATH }}
             # Explicit -p: DEPLOY_PATH's basename is "portfolio", generic
             # enough to risk colliding with some other project later.
             docker compose -p portfolio -f docker-compose.prod.yml pull
@@ -180,6 +226,7 @@ jobs:
           username: ${{ vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            cd ${{ vars.DEPLOY_PATH }}
             for i in $(seq 1 20); do
               if curl -fs "http://127.0.0.1:${{ vars.PORT_HOST || '5000' }}/api/health" > /dev/null; then
                 echo "Healthy."
@@ -189,4 +236,15 @@ jobs:
             done
             echo "Healthcheck did not pass within 60s." >&2
             docker logs --tail 100 portfolio-web-1 || true
+
+            PREV_TAG=$(cat .env.prev_tag 2>/dev/null || true)
+            if [ -n "$PREV_TAG" ]; then
+              echo "Rolling back to IMAGE_TAG=$PREV_TAG" >&2
+              sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$PREV_TAG/" .env
+              docker compose -p portfolio -f docker-compose.prod.yml pull
+              docker compose -p portfolio -f docker-compose.prod.yml up -d --remove-orphans
+              echo "Rolled back — this deploy still failed and needs investigation." >&2
+            else
+              echo "No previous IMAGE_TAG recorded — nothing to roll back to (first deploy?)." >&2
+            fi
             exit 1
