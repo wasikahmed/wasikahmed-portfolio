@@ -1,6 +1,21 @@
+import Script from 'next/script';
 import { SiteShell } from '@/components/layout/site-shell';
 import { Footer } from '@/components/layout/footer';
 import { getSettings, getProjects, getPosts } from '@/server/queries';
+
+/*
+ * Umami analytics (PLAN.md's former Phase 6 gap, closed 2026-08-30). Both
+ * env vars unset = no script at all, same no-op-if-unset pattern as
+ * email/Turnstile elsewhere. Lives in this layout rather than the root
+ * one deliberately — it wraps only `(site)`, so admin usage is never
+ * counted alongside real visitor traffic. `next/script` picks up the
+ * per-request nonce automatically from the CSP request header proxy.ts
+ * sets (Next's documented pattern — no `nonce` prop needed here); the
+ * beacon's own origin is allow-listed in `connect-src` by proxy.ts's
+ * `buildCsp`.
+ */
+const UMAMI_SCRIPT_URL = process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL;
+const UMAMI_WEBSITE_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 
 /*
  * Every page under this layout is CMS-backed — the layout itself queries
@@ -30,6 +45,13 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         {children}
       </main>
       <Footer settings={settings} />
+      {UMAMI_SCRIPT_URL && UMAMI_WEBSITE_ID ? (
+        <Script
+          src={UMAMI_SCRIPT_URL}
+          data-website-id={UMAMI_WEBSITE_ID}
+          strategy="afterInteractive"
+        />
+      ) : null}
     </SiteShell>
   );
 }

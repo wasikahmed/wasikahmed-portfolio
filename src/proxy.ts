@@ -37,7 +37,26 @@ const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password'];
  * `'unsafe-eval'` is added to `script-src` outside production only —
  * Turbopack/webpack's HMR client relies on it in dev, and there is no
  * tunnel or real attacker surface in front of `pnpm dev`.
+ *
+ * Umami's origin (when `NEXT_PUBLIC_UMAMI_SCRIPT_URL` is set — see the root
+ * layout's analytics script, PLAN.md's former Phase 6 gap) is derived once
+ * at module load rather than parsed per request: the nonce'd `<script>` tag
+ * itself loads fine under `strict-dynamic` regardless of host, but the
+ * tracking beacon it fires is a `fetch`/`XHR` to that same origin by
+ * default, which `connect-src` has to explicitly allow.
  */
+const umamiOrigin = (() => {
+  try {
+    return process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL
+      ? new URL(process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL).origin
+      : null;
+  } catch {
+    // Malformed env value — fail closed (no extra CSP origin) rather than
+    // crash every request's middleware.
+    return null;
+  }
+})();
+
 function buildCsp(nonce: string): string {
   const scriptSrc = [
     "'self'",
@@ -47,13 +66,19 @@ function buildCsp(nonce: string): string {
     ...(process.env.NODE_ENV === 'production' ? [] : ["'unsafe-eval'"]),
   ].join(' ');
 
+  const connectSrc = [
+    "'self'",
+    'https://challenges.cloudflare.com',
+    ...(umamiOrigin ? [umamiOrigin] : []),
+  ].join(' ');
+
   return [
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data:`,
     `font-src 'self'`,
-    `connect-src 'self' https://challenges.cloudflare.com`,
+    `connect-src ${connectSrc}`,
     `frame-src https://challenges.cloudflare.com`,
     `object-src 'none'`,
     `base-uri 'self'`,

@@ -38,6 +38,10 @@ name: Build and deploy
 #                           by this workflow alone.
 #   CF_ACCESS_AUD           The Access application's Audience (AUD) tag,
 #                           from the same dashboard page.
+#   NEXT_PUBLIC_UMAMI_SCRIPT_URL   Self-hosted or cloud Umami script URL.
+#                                  Unset = no analytics script at all (see
+#                                  src/app/(site)/layout.tsx) — optional.
+#   NEXT_PUBLIC_UMAMI_WEBSITE_ID   The Umami site's website ID.
 #
 # Secrets (masked in logs — actual credentials):
 #   DOCKERHUB_TOKEN     Docker Hub access token (not your account password)
@@ -209,6 +213,8 @@ jobs:
             TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
             CF_ACCESS_TEAM_DOMAIN=${{ vars.CF_ACCESS_TEAM_DOMAIN }}
             CF_ACCESS_AUD=${{ vars.CF_ACCESS_AUD }}
+            NEXT_PUBLIC_UMAMI_SCRIPT_URL=${{ vars.NEXT_PUBLIC_UMAMI_SCRIPT_URL }}
+            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
             ENVEOF
             chmod 600 ${{ vars.DEPLOY_PATH }}/.env
 

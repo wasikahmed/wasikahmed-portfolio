@@ -1,4 +1,12 @@
 allowBuilds:
   esbuild: true
+  # false, deliberately: letting this run its postinstall would download a
+  # ~75MB mongod binary on every `pnpm install` — including inside the
+  # Docker build, which never runs a single test and has no use for it.
+  # Skipping the postinstall doesn't break tests: MongoMemoryServer falls
+  # back to downloading the binary itself, on demand, the first time a test
+  # actually calls MongoMemoryServer.create() — a one-time cost on a real
+  # test run, never paid by `next build`.
+  mongodb-memory-server: false
   sharp: false
   unrs-resolver: false
