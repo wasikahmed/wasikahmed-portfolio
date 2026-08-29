@@ -1,8 +1,9 @@
 # PLAN.md
 
 Forward plan, written 2026-08-27 from a full review of the codebase as it stands.
-Verified against a running system on 2026-08-30 (see below). This supersedes
-the original build plan; nothing here is inherited from it.
+Verified against a running system on 2026-08-30, then advanced through W3, W4,
+analytics, and the first W6 test the same day (see below). This supersedes the
+original build plan; nothing here is inherited from it.
 
 Ordering below is a recommendation based on impact, not a contract. Reorder freely.
 
@@ -10,33 +11,37 @@ Ordering below is a recommendation based on impact, not a contract. Reorder free
 
 ## Where the project actually is
 
-**Done, deployed, and now verified live, not just read.** Seven public pages
-rendering entirely from MongoDB; a complete design token system with an
-enforced ambient budget and a tested reduced-motion contract; the typed query
-layer with a published/draft split; a full admin CMS with argon2 + TOTP auth,
-CSRF, Zod validation, an audit log, drag reordering, an MDX editor with live
-preview, and a media library; a production Docker image and a push-to-main
-deploy pipeline to the VPS. The contact form pipeline (W1) is now real and
-deployed, admin password recovery (email OTP) is built and verified, and the
-security hardening pass (W2) is done — see below. A real logomark, favicon,
-and OG image now exist too (`metadataBase` is set), though the rest of W3's
-SEO surface is still open.
+**Done, deployed, and verified live at every step — not just read, and not
+just built.** Seven public pages rendering entirely from MongoDB; a complete
+design token system with an enforced ambient budget and a tested
+reduced-motion contract; the typed query layer with a published/draft split,
+now with a real test proving that split holds (W6 item 1); a full admin CMS
+with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag reordering,
+an MDX editor with live preview, and a media library; a full SEO surface
+(sitemap, robots, RSS, JSON-LD, per-page dynamic OG images, canonical URLs —
+W3); Umami analytics wired in behind two optional env vars; a CI-gated,
+auto-rollback, backed-up, Node-pinned deploy pipeline to the VPS (W4). The
+contact form pipeline (W1) is real and deployed, and admin password recovery
+(email OTP) is built and verified.
 
-**Verified healthy, both statically and by running it.** `typecheck`, `lint`,
-`build`, `test`, and `format:check` all pass clean. No `any`, no `TODO`s, no
-stray `console.log`, no dead dependencies. On 2026-08-30 the actual `Dockerfile`
-production image was built and run against a real Mongo instance (not just
-read) — health check, static generation with `dynamicParams` fallback, CSP
-headers (`'unsafe-eval'` correctly absent outside dev), and every public route
-all confirmed live. The admin login flow was driven through a real browser up
-to the TOTP gate, confirming both the password and 2FA layers actually engage.
-All 54 Playwright E2E tests pass.
+**Verified healthy, statically, by running it, and by breaking it on
+purpose.** `typecheck`, `lint`, `build`, `test`, and `format:check` all pass
+clean. No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
+Every push since 2026-08-30 has gone through the real `Dockerfile` production
+image — built with `--no-cache`, seeded, and hit directly, which is what
+caught the `robots.ts` build-time-freeze bug below and confirmed the Umami
+script clears CSP with a real headless browser. All 54 Playwright E2E tests
+pass, both locally and via the real standalone server shape (W4). The
+`queries.ts` visibility test (W6 item 1) was deliberately sabotaged once to
+confirm it actually fails when it should, then restored.
 
-**Decided 2026-08-30, next up in this order:** fold in five small findings
-from that verification pass (below) — done → **W4's CI gate** (re-added, see
-W4) — done → **W3 SEO** — done → the `queries.ts` visibility test from W6 →
-W5 cleanup opportunistically. **Cloudflare Access activation is explicitly
-deferred** — still fail-open on purpose, revisit as its own step later.
+**Decided 2026-08-30, work completed in this order:** fold in five small
+findings from the verification pass (below) — done → **W4's CI gate** —
+done → **W3 SEO** — done → **Umami analytics** (the rest of Phase 6) — done
+→ **the `queries.ts` visibility test from W6** — done. **Cloudflare Access
+activation is explicitly deferred** — still fail-open on purpose, revisit as
+its own step later. Next up: the remaining W6 tests, then W5 cleanup
+opportunistically.
 
 **The one thing that matters most now.**
 
@@ -50,7 +55,8 @@ deferred** — still fail-open on purpose, revisit as its own step later.
    rate limiting, CSP, the SVG upload hole, session `maxAge`, constant-time
    CSRF — is done and now verified live (see below).
 
-The SEO gap that used to be listed here is closed — see W3.
+Every other gap this section used to list — SEO, analytics — is closed. See
+W3 and the Analytics section below.
 
 ---
 
@@ -323,12 +329,39 @@ production `Dockerfile` image built, seeded, and hit directly, not just
   get indexed from an external link, with no snippet). `e2e/motion-contract.spec.ts`'s
   dependency on the route is now moot — nothing moved.
 
-**Not done as part of W3:** analytics (Phase 6 also listed "analytics" —
-`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID` exist in
-`.env.example` but are read nowhere in `src/`, confirmed 2026-08-30). Out of
-scope for "SEO, sharing, and discoverability" specifically; needs its own
-small task — wire the Umami script into the root layout behind those two
-env vars, same no-op-if-unset pattern as email/Turnstile.
+Analytics (Phase 6's other half) was deliberately left out of this pass as
+out of scope for "SEO, sharing, and discoverability" specifically — see
+below, done the same day.
+
+---
+
+## Analytics — Done, 2026-08-30
+
+Umami, self-hosted or cloud, behind two optional env vars — the last piece
+of the old Phase 6 "polish" bucket.
+
+- **`src/app/(site)/layout.tsx`** injects the tracking script via
+  `next/script` (`strategy="afterInteractive"`), only when both
+  `NEXT_PUBLIC_UMAMI_SCRIPT_URL` and `NEXT_PUBLIC_UMAMI_WEBSITE_ID` are
+  set — same no-op-if-unset pattern as email/Turnstile elsewhere. Lives in
+  the `(site)` layout specifically, not the root one, so admin usage is
+  never counted alongside real visitor traffic.
+- **`src/proxy.ts`'s CSP** allow-lists the script's origin (parsed once from
+  `NEXT_PUBLIC_UMAMI_SCRIPT_URL` at module load) in `connect-src` — the
+  nonce'd `<script>` tag itself loads fine under `strict-dynamic` regardless
+  of host, but the tracking beacon it fires is a same-origin `fetch`/`XHR`
+  by default, which `connect-src` has to separately allow.
+- Added to `.env.example` (with a comment saying what reads it) and
+  `deploy.yml`'s variable-docs comment and `.env` heredoc, per AGENTS.md §8.
+- **Verified in the actual production Docker image with a real headless
+  browser** (not just `curl` — a `<script>` tag with `strategy=
+"afterInteractive"` is injected client-side after hydration, so it never
+  appears in the raw SSR HTML): the script renders with the correct
+  `src`/`data-website-id` attributes, fires a request to the configured
+  origin, produces zero CSP-violation console errors, and is confirmed
+  absent from `/admin`. Also confirmed the script is absent entirely from
+  the homepage when both env vars are unset (today's actual production
+  state — nobody has set these yet).
 
 ---
 
@@ -424,27 +457,47 @@ None of this is urgent; all of it is cheap and reduces future bug surface.
   be wrong the moment a fifth ships. `Process.STEPS` and About's `STORY` are
   hardcoded arrays on an otherwise fully CMS-driven site.
 - `formatDate` hardcodes `en-GB`.
-- **Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**
-  Confirmed 2026-08-30 firing a real deprecation warning on every request:
-  `admin-crud.ts:143` and `rate-limit.ts:43` both still use the old option.
+- ~~**Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**~~
+  — **done, 2026-08-30.** Fixed in `admin-crud.ts`, `rate-limit.ts`, and (not
+  in the original finding, same issue) the settings route.
 - ~~Run `pnpm format`~~ — **done.** `pnpm format:check` confirmed clean
   2026-08-30.
-- Drop the stale `_reference/**` exclude from `vitest.config.ts`; that directory
-  no longer exists.
+- ~~Drop the stale `_reference/**` exclude from `vitest.config.ts`~~ — **done,
+  2026-08-30,** in passing while adding the `server-only` alias next to it
+  (W6 item 1).
 - Write a `README.md`. There isn't one.
 
 ---
 
 ## W6 — Testing
 
-Three unit tests exist and all three cover `clamp()`. The E2E suite is genuinely
+Item 1 done, 2026-08-30 — five items still open. Before this pass, three unit
+tests existed and all three covered `clamp()`. The E2E suite is genuinely
 good — route sweep, horizontal-overflow checks at four viewports, command
 palette, and a real reduced-motion contract — but it stops at the public site.
 
 Priority order, by what would actually catch a costly bug:
 
-1. **`queries.ts` visibility rules.** A regression in `visibleNow()` publishes
-   drafts. This is the highest-value test in the repo and does not exist.
+1. ~~**`queries.ts` visibility rules.**~~ — **Done, 2026-08-30.**
+   `src/server/__tests__/queries.test.ts`, 10 tests, against a real ephemeral
+   MongoDB (`mongodb-memory-server`) rather than a mock — covers
+   `getProjects`/`getPosts`/`getAllProjects`/`getAllPosts`/`getProject`/
+   `getPost`/`getProjectSlugs`/`getPostSlugs` across draft,
+   scheduled-future, scheduled-past-due, and published status combinations.
+   Deliberately sabotaged `visibleNow()` once mid-implementation to confirm
+   6/10 tests actually fail when the filter is broken, then restored it —
+   a green test suite that can't go red on its own regression isn't worth
+   having. Required two small infra additions: `vitest.config.ts` now
+   aliases `server-only` to its own empty `react-server` export (every
+   `import 'server-only'` module — `db.ts`, `queries.ts` — threw
+   immediately on import in Vitest otherwise, since Vite doesn't resolve
+   that package's export condition the way Next's bundler does), and
+   `mongodb-memory-server`'s postinstall is disabled in
+   `pnpm-workspace.yaml`'s `allowBuilds` (confirmed it would otherwise
+   download a ~75MB mongod binary on every `pnpm install`, including inside
+   the Docker build, which never runs a test) — the binary instead
+   downloads on demand the first time a real test run needs it, confirmed
+   both ways.
 2. **`admin-crud.ts`** — auth rejection, CSRF rejection, Zod rejection, duplicate
    key → 409, audit entry written.
 3. **`totp.ts`** encrypt/decrypt round-trip and drift window; `password.ts`
@@ -490,7 +543,7 @@ as you touch each file.
 | Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                            |
 | Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                            |
 | Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                   |
-| Phase 6               | Polish — SEO, OG, RSS, analytics                       | SEO done — W3. Analytics (Umami) not started, not in a W                        |
+| Phase 6               | Polish — SEO, OG, RSS, analytics                       | Done — W3 (SEO/OG/RSS) and the Analytics section                                |
 | Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                        |
 | Phase 8               | Real photography and final content                     | Not started                                                                     |
 | §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                             |
