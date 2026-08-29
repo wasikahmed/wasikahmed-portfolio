@@ -177,7 +177,9 @@ export const getSettings = cache(async (): Promise<SettingsType> => {
   if (!doc) {
     return { ...settingsSeed, socials: settingsSeed.socials.map((s) => ({ ...s })) };
   }
-  const normalized: Record<string, unknown> = normalizeDoc(doc);
-  delete normalized.id;
-  return normalized as unknown as SettingsType;
+  // Settings' `_id` is the fixed singleton key, not a per-record identity
+  // like every other collection's — dropped rather than exposed as `id`.
+  const normalized = normalizeDoc(doc);
+  delete (normalized as Record<string, unknown>).id;
+  return normalized as SettingsType;
 });

@@ -158,6 +158,14 @@ export interface Lead {
   message: string;
   status: 'new' | 'read' | 'replied' | 'archived';
   notes?: string;
+  /**
+   * Set server-side in POST /api/contact, never client input — deliberately
+   * absent from `leadSchema` (the untrusted-submission contract). Captured
+   * for moderation/triage but wasn't surfaced anywhere until PLAN.md W5.
+   */
+  source?: string;
+  ipHash?: string;
+  userAgent?: string;
   createdAt: string;
 }
 

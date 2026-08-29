@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /**
  * Admin change history. `userEmail` is denormalized rather than an
@@ -18,4 +18,6 @@ const auditLogSchema = new Schema(
 );
 
 export type AuditLogDocument = InferSchemaType<typeof auditLogSchema>;
-export const AuditLog = mongoose.models.AuditLog ?? mongoose.model('AuditLog', auditLogSchema);
+export const AuditLog =
+  (mongoose.models.AuditLog as Model<AuditLogDocument>) ??
+  mongoose.model<AuditLogDocument>('AuditLog', auditLogSchema);

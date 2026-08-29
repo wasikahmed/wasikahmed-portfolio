@@ -4,6 +4,7 @@ import { Button, ArrowRight } from '@/components/ui/button';
 import { ProjectCard } from '@/components/work/project-card';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { getProjects } from '@/server/queries';
+import { spelledOutCount } from '@/lib/format';
 
 /**
  * Asymmetric offset grid — one of the three sections that deliberately
@@ -14,6 +15,8 @@ import { getProjects } from '@/server/queries';
 export async function SelectedWork() {
   const projects = await getProjects();
   const [lead, ...rest] = projects;
+  const count = spelledOutCount(projects.length);
+  const countCapitalized = count.charAt(0).toUpperCase() + count.slice(1);
 
   return (
     <Section id="work" bordered ambient={['grid']}>
@@ -23,7 +26,9 @@ export async function SelectedWork() {
             <div>
               <Eyebrow rule>Selected work</Eyebrow>
               <h2 className="font-display mt-5 max-w-xl text-3xl font-bold tracking-tight text-balance">
-                Four systems, still in production.
+                {/* Was hardcoded "Four" (PLAN.md W5) — silently wrong the
+                    moment a project shipped or was unpublished. */}
+                {countCapitalized} system{projects.length === 1 ? '' : 's'}, still in production.
               </h2>
             </div>
             <Button href="/work" variant="ghost" className="group">

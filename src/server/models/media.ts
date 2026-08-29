@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /** The media library — uploaded assets, stored on local disk in dev (see /api/admin/media). */
 const mediaSchema = new Schema(
@@ -15,4 +15,6 @@ const mediaSchema = new Schema(
 );
 
 export type MediaDocument = InferSchemaType<typeof mediaSchema>;
-export const Media = mongoose.models.Media ?? mongoose.model('Media', mediaSchema);
+export const Media =
+  (mongoose.models.Media as Model<MediaDocument>) ??
+  mongoose.model<MediaDocument>('Media', mediaSchema);

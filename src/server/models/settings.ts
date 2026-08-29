@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 const linkSchema = new Schema(
   { label: { type: String, required: true }, href: { type: String, required: true } },
@@ -33,4 +33,6 @@ const settingsSchema = new Schema(
 );
 
 export type SettingsDocument = InferSchemaType<typeof settingsSchema>;
-export const Settings = mongoose.models.Settings ?? mongoose.model('Settings', settingsSchema);
+export const Settings =
+  (mongoose.models.Settings as Model<SettingsDocument>) ??
+  mongoose.model<SettingsDocument>('Settings', settingsSchema);

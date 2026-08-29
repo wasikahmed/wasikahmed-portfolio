@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /**
  * Phase 4 — admin auth. Schema only for now; seeded by a CLI script, never
@@ -15,4 +15,5 @@ const userSchema = new Schema(
 );
 
 export type UserDocument = InferSchemaType<typeof userSchema>;
-export const User = mongoose.models.User ?? mongoose.model('User', userSchema);
+export const User =
+  (mongoose.models.User as Model<UserDocument>) ?? mongoose.model<UserDocument>('User', userSchema);

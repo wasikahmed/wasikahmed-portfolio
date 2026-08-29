@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /**
  * One-time codes for the "forgot password" flow. TTL-indexed like
@@ -16,4 +16,5 @@ passwordResetSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export type PasswordResetDocument = InferSchemaType<typeof passwordResetSchema>;
 export const PasswordReset =
-  mongoose.models.PasswordReset ?? mongoose.model('PasswordReset', passwordResetSchema);
+  (mongoose.models.PasswordReset as Model<PasswordResetDocument>) ??
+  mongoose.model<PasswordResetDocument>('PasswordReset', passwordResetSchema);

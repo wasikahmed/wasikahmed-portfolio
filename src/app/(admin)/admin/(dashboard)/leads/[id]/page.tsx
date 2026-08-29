@@ -122,6 +122,30 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               rows={4}
             />
           </Field>
+
+          {lead.source || lead.ipHash || lead.userAgent ? (
+            <details className="group">
+              <summary className="text-2xs text-fg-subtle cursor-pointer font-mono tracking-widest uppercase [&::-webkit-details-marker]:hidden">
+                Technical details <span className="group-open:hidden">▸</span>
+                <span className="hidden group-open:inline">▾</span>
+              </summary>
+              <div className="mt-4 flex flex-col gap-2">
+                {lead.source ? (
+                  <p className="text-2xs text-fg-subtle font-mono">Source: {lead.source}</p>
+                ) : null}
+                {lead.ipHash ? (
+                  <p className="text-2xs text-fg-subtle font-mono break-all">
+                    IP hash: {lead.ipHash}
+                  </p>
+                ) : null}
+                {lead.userAgent ? (
+                  <p className="text-2xs text-fg-subtle font-mono break-all">
+                    User agent: {lead.userAgent}
+                  </p>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
         </div>
       ) : null}
     </div>

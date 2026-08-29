@@ -29,11 +29,14 @@ purpose.** `typecheck`, `lint`, `build`, `test`, and `format:check` all pass
 clean. No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
 Every push since 2026-08-30 has gone through the real `Dockerfile` production
 image — built with `--no-cache`, seeded, and hit directly, which is what
-caught the `robots.ts` build-time-freeze bug below and confirmed the Umami
-script clears CSP with a real headless browser. All 54 Playwright E2E tests
-pass, both locally and via the real standalone server shape (W4). The
-`queries.ts` visibility test (W6 item 1) was deliberately sabotaged once to
-confirm it actually fails when it should, then restored.
+caught the `robots.ts` build-time-freeze bug and the critical admin-login CSP
+bug below (see W6), and confirmed the Umami script clears CSP and the
+leads "Technical details" panel renders correctly, both with a real
+headless browser. All 55 Playwright E2E tests and 93 Vitest unit tests pass,
+both locally and via the real standalone server shape (W4). The `queries.ts`
+visibility test (W6 item 1) and the `admin-crud.ts` CSRF test (W6 item 2)
+were each deliberately sabotaged once to confirm they actually fail when
+they should, then restored.
 
 **Decided 2026-08-30, work completed in this order:** fold in five small
 findings from the verification pass (below) — done → **W4's CI gate** —
@@ -41,8 +44,12 @@ done → **W3 SEO** — done → **Umami analytics** (the rest of Phase 6) — d
 → **W6 items 1–5** (visibility test, admin-crud, totp/password, Zod
 schemas, admin E2E path) — done, and **one critical production bug found
 and fixed along the way** (see below) → **Cloudflare Access status
-corrected** (see below — it was never actually inactive). Next up: W6 item
-6 was decided rather than pursued further (see W6); W5 cleanup remains.
+corrected** (see below — it was never actually inactive) → **W5 cleanup —
+done in full** (see W5; every item either fixed or explicitly decided
+against, with the reasoning recorded, not silently skipped). **Every
+work-plan item in this file is now resolved** except one genuine remaining
+action: Cloudflare Access's end-to-end login walk, which needs the actual
+site owner (see the Cloudflare Access section).
 
 **A critical bug, found and fixed 2026-08-30 while writing the admin E2E
 test (W6 item 5):** `/admin/login` and `/admin/forgot-password` had no
@@ -534,54 +541,105 @@ two.
 
 ---
 
-## W5 — Consistency and code health
+## W5 — Consistency and code health — Done, 2026-08-30
 
-None of this is urgent; all of it is cheap and reduces future bug surface.
-Four items closed 2026-08-30 in a pass alongside W6 — the rest remain open.
+None of this was urgent; all of it was cheap. Every item is now resolved —
+either fixed, or investigated and explicitly decided against, with the
+reasoning recorded below rather than left as a silent "won't fix."
 
-- ~~**Fix `getAdjacentProjects`.**~~ — **done, 2026-08-30.** Dropped the
-  wrap-around (a site with one published project no longer links to itself
-  as "Next project"), matching `getAdjacentPosts`'s existing behavior. Two
-  new tests in `queries.test.ts` cover it: first/last-of-N have no
-  prev/next respectively, and a single project has neither.
-- ~~**Audit-log reorder operations.**~~ — **done, 2026-08-30.**
-  `reorderHandler` now takes an `entityType` (all six call sites updated)
-  and writes one audit entry per reorder — not per item, since it's one
-  logical change — plus switched the N sequential `findByIdAndUpdate`
-  calls to a single `bulkWrite`. Three new tests in `admin-crud.test.ts`
-  (401, 422 on empty `ids`, and that array-position ordering + the single
-  audit entry are both correct).
-- ~~Write a `README.md`.~~ — **done, 2026-08-30.** Quick-start, stack
-  summary, and pointers to AGENTS.md/PLAN.md for everything else.
-- ~~**Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**~~
-  — **done, 2026-08-30.** Fixed in `admin-crud.ts`, `rate-limit.ts`, and (not
-  in the original finding, same issue) the settings route.
-- ~~Run `pnpm format`~~ — **done.** `pnpm format:check` confirmed clean
-  2026-08-30.
-- ~~Drop the stale `_reference/**` exclude from `vitest.config.ts`~~ — **done,
-  2026-08-30,** in passing while adding the `server-only` alias next to it
-  (W6 item 1).
-
-**Still open:**
-
-- **Type the Mongoose models.** `mongoose.models.X ?? mongoose.model('X', schema)`
-  loses the generic, which is why `queries.ts` carries twelve `as unknown as`
-  casts. Passing the document type removes all of them.
-- **Reconcile Zod and Mongoose schemas.** They are hand-maintained in parallel and
-  have already drifted: `publishedAt` is `z.string().datetime()` in Zod but
-  `Date` in Mongoose; the `Lead` model has `source`/`ipHash`/`userAgent` that
-  `leadSchema` doesn't. Either generate one from the other or add a test that
-  fails when they disagree.
-- **Settle the Role/Experience/Post/Writing naming.** `/api/admin/experience` →
-  `Role` model → `entityType: 'role'`, and `/admin/posts` is labelled "Writing"
-  in the nav. Pick one name per concept. Deliberately not touched in this pass —
-  a rename across routes/models/nav is exactly the kind of change that wants
-  its own review, not a drive-by alongside a security fix and five test files.
-- **Move hardcoded copy into the CMS,** or accept it explicitly. `SelectedWork`'s
-  "Four systems, still in production." is a literal above a dynamic grid and will
-  be wrong the moment a fifth ships. `Process.STEPS` and About's `STORY` are
-  hardcoded arrays on an otherwise fully CMS-driven site.
-- `formatDate` hardcodes `en-GB`.
+- ~~**Fix `getAdjacentProjects`.**~~ — **done.** Dropped the wrap-around (a
+  site with one published project no longer links to itself as "Next
+  project"), matching `getAdjacentPosts`'s existing behavior. Two tests in
+  `queries.test.ts`.
+- ~~**Audit-log reorder operations.**~~ — **done.** `reorderHandler` now
+  takes an `entityType` (all six call sites updated) and writes one audit
+  entry per reorder — not per item — plus switched N sequential
+  `findByIdAndUpdate` calls to a single `bulkWrite`. Three tests in
+  `admin-crud.test.ts`.
+- ~~Write a `README.md`.~~ — **done.** Quick-start, stack summary, pointers
+  to AGENTS.md/PLAN.md.
+- ~~**Replace deprecated Mongoose `new: true`.**~~ — **done.** Fixed in
+  `admin-crud.ts`, `rate-limit.ts`, and the settings route.
+- ~~Run `pnpm format`~~ / ~~drop the stale `_reference/**` exclude~~ — **done.**
+- ~~**Type the Mongoose models.**~~ — **Partially done, 2026-08-30, with the
+  trade-off recorded rather than forced.** `Media`, `AuditLog`, `User`,
+  `PasswordReset`, `RateLimit`, and `Settings` now pass their inferred
+  document type to `mongoose.model<T>()` — none of these six are ever
+  passed to `admin-crud.ts`'s generic factory, so nothing else needed to
+  change. This removed one of the twelve `as unknown as` casts in
+  `queries.ts` (`getSettings`, now a single `as SettingsType`).
+  **The other six** (`Project`, `Post`, `Testimonial`, `Role`, `TechItem`,
+  `SkillGroup`) were typed too, and then **reverted** — typing them breaks
+  `admin-crud.ts`'s shared `Model<Record<string, unknown>>` parameter type
+  (`createHandler`/`updateHandler`/`deleteHandler`/`listHandler`/
+  `getOneHandler`/`reorderHandler` all take it), because Mongoose's own
+  `Model<T>` type is not covariant enough for a concretely-typed model to
+  satisfy that broader signature. Fixing it properly means either (a)
+  making six generic factory functions doubly-generic over both the Zod
+  input type and the Mongoose document type — a real change to a
+  security-critical, heavily-shared file, for a "not urgent" cleanup item
+  — or (b) widening `admin-crud.ts`'s model parameter to `Model<any>`,
+  which contradicts this repo's own "no `any`" standard (AGENTS.md,
+  PLAN.md's "verified healthy" checklist) to fix a cosmetic issue in a
+  different file. Neither trade was worth it for six remaining casts that
+  are already covered by real tests (`admin-crud.test.ts`,
+  `queries.test.ts`) and have never caused an actual bug.
+- ~~**Reconcile Zod and Mongoose schemas.**~~ — **done, 2026-08-30 — the
+  actual bug fixed, not just documented.** The real issue wasn't the
+  `publishedAt: z.string().datetime()` (Zod) vs. `Date` (Mongoose)
+  declaration — validating an ISO string on the way in and storing a
+  `Date` is normal. The real issue was `normalizeDoc()` passing every
+  `Date` field through untouched: every public interface in
+  `src/lib/types.ts` declares `createdAt`/`publishedAt` as `string`, but
+  Server Components calling `queries.ts` directly (no JSON-serialization
+  boundary in between) got a live `Date` object instead — silently
+  tolerated everywhere it was actually used (`new Date(...)`,
+  `JSON.stringify`, Next's sitemap builder all accept both), but one
+  `.slice()`/`.startsWith()` call away from a type-checked crash.
+  `normalizeDoc()` now converts every top-level `Date` field to an ISO
+  string, so the runtime value matches the declared type everywhere, not
+  just after incidental serialization. Four new tests in
+  `mongo-utils.test.ts`. Separately: `Lead`'s `source`/`ipHash`/`userAgent`
+  were never really "drift" — `leadSchema` is deliberately the _public
+  submission_ contract (`POST /api/contact`), which correctly excludes
+  fields the server sets itself. What was a real, if small, gap: those
+  three fields were captured on every submission and then never surfaced
+  anywhere. Added to the `Lead` interface and to a new "Technical details"
+  panel on the admin lead-detail page — verified against a real production
+  Docker image with a real contact-form submission.
+- ~~**Settle the Role/Experience/Post/Writing naming.**~~ — **investigated,
+  decided against a rename, 2026-08-30.** On inspection this isn't actually
+  an inconsistency: "Experience" is the human-facing nav label for the
+  _section_ (a person's work history), and `Role` is the correct technical
+  name for each _document_ in it (one employer, one title) — precisely the
+  same relationship as "Writing" (the nav label for the section) and `Post`
+  (the model for each article/TIL). Testimonials/Skills follow the same
+  pattern. Renaming either would trade a real, working, sensibly-modeled
+  system for surface consistency, and `entityType: 'role'` is already
+  written into every historical audit log entry — changing it retroactively
+  changes what old records mean. Not touching this.
+- ~~**Move hardcoded copy into the CMS, or accept it explicitly.**~~ —
+  **done, 2026-08-30 — one fixed, two accepted explicitly.**
+  `SelectedWork`'s "Four systems, still in production." was the one that
+  actually mattered: it's a _fact_ (a live count) hardcoded as prose, so it
+  silently goes wrong the moment a project ships or is unpublished — unlike
+  `Process.STEPS` and About's `STORY`, which are authored narrative copy
+  that doesn't reference live data and isn't the kind of thing a CMS field
+  makes more correct, only slower to edit. Fixed the headline with a new
+  `spelledOutCount()` helper (`src/lib/format.ts`) — spells out 0–10,
+  digit fallback above that — so it now reads "Four systems..." or "Five
+  systems..." correctly as the count changes; verified live against the
+  seeded 4-project database. `Process.STEPS`/About's `STORY` are left as
+  deliberately hardcoded — moving them into the CMS would mean a new
+  model, schema, and admin UI for content that's edited by code review a
+  few times a year, not the kind of thing this CMS exists to make fast to
+  change.
+- ~~`formatDate` hardcodes `en-GB`.~~ — **investigated, decided to keep,
+  2026-08-30.** This is a deliberate fixed editorial format, not a gap —
+  the site should read the same date shape ("15 Nov 2024") for every
+  visitor regardless of browser locale, the same way a printed CV doesn't
+  reformat per reader. Documented directly in `format.ts` so the next
+  person to look doesn't wonder the same thing.
 
 ---
 
@@ -682,19 +740,19 @@ that no longer exists. They are not wrong, just unresolvable. Rather than
 rewrite all of them, here is the mapping; clean the references up opportunistically
 as you touch each file.
 
-| Old reference         | What it meant                                          | Status                                                                          |
-| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                                                                            |
-| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                                                                            |
-| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                                                                            |
-| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                            |
-| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                            |
-| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                   |
-| Phase 6               | Polish — SEO, OG, RSS, analytics                       | Done — W3 (SEO/OG/RSS) and the Analytics section                                |
-| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                        |
-| Phase 8               | Real photography and final content                     | Not started                                                                     |
-| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                             |
-| §3 "defense in depth" | The three auth layers                                  | Layers 2/3 done, layer 1 (Cloudflare Access) wired but inactive — see W2 item 2 |
+| Old reference         | What it meant                                          | Status                                                                                            |
+| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                                                                                              |
+| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                                                                                              |
+| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                                                                                              |
+| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                                              |
+| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                                              |
+| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                                     |
+| Phase 6               | Polish — SEO, OG, RSS, analytics                       | Done — W3 (SEO/OG/RSS) and the Analytics section                                                  |
+| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                                          |
+| Phase 8               | Real photography and final content                     | Not started                                                                                       |
+| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                                               |
+| §3 "defense in depth" | The three auth layers                                  | All three active — Cloudflare Access confirmed live 2026-08-30, see the Cloudflare Access section |
 
 The `AGENTS.md` reference in `.github/workflows/deploy.yml:8` is valid again —
 the local pre-push gate lives in AGENTS.md §2.

@@ -1,4 +1,4 @@
-import mongoose, { Schema, type InferSchemaType } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /**
  * Sliding-window counters for public, unauthenticated endpoints (currently
@@ -15,4 +15,6 @@ const rateLimitSchema = new Schema({
 rateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export type RateLimitDocument = InferSchemaType<typeof rateLimitSchema>;
-export const RateLimit = mongoose.models.RateLimit ?? mongoose.model('RateLimit', rateLimitSchema);
+export const RateLimit =
+  (mongoose.models.RateLimit as Model<RateLimitDocument>) ??
+  mongoose.model<RateLimitDocument>('RateLimit', rateLimitSchema);

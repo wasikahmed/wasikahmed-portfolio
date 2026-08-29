@@ -20,6 +20,8 @@ import mongoose from 'mongoose';
 let mongod: MongoMemoryServer;
 let Project: (typeof import('../models/project'))['Project'];
 let Post: (typeof import('../models/post'))['Post'];
+let Settings: (typeof import('../models/settings'))['Settings'];
+let SETTINGS_SINGLETON_ID: (typeof import('../models/settings'))['SETTINGS_SINGLETON_ID'];
 let queries: typeof import('../queries');
 
 const FIXED_NOW = new Date('2026-08-30T00:00:00.000Z');
@@ -68,6 +70,7 @@ beforeAll(async () => {
   const { connectToDatabase } = await import('../db');
   ({ Project } = await import('../models/project'));
   ({ Post } = await import('../models/post'));
+  ({ Settings, SETTINGS_SINGLETON_ID } = await import('../models/settings'));
   queries = await import('../queries');
 
   // Every query function calls this lazily, but beforeEach below talks to
@@ -85,6 +88,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await Project.deleteMany({});
   await Post.deleteMany({});
+  await Settings.deleteMany({});
 });
 
 describe('visibility — projects', () => {
@@ -199,5 +203,36 @@ describe('visibility — posts', () => {
     ]);
 
     expect((await queries.getPostSlugs()).sort()).toEqual(['published']);
+  });
+});
+
+describe('getSettings', () => {
+  it('falls back to the seed shape when unseeded', async () => {
+    const settings = await queries.getSettings();
+    expect(settings.name).toBeTruthy();
+    expect(Array.isArray(settings.socials)).toBe(true);
+  });
+
+  it('returns the real document without an `id` field (PLAN.md W5)', async () => {
+    await Settings.create({
+      _id: SETTINGS_SINGLETON_ID,
+      name: 'Real Name',
+      initials: 'RN',
+      role: 'Engineer',
+      discipline: 'Systems',
+      tagline: 'Tagline',
+      proof: 'Proof',
+      email: 'real@example.com',
+      location: 'Remote',
+      timezone: 'UTC',
+      available: true,
+      availableFor: 'Work',
+      responseTime: '24h',
+      socials: [],
+    });
+
+    const settings = await queries.getSettings();
+    expect(settings.name).toBe('Real Name');
+    expect('id' in settings).toBe(false);
   });
 });
