@@ -56,6 +56,13 @@ touched anything the public site renders. First time on a machine, install the
 browser binary once: `pnpm exec playwright install` — `pnpm e2e` fails outright
 without it and nothing else in the repo does this for you.
 
+`e2e/admin.spec.ts` additionally needs `pnpm seed:e2e-admin` run first (with
+`E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` set in `.env`) — a deterministic,
+no-TOTP admin account for exercising the real login → create → publish →
+delete pipeline. It `test.skip`s itself cleanly if that account was never
+seeded, so skipping this step just means that one file no-ops rather than
+failing the whole suite.
+
 **Docker dev stack** (Mongo + mongo-express + hot reload):
 
 ```bash

@@ -37,6 +37,10 @@ jobs:
       # it, same shape `node -e "console.log(require('crypto')...` produces.
       AUTH_SECRET: ZTJlLWNpLW9ubHktc2VjcmV0LWRvLW5vdC1yZXVzZQ==
       ADMIN_EMAIL: e2e@example.com
+      # Deterministic, no-TOTP admin account for e2e/admin.spec.ts — see
+      # scripts/seed-e2e-admin.ts. Also throwaway; never reused anywhere else.
+      E2E_ADMIN_EMAIL: e2e-admin@example.com
+      E2E_ADMIN_PASSWORD: e2e-admin-password-not-a-secret
     steps:
       - uses: actions/checkout@v4
 
@@ -61,9 +65,12 @@ jobs:
           MONGODB_URI=${{ env.MONGODB_URI }}
           AUTH_SECRET=${{ env.AUTH_SECRET }}
           ADMIN_EMAIL=${{ env.ADMIN_EMAIL }}
+          E2E_ADMIN_EMAIL=${{ env.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD=${{ env.E2E_ADMIN_PASSWORD }}
           EOF
 
       - run: pnpm seed
+      - run: pnpm seed:e2e-admin
 
       - run: pnpm e2e
 
