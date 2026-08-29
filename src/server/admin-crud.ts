@@ -196,10 +196,17 @@ export function deleteHandler(model: Model<Record<string, unknown>>, entityType:
 
 const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });
 
-/** Drag-to-reorder: body is the full list of ids in their new order. */
-export function reorderHandler(model: Model<Record<string, unknown>>) {
+/**
+ * Drag-to-reorder: body is the full list of ids in their new order.
+ *
+ * `entityType` makes this the one mutation that was missing an audit
+ * entry (AGENTS.md §4 rule 5, a known gap — PLAN.md W5) — one entry per
+ * reorder rather than per item, since the operation is a single logical
+ * change even though it touches every row.
+ */
+export function reorderHandler(model: Model<Record<string, unknown>>, entityType: string) {
   return async function POST(request: NextRequest) {
-    const { response } = await requireSession();
+    const { session, response } = await requireSession();
     if (response) return response;
     const csrfError = verifyCsrf(request);
     if (csrfError) return csrfError;
@@ -211,9 +218,21 @@ export function reorderHandler(model: Model<Record<string, unknown>>) {
     }
 
     await connectToDatabase();
-    await Promise.all(
-      result.data.ids.map((id, index) => model.findByIdAndUpdate(id, { order: index })),
+    // One round trip instead of N sequential findByIdAndUpdate calls
+    // (PLAN.md W5) — same effect, ordering still comes from array index.
+    await model.bulkWrite(
+      result.data.ids.map((id, index) => ({
+        updateOne: { filter: { _id: id }, update: { order: index } },
+      })),
     );
+
+    await writeAuditLog({
+      userEmail: session.email,
+      action: 'update',
+      entityType,
+      entityId: 'reorder',
+      summary: `Reordered ${result.data.ids.length} ${entityType}(s)`,
+    });
 
     return NextResponse.json({ ok: true });
   };

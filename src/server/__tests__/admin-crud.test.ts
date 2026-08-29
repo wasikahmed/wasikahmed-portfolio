@@ -228,3 +228,43 @@ describe('getOneHandler / listHandler', () => {
     expect(body.items).toHaveLength(2);
   });
 });
+
+describe('reorderHandler', () => {
+  it('401s without a session', async () => {
+    unauthed();
+    const res = await admin.reorderHandler(
+      Project,
+      'project',
+    )(req('POST', { body: { ids: ['x'] } }));
+    expect(res.status).toBe(401);
+  });
+
+  it('422s on an empty ids array', async () => {
+    authed();
+    const res = await admin.reorderHandler(Project, 'project')(req('POST', { body: { ids: [] } }));
+    expect(res.status).toBe(422);
+  });
+
+  it('writes order by array position and one audit log entry for the whole batch', async () => {
+    authed();
+    const [a, b, c] = await Project.create([
+      { ...validProject, slug: 'a', order: 0 },
+      { ...validProject, slug: 'b', order: 1 },
+      { ...validProject, slug: 'c', order: 2 },
+    ]);
+
+    // Reversed: c, b, a.
+    const res = await admin.reorderHandler(
+      Project,
+      'project',
+    )(req('POST', { body: { ids: [c._id.toString(), b._id.toString(), a._id.toString()] } }));
+    expect(res.status).toBe(200);
+
+    const bySlug = Object.fromEntries((await Project.find().lean()).map((p) => [p.slug, p.order]));
+    expect(bySlug).toEqual({ a: 2, b: 1, c: 0 });
+
+    const logs = await AuditLog.find().lean();
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ action: 'update', entityType: 'project' });
+  });
+});

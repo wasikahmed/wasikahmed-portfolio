@@ -131,6 +131,33 @@ describe('visibility — projects', () => {
   });
 });
 
+describe('getAdjacentProjects — no wrap-around (PLAN.md W5)', () => {
+  it('the first project has no prev, the last has no next', async () => {
+    await Project.create([
+      project({ slug: 'a', status: 'published', order: 0 }),
+      project({ slug: 'b', status: 'published', order: 1 }),
+      project({ slug: 'c', status: 'published', order: 2 }),
+    ]);
+
+    expect(await queries.getAdjacentProjects('a')).toEqual({
+      prev: undefined,
+      next: expect.objectContaining({ slug: 'b' }),
+    });
+    expect(await queries.getAdjacentProjects('c')).toEqual({
+      prev: expect.objectContaining({ slug: 'b' }),
+      next: undefined,
+    });
+  });
+
+  it('a single published project has neither prev nor next', async () => {
+    await Project.create(project({ slug: 'only', status: 'published' }));
+    expect(await queries.getAdjacentProjects('only')).toEqual({
+      prev: undefined,
+      next: undefined,
+    });
+  });
+});
+
 describe('visibility — posts', () => {
   it('getPosts excludes draft and not-yet-due scheduled, includes published and due scheduled', async () => {
     await Post.create([

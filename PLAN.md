@@ -38,22 +38,48 @@ confirm it actually fails when it should, then restored.
 **Decided 2026-08-30, work completed in this order:** fold in five small
 findings from the verification pass (below) — done → **W4's CI gate** —
 done → **W3 SEO** — done → **Umami analytics** (the rest of Phase 6) — done
-→ **the `queries.ts` visibility test from W6** — done. **Cloudflare Access
-activation is explicitly deferred** — still fail-open on purpose, revisit as
-its own step later. Next up: the remaining W6 tests, then W5 cleanup
-opportunistically.
+→ **W6 items 1–5** (visibility test, admin-crud, totp/password, Zod
+schemas, admin E2E path) — done, and **one critical production bug found
+and fixed along the way** (see below) → **Cloudflare Access status
+corrected** (see below — it was never actually inactive). Next up: W6 item
+6 was decided rather than pursued further (see W6); W5 cleanup remains.
 
-**The one thing that matters most now.**
+**A critical bug, found and fixed 2026-08-30 while writing the admin E2E
+test (W6 item 5):** `/admin/login` and `/admin/forgot-password` had no
+dynamic API call of their own, so Next statically prerendered both at
+build time — freezing ONE nonce into their `<script>` tags forever, while
+`proxy.ts`'s CSP header carries a fresh nonce on every request. Under
+`strict-dynamic`, a mismatched nonce means the script doesn't run at all —
+**the admin login page could not hydrate in any CSP-enforcing browser
+since the CSP rollout (W2, 2026-08-27)**, meaning the login form was
+non-interactive in production for a real user this whole time, unless
+their browser or an extension happened to relax CSP. Fixed with
+`export const dynamic = 'force-dynamic'` on both pages (same pattern
+`(site)/layout.tsx` already used, different reason). Verified against a
+`--no-cache` production Docker build: header and HTML nonce now match, on
+two separate requests, for both pages. See W2 and W6 below for the full
+writeup.
 
-1. **Cloudflare Access is still inactive in production — deferred, not
-   forgotten.** The verification code is correct and `CF_ACCESS_TEAM_DOMAIN` /
-   `CF_ACCESS_AUD` now flow through the deploy workflow's `.env` (W2 item 2),
-   but nothing has set them yet — that requires creating the actual Access
-   application in the Cloudflare dashboard, a manual step outside this repo,
-   and outside this round of work by deliberate choice (2026-08-30). Until
-   then `verifyCloudflareAccess` keeps no-opping. Everything else in W2 — auth
-   rate limiting, CSP, the SVG upload hole, session `maxAge`, constant-time
-   CSRF — is done and now verified live (see below).
+**Cloudflare Access status corrected, 2026-08-30 — it is already active,
+not deferred.** Every prior version of this file (including several
+versions written earlier today) claimed Cloudflare Access was inactive/
+no-opping in production. That was wrong. Discovered by accident: hitting
+`https://wasikahmed.me/admin/login` directly during the CSP bug
+investigation above returned a `302` to
+`wasikahmed.cloudflareaccess.com`'s own login page — Cloudflare's edge is
+actively gating `/admin` right now. Checking further: `CF_ACCESS_TEAM_DOMAIN`
+and `CF_ACCESS_AUD` have been set as real GitHub repo variables since
+**2026-08-27** (`gh variable list` confirms both, predating this entire
+session), and `deploy.yml` has written them into the deployed `.env` on
+every push since then (W2 item 2 shipped that wiring the same day). Since
+`cloudflareAccessConfigured()` in `src/server/cloudflare-access.ts` is
+`Boolean(CF_ACCESS_TEAM_DOMAIN && CF_ACCESS_AUD)`, the app has **not** been
+no-opping either — `verifyCloudflareAccess()` has been actively verifying
+the `Cf-Access-Jwt-Assertion` JWT on every `/admin/*` and `/api/admin/*`
+request reaching the origin for the same three days. Both layers of
+defense-in-depth's "layer 1" have been live the entire time this session
+was (incorrectly) describing it as deferred. See the **Cloudflare Access**
+section below for what's actually left to verify.
 
 Every other gap this section used to list — SEO, analytics — is closed. See
 W3 and the Analytics section below.
@@ -234,14 +260,16 @@ Ordered by exposure in the original plan; all seven items addressed.
    `CredentialsSignin` error, the 9th returns `RATE_LIMITED`; a legitimate
    login with correct credentials for a fresh email still reaches
    `TOTP_REQUIRED` normally.
-2. **Cloudflare Access wiring, not yet activated.** `CF_ACCESS_TEAM_DOMAIN`
-   and `CF_ACCESS_AUD` now flow through `deploy.yml`'s heredoc from repo
-   variables. **Left fail-open on purpose** — flipping `verifyCloudflareAccess`
-   to fail closed when unset would lock `/admin` out entirely on the next
-   deploy, since no Access application exists in the Cloudflare dashboard yet
-   (that's a manual step, outside what this repo can do). Revisit fail-closed
-   once the Access application is actually configured and `CF_ACCESS_TEAM_DOMAIN`/
-   `CF_ACCESS_AUD` are set as real repo variables.
+2. **Cloudflare Access wiring — and, corrected 2026-08-30, actually
+   activated the same day this was written.** `CF_ACCESS_TEAM_DOMAIN` and
+   `CF_ACCESS_AUD` flow through `deploy.yml`'s heredoc from repo variables,
+   which were set for real on 2026-08-27 (same day as this W2 entry) —
+   `gh variable list` confirms both, and every deploy since has written
+   them into production. This repo's own PLAN.md nonetheless kept
+   describing this as "not yet activated" / "deferred" through several
+   rounds of edits, discovered wrong only on 2026-08-30 while investigating
+   the CSP bug in W6 below. See the **Cloudflare Access** section for the
+   current, verified status and what's still open.
 3. **SVG uploads dropped.** Removed from `ALLOWED_TYPES` in
    `/api/admin/media` and the upload input's `accept`.
 4. **Security headers, CSP included.** Added in `proxy.ts` — CSP (nonce-based
@@ -262,6 +290,16 @@ Ordered by exposure in the original plan; all seven items addressed.
    extension wasn't connected this session, so this fell back to server-side
    HTML inspection instead. Worth a real browser pass before relying on it
    further, especially for the Turnstile widget and TOTP QR code.
+
+   **This gap turned out to matter, 2026-08-30:** the "every script tag
+   carries a matching nonce" check above only verified a nonce was
+   _present_, not that it matched the response's actual CSP header — which
+   held for every page except `/admin/login` and `/admin/forgot-password`,
+   both statically prerendered and therefore serving one nonce forever
+   against a fresh per-request header. A real headless-browser console
+   check (which this W2 pass explicitly flagged as unverified) would have
+   caught it immediately. Fixed in W6 below.
+
 5. **Uploads validated by content.** `/api/admin/media` now rejects a file
    `probe-image-size` can't read or whose detected `mime` isn't in
    `ALLOWED_TYPES`, and derives the stored extension from that detected type
@@ -270,6 +308,71 @@ Ordered by exposure in the original plan; all seven items addressed.
 6. **Session `maxAge` set to 7 days,** down from Auth.js's 30-day default.
 7. **`verifyCsrf` now uses a constant-time compare** (manual XOR loop — Edge
    runtime has no `node:crypto.timingSafeEqual`).
+
+---
+
+## Cloudflare Access — active, status corrected 2026-08-30
+
+**Read this before touching anything Cloudflare-related — it corrects
+every earlier version of this file, including several written earlier in
+this same day.** The short version: it is already on. Do not "activate"
+it again; do not re-wire `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` thinking
+they're unset. Verify, don't redo.
+
+**What's actually confirmed, and how:**
+
+- `CF_ACCESS_TEAM_DOMAIN=wasikahmed.cloudflareaccess.com` and
+  `CF_ACCESS_AUD` are set as real GitHub repo variables — `gh variable list`
+  confirms both, dated 2026-08-27. Every deploy since (`deploy.yml`'s
+  heredoc) has written them into the VPS's `.env`.
+- `src/server/cloudflare-access.ts`'s `cloudflareAccessConfigured()` is
+  `Boolean(CF_ACCESS_TEAM_DOMAIN && CF_ACCESS_AUD)` — both being set means
+  `verifyCloudflareAccess()` has been actively verifying the
+  `Cf-Access-Jwt-Assertion` header's JWT (signature, audience) against
+  Cloudflare's own JWKS on every `/admin/*` and `/api/admin/*` request
+  reaching the origin, not no-opping, since 2026-08-27.
+- **The Cloudflare-side Access application exists too** — confirmed
+  2026-08-30 by hitting `https://wasikahmed.me/admin/login` directly (no
+  cookies, no auth) and getting a real `302` to
+  `wasikahmed.cloudflareaccess.com`'s own hosted login page, with a
+  `CF_AppSession` cookie set and a `WWW-Authenticate: Cloudflare-Access`
+  header. That is Cloudflare's edge itself gating the route — this is not
+  something the app or `deploy.yml` could produce on its own; someone
+  configured an actual Access application in the Cloudflare dashboard for
+  this hostname/path, outside this repo, at some point on or before
+  2026-08-27.
+
+**So both defense-in-depth layers described in AGENTS.md §7 — edge-level
+Cloudflare Access, and the app's own JWT verification — have been live for
+three days.** This directly contradicts every prior claim in this file
+("deferred," "no-opping," "not yet activated"); those were wrong, not
+this correction.
+
+**What is NOT yet confirmed, and is the actual remaining TODO:**
+
+- **Nobody has walked the real end-to-end flow** in this session: Cloudflare
+  Access login (whatever identity provider it's configured with — Google,
+  a one-time PIN, GitHub, etc.) → origin receives a valid
+  `Cf-Access-Jwt-Assertion` → the app's own password + TOTP layer still
+  applies on top. This needs the actual site owner, since it requires a
+  real Access-authorized identity — nothing this session can script or
+  fake. **Action: log in through `https://wasikahmed.me/admin/login`
+  yourself once, end to end, and confirm it reaches the password form
+  after Access clears you.**
+- **Whether fail-open is still the right default is now a live question,
+  not a hypothetical one.** `verifyCloudflareAccess()` returns `true` when
+  the env vars are unset (fail-open) — reasonable when nothing was
+  configured, but the vars _are_ configured now, in production, meaning a
+  future accidental unset (a botched `.env` rewrite, a variable deleted in
+  the GitHub UI) would silently fall back to open rather than failing
+  closed. Worth deciding deliberately: alert if `NODE_ENV=production` and
+  these vars are missing, at minimum.
+- **Which identity provider Access is configured with, and who besides the
+  site owner has access** — not visible from this repo or from the outside
+  and not addressed here.
+- Update AGENTS.md §7 if it still describes this as inactive (check before
+  the next edit there — this correction was made directly to PLAN.md,
+  worth propagating).
 
 ---
 
@@ -434,6 +537,32 @@ two.
 ## W5 — Consistency and code health
 
 None of this is urgent; all of it is cheap and reduces future bug surface.
+Four items closed 2026-08-30 in a pass alongside W6 — the rest remain open.
+
+- ~~**Fix `getAdjacentProjects`.**~~ — **done, 2026-08-30.** Dropped the
+  wrap-around (a site with one published project no longer links to itself
+  as "Next project"), matching `getAdjacentPosts`'s existing behavior. Two
+  new tests in `queries.test.ts` cover it: first/last-of-N have no
+  prev/next respectively, and a single project has neither.
+- ~~**Audit-log reorder operations.**~~ — **done, 2026-08-30.**
+  `reorderHandler` now takes an `entityType` (all six call sites updated)
+  and writes one audit entry per reorder — not per item, since it's one
+  logical change — plus switched the N sequential `findByIdAndUpdate`
+  calls to a single `bulkWrite`. Three new tests in `admin-crud.test.ts`
+  (401, 422 on empty `ids`, and that array-position ordering + the single
+  audit entry are both correct).
+- ~~Write a `README.md`.~~ — **done, 2026-08-30.** Quick-start, stack
+  summary, and pointers to AGENTS.md/PLAN.md for everything else.
+- ~~**Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**~~
+  — **done, 2026-08-30.** Fixed in `admin-crud.ts`, `rate-limit.ts`, and (not
+  in the original finding, same issue) the settings route.
+- ~~Run `pnpm format`~~ — **done.** `pnpm format:check` confirmed clean
+  2026-08-30.
+- ~~Drop the stale `_reference/**` exclude from `vitest.config.ts`~~ — **done,
+  2026-08-30,** in passing while adding the `server-only` alias next to it
+  (W6 item 1).
+
+**Still open:**
 
 - **Type the Mongoose models.** `mongoose.models.X ?? mongoose.model('X', schema)`
   loses the generic, which is why `queries.ts` carries twelve `as unknown as`
@@ -443,71 +572,89 @@ None of this is urgent; all of it is cheap and reduces future bug surface.
   `Date` in Mongoose; the `Lead` model has `source`/`ipHash`/`userAgent` that
   `leadSchema` doesn't. Either generate one from the other or add a test that
   fails when they disagree.
-- **Audit-log reorder operations.** `reorderHandler` is the only mutation that
-  writes no audit entry. It also issues N sequential `findByIdAndUpdate` calls
-  where one `bulkWrite` would do.
 - **Settle the Role/Experience/Post/Writing naming.** `/api/admin/experience` →
   `Role` model → `entityType: 'role'`, and `/admin/posts` is labelled "Writing"
-  in the nav. Pick one name per concept.
-- **Fix `getAdjacentProjects`.** It wraps around, so a site with one published
-  project links to itself as "Next project". `getAdjacentPosts` doesn't wrap —
-  make them agree.
+  in the nav. Pick one name per concept. Deliberately not touched in this pass —
+  a rename across routes/models/nav is exactly the kind of change that wants
+  its own review, not a drive-by alongside a security fix and five test files.
 - **Move hardcoded copy into the CMS,** or accept it explicitly. `SelectedWork`'s
   "Four systems, still in production." is a literal above a dynamic grid and will
   be wrong the moment a fifth ships. `Process.STEPS` and About's `STORY` are
   hardcoded arrays on an otherwise fully CMS-driven site.
 - `formatDate` hardcodes `en-GB`.
-- ~~**Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**~~
-  — **done, 2026-08-30.** Fixed in `admin-crud.ts`, `rate-limit.ts`, and (not
-  in the original finding, same issue) the settings route.
-- ~~Run `pnpm format`~~ — **done.** `pnpm format:check` confirmed clean
-  2026-08-30.
-- ~~Drop the stale `_reference/**` exclude from `vitest.config.ts`~~ — **done,
-  2026-08-30,** in passing while adding the `server-only` alias next to it
-  (W6 item 1).
-- Write a `README.md`. There isn't one.
 
 ---
 
 ## W6 — Testing
 
-Item 1 done, 2026-08-30 — five items still open. Before this pass, three unit
-tests existed and all three covered `clamp()`. The E2E suite is genuinely
-good — route sweep, horizontal-overflow checks at four viewports, command
-palette, and a real reduced-motion contract — but it stops at the public site.
+Items 1–5 done, 2026-08-30 — item 6 decided rather than pursued (see below).
+Before this pass, three unit tests existed and all three covered `clamp()`;
+now 85 do, across six files, plus a fifth E2E spec covering the real admin
+path. The E2E suite is genuinely good — route sweep, horizontal-overflow
+checks at four viewports, command palette, a real reduced-motion contract,
+and now a full admin login → create → publish → delete round trip — and no
+longer stops at the public site.
 
 Priority order, by what would actually catch a costly bug:
 
 1. ~~**`queries.ts` visibility rules.**~~ — **Done, 2026-08-30.**
-   `src/server/__tests__/queries.test.ts`, 10 tests, against a real ephemeral
+   `src/server/__tests__/queries.test.ts`, against a real ephemeral
    MongoDB (`mongodb-memory-server`) rather than a mock — covers
    `getProjects`/`getPosts`/`getAllProjects`/`getAllPosts`/`getProject`/
    `getPost`/`getProjectSlugs`/`getPostSlugs` across draft,
-   scheduled-future, scheduled-past-due, and published status combinations.
-   Deliberately sabotaged `visibleNow()` once mid-implementation to confirm
-   6/10 tests actually fail when the filter is broken, then restored it —
-   a green test suite that can't go red on its own regression isn't worth
-   having. Required two small infra additions: `vitest.config.ts` now
-   aliases `server-only` to its own empty `react-server` export (every
-   `import 'server-only'` module — `db.ts`, `queries.ts` — threw
-   immediately on import in Vitest otherwise, since Vite doesn't resolve
-   that package's export condition the way Next's bundler does), and
-   `mongodb-memory-server`'s postinstall is disabled in
+   scheduled-future, scheduled-past-due, and published status combinations,
+   plus (added same day, folded in alongside the W5 fix) `getAdjacentProjects`'s
+   wrap-around removal. Deliberately sabotaged `visibleNow()` once
+   mid-implementation to confirm 6/10 tests actually fail when the filter
+   is broken, then restored it — a green test suite that can't go red on
+   its own regression isn't worth having. Required two small infra
+   additions: `vitest.config.ts` now aliases `server-only` to its own empty
+   `react-server` export (every `import 'server-only'` module — `db.ts`,
+   `queries.ts` — threw immediately on import in Vitest otherwise, since
+   Vite doesn't resolve that package's export condition the way Next's
+   bundler does), and `mongodb-memory-server`'s postinstall is disabled in
    `pnpm-workspace.yaml`'s `allowBuilds` (confirmed it would otherwise
    download a ~75MB mongod binary on every `pnpm install`, including inside
    the Docker build, which never runs a test) — the binary instead
    downloads on demand the first time a real test run needs it, confirmed
    both ways.
-2. **`admin-crud.ts`** — auth rejection, CSRF rejection, Zod rejection, duplicate
-   key → 409, audit entry written.
-3. **`totp.ts`** encrypt/decrypt round-trip and drift window; `password.ts`
-   hash/verify.
-4. **Zod schemas** — that each one rejects the shapes it is supposed to.
-5. **An admin E2E path**: log in, create a project, publish it, confirm it
-   appears on the public site, delete it.
-6. Make E2E seed its own fixtures. It currently navigates to hardcoded slugs
-   (`docflow-ai`, `when-to-build-vs-buy-ai`) and fails outright against a fresh
-   database.
+2. ~~**`admin-crud.ts`**~~ — **Done, 2026-08-30.**
+   `src/server/__tests__/admin-crud.test.ts` — the four things AGENTS.md §4
+   rule 5 requires (session check, CSRF, Zod, audit log) proven against the
+   real generic factory, plus 409 on a duplicate key and (added alongside
+   the W5 reorder fix) the reorder handler's own 401/422/bulk-write/
+   single-audit-entry behavior. `getAdminSession` is mocked (its own
+   integration surface, not what this file tests); CSRF and the database
+   side are real, via the same `mongodb-memory-server` pattern as item 1.
+3. ~~**`totp.ts`** encrypt/decrypt round-trip and drift window;
+   **`password.ts`** hash/verify.~~ — **Done, 2026-08-30.**
+   `totp.test.ts`: AES-256-GCM round-trip, a fresh IV each call, GCM
+   auth-tag tamper detection, drift window (accepts one period back,
+   rejects three), whitespace trimming. `password.test.ts`: argon2id
+   round-trip, wrong-password rejection, per-call salt, and
+   `generatePassword`'s excluded-character set.
+4. ~~**Zod schemas**~~ — **Done, 2026-08-30.** `schemas.test.ts`, 40 tests —
+   every exported schema, a happy path plus a representative rejection per
+   constraint (enum, regex, min/max length, required field).
+5. ~~**An admin E2E path**~~ — **Done, 2026-08-30.** `e2e/admin.spec.ts`:
+   log in with a deterministic no-TOTP account
+   (`scripts/seed-e2e-admin.ts` / `pnpm seed:e2e-admin`), create a project
+   through the real form, publish it, confirm it's live on `/work`, delete
+   it, confirm 404 on both the admin list and the public route. **This is
+   what surfaced the critical CSP bug** documented at the top of this
+   file and in W2 — the test could not get past the login page at all
+   until `admin/login/page.tsx` and `admin/forgot-password/page.tsx` were
+   fixed with `force-dynamic`.
+6. **Decided, not pursued further, 2026-08-30:** making E2E seed its own
+   fixtures independent of the real seed-data. `site.spec.ts`'s specific
+   content assertions (exact headline metrics, filter counts, command-palette
+   results) are deliberately coupled to the actual seed-data — correct for a
+   single-tenant site with fixed, versioned content, since decoupling them
+   would trade real content-regression coverage for marginal robustness
+   benefit. `pnpm seed` is already a required, documented step everywhere
+   E2E actually runs (both locally, per AGENTS.md §2, and in `e2e.yml`), so
+   the practical form of "fails outright against a fresh database" is
+   already handled — a fresh database is never what any real run uses.
 
 ---
 

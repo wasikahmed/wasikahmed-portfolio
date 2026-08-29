@@ -72,9 +72,13 @@ export async function getAdjacentProjects(slug: string) {
   const projects = await getProjects();
   const index = projects.findIndex((p) => p.slug === slug);
   if (index === -1) return { prev: undefined, next: undefined };
+  // Matches getAdjacentPosts below: no wrap-around. A site with exactly
+  // one published project used to link "Next project" back to itself
+  // (PLAN.md W5) — the case-study page already guards `next`/`prev` being
+  // undefined, so there's no reason for this one to differ.
   return {
-    prev: index > 0 ? projects[index - 1] : projects[projects.length - 1],
-    next: index < projects.length - 1 ? projects[index + 1] : projects[0],
+    prev: index > 0 ? projects[index - 1] : undefined,
+    next: index < projects.length - 1 ? projects[index + 1] : undefined,
   };
 }
 

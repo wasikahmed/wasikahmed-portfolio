@@ -174,8 +174,12 @@ Fonts: Inter (`font-sans`), Space Grotesk (`font-display`), JetBrains Mono
 Three layers, in order:
 
 1. **Cloudflare Access** (`src/server/cloudflare-access.ts`) — verifies the
-   `Cf-Access-Jwt-Assertion` JWT at the origin. **No-ops when `CF_ACCESS_*` is
-   unset, which is currently the case in production.** See PLAN.md W2.
+   `Cf-Access-Jwt-Assertion` JWT at the origin. No-ops only when `CF_ACCESS_*`
+   is unset — which it is **not** in production: both vars have been set as
+   real repo variables since 2026-08-27, confirmed active (edge-level
+   Cloudflare Access application + app-level JWT verification, both live).
+   See PLAN.md's "Cloudflare Access" section for the full correction and
+   what's still unverified.
 2. **Session** — Auth.js JWT cookie, checked in `src/proxy.ts` for
    `/admin/*` and `/api/admin/*`, then re-checked in the dashboard layout and
    again in every API route.
@@ -260,10 +264,12 @@ shipping these off-box as its own task if that risk becomes worth carrying.
 The public site, design system, data layer, and admin CMS are complete and
 deployed. The contact form is real end to end (Turnstile + rate limiting +
 Gmail SMTP notifications + a working `/admin/leads` list/detail/status
-pipeline), and TOTP has been verified working in dev. `/admin` is still
-protected by password + TOTP only — Cloudflare Access is written but inactive
-in production. The SEO surface is done (sitemap, robots, per-page dynamic OG
-images, RSS, JSON-LD, canonical URLs) — see PLAN.md W3. CI now gates every
-push to `main` (typecheck/lint/format:check/test/build) before it ships, with
-E2E running separately on PRs and a daily schedule — see PLAN.md W4. See
+pipeline), and TOTP has been verified working in dev. `/admin` is protected by
+all three layers described in §7 — Cloudflare Access, session, credentials —
+Cloudflare Access included, confirmed active in production 2026-08-30 (see
+PLAN.md's "Cloudflare Access" section). The SEO surface is done (sitemap,
+robots, per-page dynamic OG images, RSS, JSON-LD, canonical URLs) — see
+PLAN.md W3. CI now gates every push to `main`
+(typecheck/lint/format:check/test/build) before it ships, with E2E running
+separately on PRs and a daily schedule — see PLAN.md W4. See
 `PLAN.md` for what is left and in what order.
