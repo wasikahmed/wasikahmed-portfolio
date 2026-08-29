@@ -1,7 +1,8 @@
 # PLAN.md
 
 Forward plan, written 2026-08-27 from a full review of the codebase as it stands.
-This supersedes the original build plan; nothing here is inherited from it.
+Verified against a running system on 2026-08-30 (see below). This supersedes
+the original build plan; nothing here is inherited from it.
 
 Ordering below is a recommendation based on impact, not a contract. Reorder freely.
 
@@ -9,35 +10,105 @@ Ordering below is a recommendation based on impact, not a contract. Reorder free
 
 ## Where the project actually is
 
-**Done and deployed.** Seven public pages rendering entirely from MongoDB; a
-complete design token system with an enforced ambient budget and a tested
-reduced-motion contract; the typed query layer with a published/draft split; a
-full admin CMS with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag
-reordering, an MDX editor with live preview, and a media library; a production
-Docker image and a push-to-main deploy pipeline to the VPS. The contact form
-pipeline (W1) is now real and deployed, admin password recovery (email OTP) is
-built and verified, and the security hardening pass (W2) is done — see below.
-A real logomark, favicon, and OG image now exist too (`metadataBase` is set),
-though the rest of W3's SEO surface is still open.
+**Done, deployed, and now verified live, not just read.** Seven public pages
+rendering entirely from MongoDB; a complete design token system with an
+enforced ambient budget and a tested reduced-motion contract; the typed query
+layer with a published/draft split; a full admin CMS with argon2 + TOTP auth,
+CSRF, Zod validation, an audit log, drag reordering, an MDX editor with live
+preview, and a media library; a production Docker image and a push-to-main
+deploy pipeline to the VPS. The contact form pipeline (W1) is now real and
+deployed, admin password recovery (email OTP) is built and verified, and the
+security hardening pass (W2) is done — see below. A real logomark, favicon,
+and OG image now exist too (`metadataBase` is set), though the rest of W3's
+SEO surface is still open.
 
-**Verified healthy.** `typecheck`, `lint`, `build`, and `test` all pass clean.
-No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
+**Verified healthy, both statically and by running it.** `typecheck`, `lint`,
+`build`, `test`, and `format:check` all pass clean. No `any`, no `TODO`s, no
+stray `console.log`, no dead dependencies. On 2026-08-30 the actual `Dockerfile`
+production image was built and run against a real Mongo instance (not just
+read) — health check, static generation with `dynamicParams` fallback, CSP
+headers (`'unsafe-eval'` correctly absent outside dev), and every public route
+all confirmed live. The admin login flow was driven through a real browser up
+to the TOTP gate, confirming both the password and 2FA layers actually engage.
+All 54 Playwright E2E tests pass.
+
+**Decided 2026-08-30, next up in this order:** fold in five small findings
+from that verification pass (below) → **W4's CI gate** (re-added, see W4) →
+**W3 SEO** → the `queries.ts` visibility test from W6 → W5 cleanup
+opportunistically. **Cloudflare Access activation is explicitly deferred** —
+still fail-open on purpose, revisit as its own step later.
 
 **The two things that matter most, in order.**
 
-1. **Cloudflare Access is still inactive in production.** The verification
-   code is correct and `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` now flow
-   through the deploy workflow's `.env` (W2 item 2), but nothing has set them
-   yet — that requires creating the actual Access application in the
-   Cloudflare dashboard, a manual step outside this repo. Until then
-   `verifyCloudflareAccess` keeps no-opping, deliberately (see W2 below for
-   why fail-closed wasn't flipped on yet). Everything else in W2 — auth rate
-   limiting, CSP, the SVG upload hole, session `maxAge`, constant-time CSRF —
-   is done.
+1. **Cloudflare Access is still inactive in production — deferred, not
+   forgotten.** The verification code is correct and `CF_ACCESS_TEAM_DOMAIN` /
+   `CF_ACCESS_AUD` now flow through the deploy workflow's `.env` (W2 item 2),
+   but nothing has set them yet — that requires creating the actual Access
+   application in the Cloudflare dashboard, a manual step outside this repo,
+   and outside this round of work by deliberate choice (2026-08-30). Until
+   then `verifyCloudflareAccess` keeps no-opping. Everything else in W2 — auth
+   rate limiting, CSP, the SVG upload hole, session `maxAge`, constant-time
+   CSRF — is done and now verified live (see below).
 2. **The site has no SEO surface.** No sitemap, robots, RSS, or JSON-LD.
    `NEXT_PUBLIC_SITE_URL` is written into production `.env` by CI and now
    read by exactly one thing (`metadataBase`) — everything else in W3 is
-   still open.
+   still open. Next up after W4.
+
+---
+
+## Verification pass — 2026-08-30
+
+A full static re-review (does the code do what PLAN.md claims) came back
+clean — see the git history around this date for the review itself. This
+section covers the follow-up: actually running the system in Docker rather
+than only reading it, plus five small things that only a live run surfaces.
+
+**What was run:**
+
+- The existing `docker compose watch` dev stack (mongo, mongo-express, web on
+  :3300) — found with an **empty database** (0 documents); `pnpm seed` fixed
+  that. Worth remembering: a fresh `docker compose watch` up needs an explicit
+  `pnpm seed` — nothing does it automatically, and an empty DB fails silently
+  as empty states, not errors.
+- The real `Dockerfile` (production, standalone) image — built and run
+  against the same Mongo, health-checked, and hit on every public route plus
+  `/admin`, `/admin/login`, and `/api/contact`. This is what `deploy.yml`
+  actually ships; it had not been exercised locally since W2 landed.
+- `pnpm e2e` — all 54 tests pass, but only after `pnpm exec playwright
+install` (the browser binary was missing entirely on this machine).
+- A real browser driven through `/admin/login`: email + password accepted,
+  correctly reveals the TOTP step. (Didn't complete TOTP — decrypting the
+  stored secret to generate a live code touches `AUTH_SECRET` in a way this
+  session's tooling declined to script; the two-layer gate itself is
+  confirmed either way.)
+
+**Five findings, none of them contradicting anything above — small additions:**
+
+1. `admin-crud.ts` and `rate-limit.ts` both still pass Mongoose's deprecated
+   `new: true` to `findOneAndUpdate` instead of `returnDocument: 'after'` —
+   fires a deprecation warning on every request through either path. See W5.
+2. `pnpm e2e`'s Playwright browser binary isn't installed by default and
+   nothing in the repo documents that `pnpm exec playwright install` is a
+   one-time prerequisite. See W6.
+3. Playwright's `webServer` runs `pnpm exec next build && next start`, which
+   Next.js itself warns is incompatible with `output: 'standalone'` — so
+   `pnpm e2e` has never actually exercised the standalone server shape the
+   production Docker image runs. Tests still pass because `next start` falls
+   back to a normal server, but the coverage gap is real: nothing but a
+   manual `docker build` (done once, this pass) proves the actual production
+   artifact serves correctly. See W6.
+4. The `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in `.env` is a real, domain-locked
+   production key — Turnstile refuses to render on `localhost` (`error
+110200`), so the contact form's Turnstile handshake has never been
+   exercised end-to-end in local dev and can't be without either a
+   Cloudflare-provided test sitekey or a dashboard change. Not a code bug.
+   See W1/W6.
+5. CSP's `'unsafe-eval'` in `script-src` is dev-only (stripped via a
+   `NODE_ENV` check) and is correctly absent from the production image's
+   response headers — confirmed by actually building and hitting that image,
+   not just reading the code. No action needed; noting it because PLAN.md's
+   original W2 write-up only documents the `style-src 'unsafe-inline'`
+   trade-off, not this one.
 
 ---
 
@@ -74,6 +145,12 @@ Shipped across two pushes: the API route, then an admin-side pass on top of it.
 shows as "new," opening it marks it "read" automatically, and status/notes
 changes persist. TOTP enrollment and login enforcement verified end to end
 locally (see AGENTS.md §11).
+
+**Not verifiable in local dev, 2026-08-30:** the actual Turnstile handshake.
+`.env`'s `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is a real, domain-locked production
+key — the widget refuses to render on `localhost` (`error 110200`). Either add
+a Cloudflare-provided always-pass test sitekey to `.env.example` for local
+dev, or accept this only gets exercised against the real deployed domain.
 
 ---
 
@@ -192,41 +269,56 @@ Ordered by exposure in the original plan; all seven items addressed.
 
 ---
 
-## W3 — SEO, sharing, and discoverability
+## W3 — SEO, sharing, and discoverability — next up after W4
 
-Currently absent in full. Everything here is standard App Router surface area.
+Mostly absent still. Two things already shipped since this was first written
+(both confirmed live 2026-08-30) — noted below so the checklist stays accurate.
 
-- `metadataBase` in the root layout, sourced from `NEXT_PUBLIC_SITE_URL` — which
-  means actually reading that variable for the first time.
+- ~~`metadataBase` in the root layout~~ — **done.** Reads `NEXT_PUBLIC_SITE_URL`.
 - `app/sitemap.ts` and `app/robots.ts`, both generated from the query layer so
   drafts stay out. **Exclude `/design-system`.**
-- `opengraph-image.tsx` — a static one for the site, dynamic per case study and
-  per post. The `seo` field (`title`, `description`, `ogImage`) already exists on
-  Project and Post and is edited in the CMS but is read nowhere.
+- ~~`opengraph-image.tsx` — a static one for the site~~ — **done**
+  ([`src/app/opengraph-image.tsx`](src/app/opengraph-image.tsx), confirmed
+  rendering live). Still open: **dynamic per case study and per post.** The
+  `seo` field (`title`, `description`, `ogImage`) already exists on Project and
+  Post and is edited in the CMS but is read nowhere.
 - RSS feed for `/writing`.
 - JSON-LD: `Person` on the homepage, `Article` on posts.
 - Canonical URLs on every page.
-- Replace the four pages that hardcode `— Wasik Ahmed` in their title with
-  `settings.name`, matching what the homepage already does.
-- Decide what `/design-system` is. It is linked from the public footer and
-  crawlable today. Either move it behind `/admin`, or keep it public as a
-  deliberate showcase — but not by default. Note `e2e/motion-contract.spec.ts`
-  depends on the route, so a move means updating those tests.
+- Replace the pages that hardcode `— Wasik Ahmed` in their title with
+  `settings.name`, matching what the homepage already does — **7 pages, not
+  4** (recount 2026-08-30): `contact`, `about`, `work`, `writing`,
+  `work/[slug]`, `writing/[slug]`, `design-system`.
+- Decide what `/design-system` is. It is linked from the public footer, but —
+  correction, 2026-08-30 — it is **not** currently crawlable: the page already
+  sets `robots: { index: false }`. The real open question is unchanged: move
+  it behind `/admin`, or keep it public as a deliberate, intentionally-noindexed
+  showcase. Note `e2e/motion-contract.spec.ts` depends on the route, so a move
+  means updating those tests.
 
 ---
 
-## W4 — Put a gate back in front of `main`
+## W4 — Put a gate back in front of `main` — decided 2026-08-30: doing this next
 
-Today a push to `main` deploys unverified. That the working tree currently fails
-`pnpm format:check` on two files is the evidence that local-discipline-only does
-not hold.
+Today a push to `main` deploys unverified. That was true even before this was
+first written, and the 2026-08-30 verification pass didn't change it — the
+gate still doesn't exist. Confirmed by the decision above: re-add it before W3.
 
 - Add a `verify` job to `deploy.yml` — `typecheck`, `lint`, `format:check`,
   `test`, `build` — and make `build-and-push` depend on it. The original job was
   removed because it added ~3 minutes; that cost is worth it, and most of it can
   be recovered with a pnpm store cache.
 - Run E2E on a schedule or on PRs rather than in the deploy path, so it doesn't
-  gate a hotfix.
+  gate a hotfix. Whichever CI runner does this needs `pnpm exec playwright
+install` as an explicit step first — confirmed 2026-08-30 that the browser
+  binary isn't present by default and `pnpm e2e` fails outright without it.
+  Also worth fixing while touching this: `playwright.config.ts`'s `webServer`
+  runs `next start`, which Next warns is incompatible with `output:
+'standalone'` — E2E currently never exercises the actual standalone shape
+  the production Docker image runs. Point it at `node
+.next/standalone/server.js` instead (needs `public/` and `.next/static`
+  copied alongside, same as the production `Dockerfile` already does) for
+  E2E to mean what it claims to mean.
 - Automate rollback on a failed healthcheck: capture the previous `IMAGE_TAG`
   before writing the new `.env`, and restore it if the health loop times out.
 - **Back up the data.** Neither the `mongo-data` nor the `media-uploads` volume
@@ -263,8 +355,11 @@ None of this is urgent; all of it is cheap and reduces future bug surface.
   be wrong the moment a fifth ships. `Process.STEPS` and About's `STORY` are
   hardcoded arrays on an otherwise fully CMS-driven site.
 - `formatDate` hardcodes `en-GB`.
-- Run `pnpm format` — `docker-compose.prod.yml` and `src/server/csrf.ts` are
-  currently unformatted.
+- **Replace deprecated Mongoose `new: true` with `returnDocument: 'after'`.**
+  Confirmed 2026-08-30 firing a real deprecation warning on every request:
+  `admin-crud.ts:143` and `rate-limit.ts:43` both still use the old option.
+- ~~Run `pnpm format`~~ — **done.** `pnpm format:check` confirmed clean
+  2026-08-30.
 - Drop the stale `_reference/**` exclude from `vitest.config.ts`; that directory
   no longer exists.
 - Write a `README.md`. There isn't one.

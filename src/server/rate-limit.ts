@@ -40,7 +40,7 @@ export async function checkRateLimit(
   const doc = (await RateLimit.findOneAndUpdate(
     { key },
     { $inc: { count: 1 }, $setOnInsert: { expiresAt: new Date(Date.now() + windowMs) } },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: 'after' },
   ).lean()) as { count: number };
 
   return doc.count <= limit;

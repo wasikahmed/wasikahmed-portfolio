@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest) {
   await connectToDatabase();
   const updated = await Settings.findByIdAndUpdate(SETTINGS_SINGLETON_ID, result.data, {
     upsert: true,
-    new: true,
+    returnDocument: 'after',
   }).lean();
 
   await writeAuditLog({

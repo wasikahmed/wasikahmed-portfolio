@@ -52,7 +52,9 @@ pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
 ```
 
 `pnpm e2e` needs a seeded database (it navigates to real slugs). Run it when you
-touched anything the public site renders.
+touched anything the public site renders. First time on a machine, install the
+browser binary once: `pnpm exec playwright install` — `pnpm e2e` fails outright
+without it and nothing else in the repo does this for you.
 
 **Docker dev stack** (Mongo + mongo-express + hot reload):
 

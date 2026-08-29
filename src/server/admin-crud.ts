@@ -140,7 +140,7 @@ export function updateHandler<T>(model: Model<Record<string, unknown>>, config: 
     try {
       const updated = await model
         .findByIdAndUpdate(id, result.data as Record<string, unknown>, {
-          new: true,
+          returnDocument: 'after',
           runValidators: true,
         })
         .lean();
