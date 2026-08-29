@@ -1,95 +1,80 @@
 # PLAN.md
 
-Forward plan, written 2026-08-27 from a full review of the codebase as it stands.
-Verified against a running system on 2026-08-30, then advanced through W3, W4,
-analytics, and the first W6 test the same day (see below). This supersedes the
-original build plan; nothing here is inherited from it.
+Forward plan, originally written 2026-08-27 from a full review of the codebase
+as it stood then. Verified against a running system on 2026-08-30 and, across
+that single day, advanced through every item this file listed — W3, W4,
+Analytics, all of W5, and all of W6 that was going to get pursued. **Closed,
+2026-08-30: every work-plan item below is done, or investigated and explicitly
+decided against with the reasoning recorded.** One genuine action remains and
+it isn't code — see "What's actually left" below. This file stays as the
+historical record of what was done and why; treat new work as a new pass, not
+an edit to the sections below.
 
 Ordering below is a recommendation based on impact, not a contract. Reorder freely.
 
 ---
 
-## Where the project actually is
+## Where the project actually is — closed out, 2026-08-30
 
-**Done, deployed, and verified live at every step — not just read, and not
-just built.** Seven public pages rendering entirely from MongoDB; a complete
-design token system with an enforced ambient budget and a tested
-reduced-motion contract; the typed query layer with a published/draft split,
-now with a real test proving that split holds (W6 item 1); a full admin CMS
-with argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag reordering,
-an MDX editor with live preview, and a media library; a full SEO surface
-(sitemap, robots, RSS, JSON-LD, per-page dynamic OG images, canonical URLs —
-W3); Umami analytics wired in behind two optional env vars; a CI-gated,
-auto-rollback, backed-up, Node-pinned deploy pipeline to the VPS (W4). The
-contact form pipeline (W1) is real and deployed, and admin password recovery
-(email OTP) is built and verified.
+**Everything is done, deployed, and verified live — not just read, not just
+built, and not just claimed.** Seven public pages rendering entirely from
+MongoDB; a complete design token system with an enforced ambient budget and a
+tested reduced-motion contract; the typed query layer with a published/draft
+split, backed by a real test proving that split holds; a full admin CMS with
+argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag reordering, an
+MDX editor with live preview, and a media library; a full SEO surface
+(sitemap, robots, RSS, JSON-LD, per-page dynamic OG images, canonical URLs);
+Umami analytics behind two optional env vars; a CI-gated, auto-rollback,
+backed-up, Node-pinned deploy pipeline; the contact form pipeline and admin
+password recovery, both real and verified end to end; and, as of today, both
+layers of Cloudflare Access confirmed genuinely active in production (not
+merely wired, as this file used to claim — see below).
 
-**Verified healthy, statically, by running it, and by breaking it on
-purpose.** `typecheck`, `lint`, `build`, `test`, and `format:check` all pass
-clean. No `any`, no `TODO`s, no stray `console.log`, no dead dependencies.
-Every push since 2026-08-30 has gone through the real `Dockerfile` production
-image — built with `--no-cache`, seeded, and hit directly, which is what
-caught the `robots.ts` build-time-freeze bug and the critical admin-login CSP
-bug below (see W6), and confirmed the Umami script clears CSP and the
-leads "Technical details" panel renders correctly, both with a real
-headless browser. All 55 Playwright E2E tests and 93 Vitest unit tests pass,
-both locally and via the real standalone server shape (W4). The `queries.ts`
-visibility test (W6 item 1) and the `admin-crud.ts` CSRF test (W6 item 2)
-were each deliberately sabotaged once to confirm they actually fail when
-they should, then restored.
+**Verified healthy, statically, by running it, and by deliberately breaking
+it.** `typecheck`, `lint`, `build`, `test`, and `format:check` all pass clean.
+No `any`, no `TODO`s, no stray `console.log`, no dead dependencies. Every
+change today went through the real `Dockerfile` production image — built with
+`--no-cache`, seeded, and hit directly with a real headless browser, which is
+what caught two real production bugs (below) that reading the code never
+would have. 55 Playwright E2E tests and 93 Vitest unit tests pass, both
+locally and via the real standalone server shape. Two of those tests
+(`queries.ts` visibility, `admin-crud.ts` CSRF) were each deliberately
+sabotaged once mid-implementation to confirm they actually fail when they
+should, then restored — a test suite that can't go red on its own regression
+isn't proof of anything.
 
-**Decided 2026-08-30, work completed in this order:** fold in five small
-findings from the verification pass (below) — done → **W4's CI gate** —
-done → **W3 SEO** — done → **Umami analytics** (the rest of Phase 6) — done
-→ **W6 items 1–5** (visibility test, admin-crud, totp/password, Zod
-schemas, admin E2E path) — done, and **one critical production bug found
-and fixed along the way** (see below) → **Cloudflare Access status
-corrected** (see below — it was never actually inactive) → **W5 cleanup —
-done in full** (see W5; every item either fixed or explicitly decided
-against, with the reasoning recorded, not silently skipped). **Every
-work-plan item in this file is now resolved** except one genuine remaining
-action: Cloudflare Access's end-to-end login walk, which needs the actual
-site owner (see the Cloudflare Access section).
+**Two things were wrong in this file itself, found and corrected today —
+worth knowing before trusting anything else in it:**
 
-**A critical bug, found and fixed 2026-08-30 while writing the admin E2E
-test (W6 item 5):** `/admin/login` and `/admin/forgot-password` had no
-dynamic API call of their own, so Next statically prerendered both at
-build time — freezing ONE nonce into their `<script>` tags forever, while
-`proxy.ts`'s CSP header carries a fresh nonce on every request. Under
-`strict-dynamic`, a mismatched nonce means the script doesn't run at all —
-**the admin login page could not hydrate in any CSP-enforcing browser
-since the CSP rollout (W2, 2026-08-27)**, meaning the login form was
-non-interactive in production for a real user this whole time, unless
-their browser or an extension happened to relax CSP. Fixed with
-`export const dynamic = 'force-dynamic'` on both pages (same pattern
-`(site)/layout.tsx` already used, different reason). Verified against a
-`--no-cache` production Docker build: header and HTML nonce now match, on
-two separate requests, for both pages. See W2 and W6 below for the full
-writeup.
+1. **A critical, live production bug:** `/admin/login` and
+   `/admin/forgot-password` had no dynamic server call of their own, so Next
+   statically prerendered both at build time — freezing one CSP nonce into
+   their `<script>` tags forever, while `proxy.ts` issues a fresh nonce every
+   request. Under `strict-dynamic`, that mismatch silently blocks every
+   script on the page. **The admin login form could not hydrate in any
+   CSP-enforcing browser since the CSP rollout on 2026-08-27** — three days
+   of a non-interactive login page in production. Fixed with
+   `export const dynamic = 'force-dynamic'` on both pages; confirmed fixed
+   against a `--no-cache` production build, header and HTML nonce matching on
+   two separate requests. Full writeup in W2 and W6.
+2. **Cloudflare Access was never actually inactive.** This file spent several
+   revisions — including some written earlier on 2026-08-30 itself — asserting
+   Cloudflare Access was "deferred"/"no-opping" in production. It was not:
+   `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` have been real repo variables since
+   2026-08-27, flowing into every deploy since, and the Cloudflare-side Access
+   application has been live at the edge for the same three days (confirmed
+   by a direct `302` redirect to Cloudflare's own login page). Both
+   defense-in-depth layers described in AGENTS.md §7 have been active the
+   entire time this file claimed otherwise. Full correction in the
+   **Cloudflare Access** section below.
 
-**Cloudflare Access status corrected, 2026-08-30 — it is already active,
-not deferred.** Every prior version of this file (including several
-versions written earlier today) claimed Cloudflare Access was inactive/
-no-opping in production. That was wrong. Discovered by accident: hitting
-`https://wasikahmed.me/admin/login` directly during the CSP bug
-investigation above returned a `302` to
-`wasikahmed.cloudflareaccess.com`'s own login page — Cloudflare's edge is
-actively gating `/admin` right now. Checking further: `CF_ACCESS_TEAM_DOMAIN`
-and `CF_ACCESS_AUD` have been set as real GitHub repo variables since
-**2026-08-27** (`gh variable list` confirms both, predating this entire
-session), and `deploy.yml` has written them into the deployed `.env` on
-every push since then (W2 item 2 shipped that wiring the same day). Since
-`cloudflareAccessConfigured()` in `src/server/cloudflare-access.ts` is
-`Boolean(CF_ACCESS_TEAM_DOMAIN && CF_ACCESS_AUD)`, the app has **not** been
-no-opping either — `verifyCloudflareAccess()` has been actively verifying
-the `Cf-Access-Jwt-Assertion` JWT on every `/admin/*` and `/api/admin/*`
-request reaching the origin for the same three days. Both layers of
-defense-in-depth's "layer 1" have been live the entire time this session
-was (incorrectly) describing it as deferred. See the **Cloudflare Access**
-section below for what's actually left to verify.
-
-Every other gap this section used to list — SEO, analytics — is closed. See
-W3 and the Analytics section below.
+**What's actually left — one item, and it isn't something this session can
+do:** walk the real Cloudflare Access login flow end to end yourself
+(`https://wasikahmed.me/admin/login`, through whatever identity provider
+Access is configured with, confirming it reaches the app's own password
+form). Everything else this file tracked is resolved. See the **Cloudflare
+Access** section for the full detail and two smaller follow-up questions
+worth a deliberate answer (fail-open vs. fail-closed; who else has access).
 
 ---
 
@@ -647,11 +632,13 @@ reasoning recorded below rather than left as a silent "won't fix."
 
 Items 1–5 done, 2026-08-30 — item 6 decided rather than pursued (see below).
 Before this pass, three unit tests existed and all three covered `clamp()`;
-now 85 do, across six files, plus a fifth E2E spec covering the real admin
-path. The E2E suite is genuinely good — route sweep, horizontal-overflow
-checks at four viewports, command palette, a real reduced-motion contract,
-and now a full admin login → create → publish → delete round trip — and no
-longer stops at the public site.
+now 93 do, across eight files (two more landed during the W5 pass right
+after this one — `mongo-utils.test.ts` and `format.test.ts` — same rigor,
+same day), plus a fifth E2E spec covering the real admin path. The E2E suite
+is genuinely good — route sweep, horizontal-overflow checks at four
+viewports, command palette, a real reduced-motion contract, and now a full
+admin login → create → publish → delete round trip — and no longer stops at
+the public site.
 
 Priority order, by what would actually catch a costly bug:
 
@@ -724,7 +711,7 @@ In good shape overall. Patch-level drift only on the things that matter:
 
 Majors available, none urgent, each its own small piece of work:
 `eslint` 9 → 10, `typescript` 5 → 7, `vitest` 3 → 4, `@vitejs/plugin-react` 5 → 6,
-`prettier-plugin-tailwindcss` 0.6 → 0.8. `@types/node` 20 → 22 belongs to W4.
+`prettier-plugin-tailwindcss` 0.6 → 0.8. `@types/node` 20 → 22 — **done, W4.**
 
 `next-auth` is pinned at `5.0.0-beta.32` — a beta in production. Auth.js v5 has
 been beta for a long time and there is no v4 path back worth taking; the risk is
