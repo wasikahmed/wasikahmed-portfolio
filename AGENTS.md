@@ -252,8 +252,11 @@ shipping these off-box as its own task if that risk becomes worth carrying.
 
 The public site, design system, data layer, and admin CMS are complete and
 deployed. The contact form is real end to end (Turnstile + rate limiting +
-Resend + a working `/admin/leads` list/detail/status pipeline), and TOTP has
-been verified working in dev. `/admin` is still protected by password + TOTP
-only — Cloudflare Access is written but inactive in production — and there is
-no SEO surface (no sitemap, robots, OG images, or RSS). See `PLAN.md` for what
-is left and in what order.
+Gmail SMTP notifications + a working `/admin/leads` list/detail/status
+pipeline), and TOTP has been verified working in dev. `/admin` is still
+protected by password + TOTP only — Cloudflare Access is written but inactive
+in production. The SEO surface is done (sitemap, robots, per-page dynamic OG
+images, RSS, JSON-LD, canonical URLs) — see PLAN.md W3. CI now gates every
+push to `main` (typecheck/lint/format:check/test/build) before it ships, with
+E2E running separately on PRs and a daily schedule — see PLAN.md W4. See
+`PLAN.md` for what is left and in what order.
