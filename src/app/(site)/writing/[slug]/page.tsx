@@ -7,7 +7,9 @@ import { ArrowRight } from '@/components/ui/button';
 import { ReadingProgress } from '@/components/layout/reading-progress';
 import { MdxContent } from '@/components/mdx/mdx-content';
 import { formatDate } from '@/lib/format';
-import { getPostSlugs, getPost, getAdjacentPosts } from '@/server/queries';
+import { getPostSlugs, getPost, getAdjacentPosts, getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
+import { articleJsonLd } from '@/lib/json-ld';
 
 export async function generateStaticParams() {
   // Best-effort pre-render: `next build` runs this with no guarantee the
@@ -30,20 +32,28 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getPost(slug);
+  const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
   if (!post) return {};
-  return { title: `${post.title} — Wasik Ahmed`, description: post.excerpt };
+  return {
+    title: pageTitle(post.seo?.title ?? post.title, settings.name),
+    description: post.seo?.description ?? post.excerpt,
+    alternates: canonical(`/writing/${slug}`),
+  };
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = await getPost(slug);
+  const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
   if (!post) notFound();
 
   const { next } = await getAdjacentPosts(slug);
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(post, settings)) }}
+      />
       <ReadingProgress />
 
       <Section density="compact" className="pt-10 sm:pt-14">

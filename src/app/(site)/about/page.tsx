@@ -5,11 +5,17 @@ import { Button, ArrowRight } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { getSkillGroups, getRoles, getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'About — Wasik Ahmed',
-  description: 'Software engineer working on AI, automation, and systems that remove manual work.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: pageTitle('About', settings.name),
+    description:
+      'Software engineer working on AI, automation, and systems that remove manual work.',
+    alternates: canonical('/about'),
+  };
+}
 
 const STORY = [
   'I started writing code at university because it was the fastest way to make things that actually worked. Computer science gave me the theory; agencies, startups, and product teams gave me everything else.',

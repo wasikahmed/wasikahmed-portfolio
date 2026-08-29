@@ -7,12 +7,22 @@ import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { Field, Input, Textarea, Select } from '@/components/ui/field';
 import { GridTexture, NoiseTexture, DotMatrix, Blob } from '@/components/ambient';
 import { MotionLab } from './motion-lab';
+import { getSettings } from '@/server/queries';
+import { pageTitle } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Design System — Wasik Ahmed',
-  description: 'Tokens, primitives, and motion for the portfolio.',
-  robots: { index: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: pageTitle('Design System', settings.name),
+    description: 'Tokens, primitives, and motion for the portfolio.',
+    // Deliberately public but not indexed (PLAN.md W3, decided 2026-08-30):
+    // it's a real showcase linked from the public footer, not an internal
+    // tool, so moving it behind /admin would be the wrong call — but it's
+    // also not content anyone should land on from search. No canonical
+    // here either, for the same reason.
+    robots: { index: false },
+  };
+}
 
 const SURFACES = [
   { name: 'bg', className: 'bg-bg', note: 'Page ground' },

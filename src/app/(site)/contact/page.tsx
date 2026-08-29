@@ -3,11 +3,16 @@ import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
 import { getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Contact — Wasik Ahmed',
-  description: 'Start a conversation about a project or a role.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: pageTitle('Contact', settings.name),
+    description: 'Start a conversation about a project or a role.',
+    alternates: canonical('/contact'),
+  };
+}
 
 export default async function ContactPage() {
   const settings = await getSettings();

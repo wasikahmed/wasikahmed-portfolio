@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { BRAND_COLORS, markDataUri } from '@/lib/brand';
+import { loadDisplayFont } from '@/lib/og-font';
 import { getSettings } from '@/server/queries';
 
 /*
@@ -16,32 +17,6 @@ export const dynamic = 'force-dynamic';
 export const alt = 'Wasik Ahmed — Software engineer building AI and automation systems.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-
-/**
- * Satori has no access to the fonts `next/font` downloads at build time, so the
- * display face is fetched here and memoised for the life of the process. If the
- * fetch fails — offline build, blocked egress on the VPS — we fall through to
- * Satori's default sans rather than failing the whole image.
- */
-let displayFont: ArrayBuffer | null | undefined;
-
-async function loadDisplayFont() {
-  if (displayFont !== undefined) return displayFont;
-
-  try {
-    const css = await fetch(
-      'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&display=swap',
-      { headers: { 'User-Agent': 'Mozilla/5.0' } },
-    ).then((r) => r.text());
-
-    const url = css.match(/src:\s*url\((https:[^)]+)\)/)?.[1];
-    displayFont = url ? await fetch(url).then((r) => r.arrayBuffer()) : null;
-  } catch {
-    displayFont = null;
-  }
-
-  return displayFont;
-}
 
 export default async function OpengraphImage() {
   const [settings, font] = await Promise.all([getSettings(), loadDisplayFont()]);

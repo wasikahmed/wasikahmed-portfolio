@@ -5,12 +5,20 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
 import { Reveal } from '@/components/motion/reveal';
 import { formatDate } from '@/lib/format';
-import { getPosts } from '@/server/queries';
+import { getPosts, getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Writing — Wasik Ahmed',
-  description: 'Notes on AI systems, constraint solving, and shipping software that lasts.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: pageTitle('Writing', settings.name),
+    description: 'Notes on AI systems, constraint solving, and shipping software that lasts.',
+    alternates: {
+      ...canonical('/writing'),
+      types: { 'application/rss+xml': '/writing/feed.xml' },
+    },
+  };
+}
 
 /**
  * Editorial layout rather than cards (PLAN.md §2.7). Articles get generous

@@ -34,11 +34,11 @@ All 54 Playwright E2E tests pass.
 
 **Decided 2026-08-30, next up in this order:** fold in five small findings
 from that verification pass (below) — done → **W4's CI gate** (re-added, see
-W4) — done → **W3 SEO** → the `queries.ts` visibility test from W6 → W5
-cleanup opportunistically. **Cloudflare Access activation is explicitly
+W4) — done → **W3 SEO** — done → the `queries.ts` visibility test from W6 →
+W5 cleanup opportunistically. **Cloudflare Access activation is explicitly
 deferred** — still fail-open on purpose, revisit as its own step later.
 
-**The two things that matter most, in order.**
+**The one thing that matters most now.**
 
 1. **Cloudflare Access is still inactive in production — deferred, not
    forgotten.** The verification code is correct and `CF_ACCESS_TEAM_DOMAIN` /
@@ -49,10 +49,8 @@ deferred** — still fail-open on purpose, revisit as its own step later.
    then `verifyCloudflareAccess` keeps no-opping. Everything else in W2 — auth
    rate limiting, CSP, the SVG upload hole, session `maxAge`, constant-time
    CSRF — is done and now verified live (see below).
-2. **The site has no SEO surface.** No sitemap, robots, RSS, or JSON-LD.
-   `NEXT_PUBLIC_SITE_URL` is written into production `.env` by CI and now
-   read by exactly one thing (`metadataBase`) — everything else in W3 is
-   still open. Next up after W4.
+
+The SEO gap that used to be listed here is closed — see W3.
 
 ---
 
@@ -269,32 +267,68 @@ Ordered by exposure in the original plan; all seven items addressed.
 
 ---
 
-## W3 — SEO, sharing, and discoverability — next up after W4
+## W3 — SEO, sharing, and discoverability — Done, 2026-08-30
 
-Mostly absent still. Two things already shipped since this was first written
-(both confirmed live 2026-08-30) — noted below so the checklist stays accurate.
+Shipped in one pass and verified three ways: the local gate green, `pnpm e2e`
+54/54 (twice), and — critically, see the bug this caught below — the actual
+production `Dockerfile` image built, seeded, and hit directly, not just
+`next dev`.
 
-- ~~`metadataBase` in the root layout~~ — **done.** Reads `NEXT_PUBLIC_SITE_URL`.
-- `app/sitemap.ts` and `app/robots.ts`, both generated from the query layer so
-  drafts stay out. **Exclude `/design-system`.**
-- ~~`opengraph-image.tsx` — a static one for the site~~ — **done**
-  ([`src/app/opengraph-image.tsx`](src/app/opengraph-image.tsx), confirmed
-  rendering live). Still open: **dynamic per case study and per post.** The
-  `seo` field (`title`, `description`, `ogImage`) already exists on Project and
-  Post and is edited in the CMS but is read nowhere.
-- RSS feed for `/writing`.
-- JSON-LD: `Person` on the homepage, `Article` on posts.
-- Canonical URLs on every page.
-- Replace the pages that hardcode `— Wasik Ahmed` in their title with
-  `settings.name`, matching what the homepage already does — **7 pages, not
-  4** (recount 2026-08-30): `contact`, `about`, `work`, `writing`,
-  `work/[slug]`, `writing/[slug]`, `design-system`.
-- Decide what `/design-system` is. It is linked from the public footer, but —
-  correction, 2026-08-30 — it is **not** currently crawlable: the page already
-  sets `robots: { index: false }`. The real open question is unchanged: move
-  it behind `/admin`, or keep it public as a deliberate, intentionally-noindexed
-  showcase. Note `e2e/motion-contract.spec.ts` depends on the route, so a move
-  means updating those tests.
+- **`src/app/sitemap.ts`** — generated from `getProjects()`/`getPosts()` (the
+  public `get*` family, so a draft can never appear), excludes
+  `/design-system`. Marked `force-dynamic` deliberately: without it, Next
+  statically generates the route once during `next build`, inside Docker,
+  with no database reachable — production would serve an empty sitemap
+  forever.
+- **`src/app/robots.ts`** — allows everything except `/admin`; deliberately
+  does **not** disallow `/design-system` (see below). **Caught a real
+  production bug while verifying this in the actual Docker image**: without
+  its own `force-dynamic`, Next fully static-generates `robots.txt` at build
+  time (no DB dependency to force it dynamic otherwise) and bakes in
+  whatever `NEXT_PUBLIC_SITE_URL` happened to be set to in the _build_
+  stage — always empty, per the Dockerfile's design — into the `Sitemap:`
+  line, permanently, regardless of the real value in the running
+  container's `.env`. Fixed with the same `force-dynamic` export
+  `sitemap.ts` already needed for a different reason. Confirmed fixed by
+  rebuilding the production image and hitting `/robots.txt` directly.
+- **`/writing/feed.xml`** — RSS 2.0, same `get*`-family safety, `force-dynamic`
+  (Route Handlers already default to dynamic, so no fix needed there — only
+  the two metadata-route files above had the static-generation trap).
+  Linked from `/writing`'s `<head>` via `alternates.types`.
+- **Per-page dynamic OG images** — `work/[slug]/opengraph-image.tsx` and
+  `writing/[slug]/opengraph-image.tsx`, sharing the root's font-loading logic
+  (extracted to `src/lib/og-font.ts`). Each honors a CMS-set `seo.ogImage` if
+  present (the schema field existed but `publish-fields.tsx` never grew a UI
+  for it — Satori composites a remote URL as an `<img>` the same way it
+  already does the brand mark's data URI) and otherwise generates a card from
+  the project's headline metric or the post's excerpt. Verified: fetched both
+  generated PNGs directly, viewed them, confirmed the design holds.
+- **JSON-LD** — `Person` on the homepage, `Article` on every post
+  (`src/lib/json-ld.ts`). Verified present in the rendered HTML.
+- **Canonical URLs** on every page in `(site)` via a shared `canonical()`
+  helper (`src/lib/seo.ts`) — home, work, work/[slug], writing, writing/[slug],
+  about, contact. Deliberately **not** on `/design-system` (see below).
+- **The seven hardcoded `— Wasik Ahmed` titles replaced** with
+  `settings.name` via a shared `pageTitle()` helper: `contact`, `about`,
+  `work`, `writing`, `work/[slug]`, `writing/[slug]`, `design-system`.
+  `work/[slug]` and `writing/[slug]` also now read the CMS's `seo.title`/
+  `seo.description` overrides — the other half of "read nowhere" from the
+  original write-up, alongside `ogImage` above.
+- **`/design-system` decided: kept public, kept noindexed, not moved.** It's
+  a real showcase linked from the public footer, not an internal tool — but
+  it's also not content anyone should land on from search, and the page
+  already sets `robots: { index: false }`. Deliberately **not** disallowed in
+  `robots.txt` either: doing so would stop a crawler from ever fetching the
+  page to see that meta tag, which is worse (an un-crawlable URL can still
+  get indexed from an external link, with no snippet). `e2e/motion-contract.spec.ts`'s
+  dependency on the route is now moot — nothing moved.
+
+**Not done as part of W3:** analytics (Phase 6 also listed "analytics" —
+`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID` exist in
+`.env.example` but are read nowhere in `src/`, confirmed 2026-08-30). Out of
+scope for "SEO, sharing, and discoverability" specifically; needs its own
+small task — wire the Umami script into the root layout behind those two
+env vars, same no-op-if-unset pattern as email/Turnstile.
 
 ---
 
@@ -456,7 +490,7 @@ as you touch each file.
 | Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                            |
 | Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                            |
 | Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                   |
-| Phase 6               | Polish — SEO, OG, RSS, analytics                       | **Not started → W3**                                                            |
+| Phase 6               | Polish — SEO, OG, RSS, analytics                       | SEO done — W3. Analytics (Umami) not started, not in a W                        |
 | Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                        |
 | Phase 8               | Real photography and final content                     | Not started                                                                     |
 | §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                             |

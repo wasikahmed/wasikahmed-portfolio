@@ -11,7 +11,8 @@ import { ViewTransition } from '@/components/motion/view-transition';
 import { Architecture } from '@/components/case-study/architecture';
 import { Toc } from '@/components/case-study/toc';
 import { MdxContent } from '@/components/mdx/mdx-content';
-import { getProjectSlugs, getProject, getAdjacentProjects } from '@/server/queries';
+import { getProjectSlugs, getProject, getAdjacentProjects, getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
 
 export async function generateStaticParams() {
   // Best-effort pre-render: `next build` runs this with no guarantee the
@@ -34,12 +35,16 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const project = await getProject(slug);
+  const [project, settings] = await Promise.all([getProject(slug), getSettings()]);
   if (!project) return {};
 
+  // The CMS's SEO override fields (publish-fields.tsx) had nowhere to land
+  // until now — PLAN.md W3. A blank override falls back to the same values
+  // the page body renders.
   return {
-    title: `${project.title} — Wasik Ahmed`,
-    description: project.problem,
+    title: pageTitle(project.seo?.title ?? project.title, settings.name),
+    description: project.seo?.description ?? project.problem,
+    alternates: canonical(`/work/${slug}`),
   };
 }
 

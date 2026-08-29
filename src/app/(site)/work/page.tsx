@@ -3,12 +3,17 @@ import { Suspense } from 'react';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { WorkIndex } from '@/components/work/work-index';
-import { getProjects } from '@/server/queries';
+import { getProjects, getSettings } from '@/server/queries';
+import { pageTitle, canonical } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Work — Wasik Ahmed',
-  description: 'Case studies: AI pipelines, schedulers, and internal systems in production.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  return {
+    title: pageTitle('Work', settings.name),
+    description: 'Case studies: AI pipelines, schedulers, and internal systems in production.',
+    alternates: canonical('/work'),
+  };
+}
 
 export default async function WorkPage() {
   const projects = await getProjects();
