@@ -169,6 +169,22 @@ export interface Lead {
   createdAt: string;
 }
 
+/**
+ * The admin/API-client-safe view of a User document — never
+ * passwordHash/totpSecret (see src/server/user-fields.ts, the one place
+ * that builds this shape server-side).
+ */
+export interface AdminUser {
+  id: string;
+  email: string;
+  name?: string;
+  role: 'viewer' | 'editor' | 'admin' | 'owner';
+  status: 'invited' | 'active' | 'suspended';
+  lastLoginAt?: string;
+  invitedBy?: string;
+  createdAt: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   userEmail: string;

@@ -89,6 +89,8 @@ src/
     queries.ts       The read layer. get*/getAll* split — see §6.
     admin-crud.ts    Generic CRUD route factory. Six collections share it.
     schemas.ts       Zod schemas. The write-side validation boundary.
+    permissions.ts   Role→permission matrix and can(). See §7.
+    session.ts       getAdminSession() — database-backed, see §7.
     auth.ts          Full Auth.js config (Node runtime only).
     auth.config.ts   Edge-safe half, for proxy.ts. Do not merge these.
   lib/               Client-safe shared code (cn, types, format, admin-fetch).
@@ -180,16 +182,39 @@ Tunnel itself is unaffected and still the only ingress to the VPS.
 
 1. **Session** — Auth.js JWT cookie, checked in `src/proxy.ts` for
    `/admin/*` and `/api/admin/*`, then re-checked in the dashboard layout and
-   again in every API route.
+   again in every API route via `getAdminSession()`, which is database-backed
+   (PLAN.md W10) — it re-reads the User document on every call rather than
+   trusting the role/status baked into the JWT, so a demoted, suspended, or
+   deleted user is rejected on their very next request.
 2. **Credentials** — argon2id via `@node-rs/argon2`, plus optional TOTP whose
    secret is AES-256-GCM encrypted at rest with a key derived from `AUTH_SECRET`.
+
+**Two ways to authenticate, one session model.** Alongside credentials,
+Google sign-in (PLAN.md W11a) is an optional second entry point — registered
+only when `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` are set. It is never a signup
+path: `auth.ts`'s `signIn` callback rejects any Google account whose email
+has no existing User document, or whose account is suspended, before a
+session is ever issued. Once past that gate it produces the exact same JWT
+session shape as credentials — `getAdminSession()` doesn't know or care which
+provider was used.
+
+**Permissions, not roles, gate everything past the session check.**
+`src/server/permissions.ts` defines the fixed `viewer`/`editor`/`admin`/`owner`
+role matrix and the one `can(session, permission)` function; `admin-crud.ts`
+and every hand-written admin route call it before doing anything the caller
+might not be allowed to do (PLAN.md W10). `owner` is a singleton — set only by
+`pnpm seed:admin` — and can only change hands via the dedicated
+transfer-ownership route, never a role-change PATCH.
 
 The `auth.ts` / `auth.config.ts` split exists because `proxy.ts` runs in the Edge
 runtime and cannot load argon2's native bindings or Mongoose. **Do not import
 `auth.ts` from `proxy.ts`** — it fails the build.
 
-The admin account is created only by `pnpm seed:admin`. There is no signup route
-and there must not be one.
+The `owner` account is created only by `pnpm seed:admin`. Every other account
+comes from the invite flow (`/admin/users` → `/admin/accept-invite/[token]`,
+PLAN.md W11) — there is still no public signup route, and there must not be
+one; Google sign-in's email allowlist above is what keeps that true for OAuth
+too.
 
 ---
 
@@ -265,7 +290,13 @@ Gmail SMTP notifications + a working `/admin/leads` list/detail/status
 pipeline), and TOTP has been verified working in dev. `/admin` is protected by
 both layers described in §7 — session and credentials; Cloudflare Access was
 removed 2026-09 (PLAN.md W8) to unblock multi-user auth, and the Cloudflare
-Tunnel is unaffected. The SEO surface is done (sitemap,
+Tunnel is unaffected. **The CMS is now genuinely multi-user** (PLAN.md
+W9–W11): fixed roles with real permission enforcement on every admin route
+(not just a session check), database-backed sessions so a role/status change
+takes effect on the changed user's very next request, and a full
+invite → accept → suspend/reactivate → delete → transfer-ownership
+`/admin/users` surface, plus optional Google sign-in as a second login path
+(never a signup path — see §7). The SEO surface is done (sitemap,
 robots, per-page dynamic OG images, RSS, JSON-LD, canonical URLs) — see
 PLAN.md W3. CI now gates every push to `main`
 (typecheck/lint/format:check/test/build) before it ships, with E2E running

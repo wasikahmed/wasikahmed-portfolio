@@ -203,3 +203,37 @@ export const leadUpdateSchema = z.object({
 export const mediaSchema = z.object({
   alt: z.string().min(1).max(300),
 });
+
+// `'owner'` deliberately excluded from every schema below — it's a
+// singleton that moves only through the explicit transfer-ownership
+// action (PLAN.md W11), never through an invite or a role-change PATCH.
+const invitableRoleSchema = z.enum(['viewer', 'editor', 'admin']);
+
+/** POST /api/admin/users — creates a status: 'invited' user, no password yet. */
+export const inviteSchema = z.object({
+  email: z.string().email(),
+  role: invitableRoleSchema,
+});
+
+/**
+ * PATCH /api/admin/users/[id] — role and/or status, independently
+ * optional so the route can be used for either a role change or a
+ * suspend/reactivate without a second endpoint. `'invited'` is
+ * deliberately not a settable status here — it's an internal state the
+ * invite flow itself manages, never something an admin sets directly.
+ */
+export const userUpdateSchema = z.object({
+  role: invitableRoleSchema.optional(),
+  status: z.enum(['active', 'suspended']).optional(),
+});
+
+/**
+ * POST /api/auth/accept-invite/[token] — sets the name and password an
+ * invited user never had. The token itself comes from the route param,
+ * not this schema — see the route file.
+ */
+export const acceptInviteSchema = z.object({
+  name: z.string().min(1).max(200),
+  password: z.string().min(12, 'At least 12 characters.'),
+  turnstileToken: z.string().optional(),
+});

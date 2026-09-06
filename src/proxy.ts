@@ -11,7 +11,7 @@ import { ensureCsrfCookie } from '@/server/csrf';
 // neither runs in Edge.
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password'];
+const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password', '/admin/accept-invite'];
 
 /**
  * Nonce-based CSP, wired up per Next.js's documented middleware pattern

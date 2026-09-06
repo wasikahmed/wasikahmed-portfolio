@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/server/session';
 import { getSettings } from '@/server/queries';
+import { can } from '@/server/permissions';
 import { Sidebar } from '@/components/admin/sidebar';
 import { AdminProfile } from '@/components/admin/admin-profile';
 import { TotpNag } from '@/components/admin/totp-nag';
@@ -13,6 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect('/admin/login');
 
   const settings = await getSettings();
+  const canManageUsers = can(session, 'user:read');
 
   return (
     <div className="bg-bg text-fg min-h-screen">
@@ -25,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="font-display text-sm font-semibold">Admin</span>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <Sidebar />
+            <Sidebar canManageUsers={canManageUsers} />
           </div>
           <div className="border-border-subtle border-t px-3 pt-4">
             <AdminProfile
@@ -62,6 +64,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               { label: 'Media', href: '/admin/media' },
               { label: 'Leads', href: '/admin/leads' },
               { label: 'Settings', href: '/admin/settings' },
+              ...(canManageUsers ? [{ label: 'Users', href: '/admin/users' }] : []),
               { label: 'Security', href: '/admin/security' },
               { label: 'Audit log', href: '/admin/audit-log' },
             ].map((l) => (

@@ -17,6 +17,74 @@ prerequisites; W9 → W14 build on each other.
 
 ---
 
+## Progress — 2026-09-06
+
+**W7 (truth-up), W8 (Cloudflare Access removed), W9 (permissions core), W10
+(database-backed sessions + enforcement), and W11 (user management) are done,
+tested, and verified live against the Docker dev stack.** W12 (Bearer
+tokens), W13 (API docs), and the remaining items of W14 (tests) are not
+started. One addition not in the original plan, done alongside W11:
+
+**W11a — Google sign-in**, added mid-session at the user's request. A second
+login path for `/admin`, registered only when `AUTH_GOOGLE_ID`/
+`AUTH_GOOGLE_SECRET` are set (Google Cloud Console OAuth client, not yet
+provided — the button simply doesn't render until then). Deliberately never
+a signup path: `auth.ts`'s `signIn` callback rejects any Google account whose
+email has no existing, non-suspended User document, before a session is ever
+issued — the same "no signup route" invariant AGENTS.md §7 has always
+stated, extended to cover the new entry point. Once past that gate it
+produces the identical JWT session shape credentials does; `getAdminSession()`
+doesn't distinguish which provider was used.
+
+**What actually shipped, by workstream:**
+
+- **W9 — permissions core.** `src/server/permissions.ts`: the
+  `viewer`/`editor`/`admin`/`owner` matrix and `can()`. Found and fixed a
+  real self-contradiction in this file's own original W9 role table while
+  writing W14's publish-boundary test: `editor` was listed with
+  `content:publish`, which would have made the permission a no-op (every
+  role that could write could also publish). Moved to `admin`, matching the
+  stated rationale and the acceptance test — the test caught this before it
+  shipped. `User` model gained `name`/`status`/`lastLoginAt`/`invitedBy`,
+  widened `role`, and `passwordHash` is now optional (for an invited user
+  with no password yet).
+- **W10 — enforcement.** `session.ts`'s `getAdminSession()` is now wrapped
+  in `cache()` and re-reads the User document on every call instead of
+  trusting the JWT's role claim — a demoted, suspended, or deleted user is
+  rejected on their very next request. `admin-crud.ts`'s `requireSession()`
+  became `requirePermission()`; every hand-written admin route
+  (audit-log, leads, media, settings, mdx-preview) got an explicit check or
+  an explicit comment recording why it deliberately has none
+  (password/TOTP routes — self-service, not permission-gated).
+  `content:publish` is enforced at the Zod layer (`withPublishGuard()` in
+  schemas.ts), not just the route.
+- **W11 — user management.** `/admin/users`: list, invite (creates a
+  `status: 'invited'` user immediately, emails a single-use 7-day token via
+  the existing Gmail-SMTP path), inline role change, suspend/reactivate,
+  delete, and owner-only ownership transfer. `/admin/accept-invite/[token]`
+  (public, Turnstile-gated, added to `proxy.ts`'s `PUBLIC_ADMIN_PATHS`) sets
+  the name/password an invited user never had. Every owner/self guard from
+  the original plan is implemented and tested: the owner can never be
+  demoted/suspended/deleted by anyone including themselves, and no one may
+  change their own role or status through the users route.
+- **Tests added:** `permissions.test.ts` (exhaustive matrix, sabotage-tested),
+  `session.test.ts` (the stale-role problem, proven against a mocked JWT +
+  real database), `users-routes.test.ts` and `accept-invite-route.test.ts`
+  (every guard above, plus the publish boundary in `admin-crud.test.ts`).
+  173 pre-existing tests still pass unmodified; ~110 new ones added.
+- **Also fixed in passing:** five files still had `localhost:3000` as their
+  `NEXT_PUBLIC_SITE_URL` fallback after W7's port move to 4000
+  (`sitemap.ts`, `robots.ts`, root `layout.tsx`, `writing/feed.xml/route.ts`,
+  `lib/json-ld.ts`) — never hit in practice since the env var is always set,
+  but wrong all the same.
+
+**Verified:** full local gate, unit suite, and the full 55-test e2e suite all
+green; the real invite → accept-invite → role-change → suspend flow driven
+live against the Docker dev stack (screenshots taken at each step); Google
+sign-in's env-gated button correctly absent with no client ID configured.
+
+---
+
 ## Where the project actually is — 2026-09-04
 
 The public site, design system, data layer, admin CMS, SEO surface, contact
@@ -147,6 +215,11 @@ elegance.
 
 ## W7 — Truth-up
 
+**Done, 2026-09-05.** Test fixed and sabotage-tested, dependency bumps and
+the design pass committed as separate real commits, ~20 stale "Phase N"
+comments swept, two wrong `.env.example` lines fixed, local dev moved to
+port 4000 (5000 was squatted by macOS AirPlay Receiver).
+
 Housekeeping. Cheap, and everything after it is easier once the tree is
 honest. No feature work.
 
@@ -174,6 +247,12 @@ honest. No feature work.
 ---
 
 ## W8 — Remove Cloudflare Access
+
+**Done, 2026-09-05, with explicit user confirmation before the commit** (it
+removes a live security layer). Still outstanding, outside this repo: tear
+down the Cloudflare-side Access application in the dashboard — the GitHub
+repo variables have been deleted, but the dashboard app itself needs doing
+by hand or real visitors hit a Cloudflare login they can no longer pass.
 
 Mechanical, but touches security-relevant code, so it gets its own workstream
 and its own verification.
@@ -204,6 +283,9 @@ on its own.
 ---
 
 ## W9 — Permissions core and the user model
+
+**Done, 2026-09-06 — see "Progress" above for what shipped and the role-table
+correction found along the way.**
 
 The foundation. No behaviour changes for the existing admin until W10 wires it
 up — this workstream is pure addition, which makes it safe to land early.
@@ -275,6 +357,8 @@ say who acted at the time it happened, not who owns that address now.
 
 ## W10 — Make the session authoritative, then enforce
 
+**Done, 2026-09-06 — see "Progress" above.**
+
 The hard part, and the one with a real design decision in it.
 
 ### The stale-role problem
@@ -330,6 +414,9 @@ permission-denied — status is checked before permissions.
 ---
 
 ## W11 — User management
+
+**Done, 2026-09-06 — see "Progress" above. Google sign-in (W11a) landed
+alongside it, not originally part of this workstream.**
 
 The visible deliverable. `/admin/users`, gated on `user:read`.
 

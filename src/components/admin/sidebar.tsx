@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 
-const GROUPS: { label: string; links: { label: string; href: string }[] }[] = [
+const BASE_GROUPS: { label: string; links: { label: string; href: string }[] }[] = [
   { label: '', links: [{ label: 'Dashboard', href: '/admin' }] },
   {
     label: 'Content',
@@ -33,12 +33,25 @@ const GROUPS: { label: string; links: { label: string; href: string }[] }[] = [
   },
 ];
 
-export function Sidebar() {
+/**
+ * `canManageUsers` hides the link entirely rather than showing it
+ * disabled — presentation only (PLAN.md W10); the actual gate is every
+ * /api/admin/users route checking `user:read`/`user:write` itself,
+ * independent of whether this link ever renders.
+ */
+export function Sidebar({ canManageUsers = false }: { canManageUsers?: boolean }) {
   const pathname = usePathname();
+  const groups = canManageUsers
+    ? BASE_GROUPS.map((group) =>
+        group.label === 'Account'
+          ? { ...group, links: [{ label: 'Users', href: '/admin/users' }, ...group.links] }
+          : group,
+      )
+    : BASE_GROUPS;
 
   return (
     <nav aria-label="Admin" className="flex flex-col gap-6">
-      {GROUPS.map((group, i) => (
+      {groups.map((group, i) => (
         <div key={group.label || i}>
           {group.label ? (
             <p className="text-2xs text-fg-subtle mb-2 px-3 font-mono tracking-widest uppercase">
