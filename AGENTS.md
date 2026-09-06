@@ -323,8 +323,13 @@ invite → accept → suspend/reactivate → delete → transfer-ownership
 (never a signup path — see §7). **Programmatic clients can now authenticate
 too** (PLAN.md W12): Bearer tokens with rotation, reuse detection, and
 per-token scopes intersected with the caller's live role, resolved through
-the same permission layer the cookie session uses — see §7. The SEO surface
-is done (sitemap, robots, per-page dynamic OG images, RSS, JSON-LD,
+the same permission layer the cookie session uses — see §7. **The API is
+documented and publicly discoverable** (PLAN.md W13): `GET /api/openapi.json`
+is generated from the same Zod schemas every route validates against, and
+`/docs` renders it (self-hosted `@scalar/api-reference-react`, not a CDN
+embed — `proxy.ts`'s CSP would block that outright). Public, not
+admin-gated — a deliberate call, not a default. The SEO surface is done
+(sitemap, robots, per-page dynamic OG images, RSS, JSON-LD,
 canonical URLs) — see PLAN.md W3. CI now gates every push to `main`
 (typecheck/lint/format:check/test/build) before it ships, with E2E running
 separately on PRs and a daily schedule — see PLAN.md W4. See

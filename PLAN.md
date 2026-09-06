@@ -20,9 +20,9 @@ prerequisites; W9 → W14 build on each other.
 ## Progress — 2026-09-06
 
 **W7 (truth-up), W8 (Cloudflare Access removed), W9 (permissions core), W10
-(database-backed sessions + enforcement), W11 (user management), and W12
-(Bearer tokens) are done, tested, and verified live against the Docker dev
-stack.** W13 (API docs) and the remaining items of W14 (tests) are not
+(database-backed sessions + enforcement), W11 (user management), W12 (Bearer
+tokens), and W13 (API documentation) are done, tested, and verified live
+against the Docker dev stack.** The remaining items of W14 (tests) are not
 started. One addition not in the original plan, done alongside W11:
 
 **W11a — Google sign-in**, added mid-session at the user's request. A second
@@ -112,6 +112,44 @@ doesn't distinguish which provider was used.
   exactly the class of gap W14 item 7 ("Bearer parity") exists to catch;
   it surfaced from running the thing, not from reading the diff.
 
+- **W13 — API documentation.** `zod-openapi` builds `GET /api/openapi.json`
+  from the same Zod schemas every route validates against (`schemas.ts`,
+  which grew a few module-local schemas — password change, TOTP confirm/
+  disable, forgot/reset-password, reorder — that used to live inline in
+  their route files, moved here so `openapi.ts` could reuse them instead of
+  re-describing their shape by hand). 41 paths across 15 tags — every
+  `content:`/`lead:` collection, media, settings, users, audit log, both
+  Bearer-token routes, and every self-service/public route. Response
+  shapes are hand-built to mirror `src/lib/types.ts` (there's no Zod schema
+  for what a route _returns_ — see `openapi.ts`'s module comment for why
+  that's an accepted, documented gap rather than an oversight). `/docs`
+  renders it with `@scalar/api-reference-react` — the npm package, not
+  Scalar's documented CDN `<script>` embed, so there's nothing for
+  `strict-dynamic` to block. **Public**, decided explicitly by the user
+  when asked directly (PLAN.md's own "decide explicitly" instruction,
+  taken literally) rather than defaulted into.
+
+  **Three more gaps live verification found, none of them visible from
+  reading the code:** (1) Scalar's own hosted fonts and its "Agent Scalar"
+  AI-chat feature both reach `*.scalar.com` by default — the CSP correctly
+  blocked the fonts outright, but the agent's registry-search calls kept
+  firing even after the obvious `hideClientButton` toggle, because Agent
+  Scalar defaults to _enabled specifically on `localhost`_ (an internal
+  `agent.disabled` flag not yet in the published `@scalar/types` package,
+  found by reading `@scalar/api-reference`'s actual source, not its type
+  declarations) — exactly the kind of default that a real browser catches
+  and a production-only check would have missed entirely. (2) The
+  package's own `.d.ts` declares `import './style.css'`, but its compiled
+  `.js` never actually does — verified by reading the compiled output
+  directly — so the reference's real grid/layout CSS silently never loaded
+  and the page rendered as an unstyled single column at every viewport
+  width, sidebar and content stacked, until that import was added by hand
+  in `docs/page.tsx`. Fixed once dev tooling (`docker compose watch`, and
+  its rebuild trigger for `package.json`/`pnpm-lock.yaml` changes) was
+  confirmed actually working — the first sync attempt silently didn't
+  rebuild the container at all, caught only by checking the container's
+  own creation timestamp against the wall clock, not by any error.
+
 **Verified:** full local gate, unit suite, and the full 55-test e2e suite all
 green; the real invite → accept-invite → role-change → suspend flow driven
 live against the Docker dev stack (screenshots taken at each step); Google
@@ -120,7 +158,12 @@ Bearer tokens verified live too: issue → use on a real permission-gated
 route → refresh/rotate → reuse-detection revokes the family → demotion
 shrinks scopes on next refresh, exercised with `curl` against every
 permission-gated `/api/admin/*` route (not just the ones covered by
-`admin-crud.ts`) after the gap above was found and fixed.
+`admin-crud.ts`) after the gap above was found and fixed. `/docs` and
+`/api/openapi.json` verified live in a real browser (Chromium): zero CSP
+console errors, the full three-column reference layout rendering correctly,
+every collection's request/response schema expanding with real generated
+`curl` examples, and `GET /api/openapi.json` returning valid JSON with no
+authentication of any kind.
 
 ---
 
@@ -534,6 +577,10 @@ who aren't us.
 ---
 
 ## W13 — API documentation
+
+**Done, 2026-09-06 — see "Progress" above, including the public-vs-gated
+decision (made explicitly, by the user, not defaulted into) and the
+CSP/layout gaps live verification found and fixed.**
 
 **Generated from the Zod schemas, not written by hand.** AGENTS.md §6 already
 makes Zod the write-side validation boundary, so a generated spec cannot drift

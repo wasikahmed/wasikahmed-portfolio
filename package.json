@@ -28,6 +28,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@node-rs/argon2": "^2.1.0",
+    "@scalar/api-reference-react": "^0.9.66",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jose": "^6.2.10",
@@ -46,7 +47,8 @@
     "server-only": "^0.0.1",
     "shiki": "^4.4.3",
     "tailwind-merge": "^3.6.0",
-    "zod": "^4.5.2"
+    "zod": "^4.5.2",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
     "@playwright/test": "^1",

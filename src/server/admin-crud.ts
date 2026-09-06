@@ -11,7 +11,7 @@ import { requirePermission } from './resolve-auth';
 import { writeAuditLog } from './audit';
 import { normalizeDoc } from './mongo-utils';
 import type { Permission } from './permissions';
-import { withPublishGuard } from './schemas';
+import { withPublishGuard, reorderSchema } from './schemas';
 
 /**
  * Generic CRUD route factory for the admin API.
@@ -224,8 +224,6 @@ export function deleteHandler(model: Model<Record<string, unknown>>, entityType:
     return new NextResponse(null, { status: 204 });
   };
 }
-
-const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });
 
 /**
  * Drag-to-reorder: body is the full list of ids in their new order.

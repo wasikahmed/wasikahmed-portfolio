@@ -256,3 +256,32 @@ export const tokenRequestSchema = z.object({
 export const refreshTokenRequestSchema = z.object({
   refreshToken: z.string().min(1),
 });
+
+/** PATCH /api/admin/password — self-service, no `can()` check (see route). */
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(12, 'At least 12 characters.'),
+});
+
+/** POST /api/admin/totp/confirm — the code from the authenticator app being enrolled. */
+export const totpConfirmSchema = z.object({ code: z.string().min(6).max(6) });
+
+/** POST /api/admin/totp/disable — current password required to de-provision 2FA. */
+export const totpDisableSchema = z.object({ password: z.string().min(1) });
+
+/** POST /api/auth/forgot-password — public, pre-auth (see route). */
+export const forgotPasswordSchema = z.object({ email: z.string().email() });
+
+/** POST /api/auth/reset-password — public, pre-auth (see route). */
+export const resetPasswordSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+  newPassword: z.string().min(12, 'At least 12 characters.'),
+});
+
+/**
+ * Drag-to-reorder body for every `content:` collection's reorder endpoint
+ * (admin-crud.ts's `reorderHandler`) — the full list of ids in their new
+ * order.
+ */
+export const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });

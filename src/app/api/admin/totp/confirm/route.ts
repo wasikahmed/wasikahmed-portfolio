@@ -1,14 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { z } from 'zod';
 import { connectToDatabase } from '@/server/db';
 import { getAdminSession } from '@/server/session';
 import { verifyCsrf } from '@/server/csrf';
 import { writeAuditLog } from '@/server/audit';
 import { User } from '@/server/models/user';
 import { decryptTotpSecret, verifyTotpCode } from '@/server/totp';
+import { totpConfirmSchema as confirmSchema } from '@/server/schemas';
 
 const PENDING_COOKIE = 'totp-pending';
-const confirmSchema = z.object({ code: z.string().min(6).max(6) });
 
 // Deliberately no `can()` check beyond the session itself (PLAN.md W10):
 // confirming your own 2FA enrollment is a base right of every role, not a

@@ -10,3 +10,8 @@ allowBuilds:
   mongodb-memory-server: false
   sharp: false
   unrs-resolver: false
+  # true — a transitive dependency of @scalar/api-reference-react (PLAN.md
+  # W13). Its postinstall only detects which Vue major is present and
+  # copies the matching stub into its own package directory (read before
+  # approving); no network access, nothing outside its own tree.
+  vue-demi: true

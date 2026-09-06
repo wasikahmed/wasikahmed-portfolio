@@ -6,11 +6,7 @@ import { verifyCsrf } from '@/server/csrf';
 import { writeAuditLog } from '@/server/audit';
 import { User } from '@/server/models/user';
 import { verifyPassword, hashPassword } from '@/server/password';
-
-const changeSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(12, 'At least 12 characters.'),
-});
+import { passwordChangeSchema as changeSchema } from '@/server/schemas';
 
 // Deliberately no `can()` check beyond the session itself (PLAN.md W10):
 // changing your own password is a base right of every role, not a

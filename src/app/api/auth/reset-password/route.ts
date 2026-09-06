@@ -7,17 +7,13 @@ import { PasswordReset } from '@/server/models/password-reset';
 import { checkRateLimit, getClientIp, hashIp, saltedHash } from '@/server/rate-limit';
 import { hashPassword } from '@/server/password';
 import { writeAuditLog } from '@/server/audit';
+import { resetPasswordSchema as resetSchema } from '@/server/schemas';
 
 /**
  * Public, pre-auth, same reasoning as forgot-password/route.ts. A 6-digit
  * code is only 1e6 possibilities, so the rate limit here is the actual
  * security boundary against brute force, not a nicety.
  */
-const resetSchema = z.object({
-  email: z.string().email(),
-  code: z.string().length(6),
-  newPassword: z.string().min(12, 'At least 12 characters.'),
-});
 
 const genericError = NextResponse.json({ error: 'Invalid or expired code.' }, { status: 401 });
 

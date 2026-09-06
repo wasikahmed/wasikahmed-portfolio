@@ -6,6 +6,7 @@ import { User } from '@/server/models/user';
 import { PasswordReset } from '@/server/models/password-reset';
 import { checkRateLimit, getClientIp, hashIp, saltedHash } from '@/server/rate-limit';
 import { sendPasswordResetOtp } from '@/server/email';
+import { forgotPasswordSchema as requestSchema } from '@/server/schemas';
 
 /**
  * Public, pre-auth — no session exists yet, so no CSRF cookie to check
@@ -13,7 +14,6 @@ import { sendPasswordResetOtp } from '@/server/email';
  * either (AGENTS.md §9), so rate limiting here is self-implemented, by
  * IP and by the targeted email, rather than inherited from anywhere.
  */
-const requestSchema = z.object({ email: z.string().email() });
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);

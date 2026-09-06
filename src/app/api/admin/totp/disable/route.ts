@@ -1,13 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { z } from 'zod';
 import { connectToDatabase } from '@/server/db';
 import { getAdminSession } from '@/server/session';
 import { verifyCsrf } from '@/server/csrf';
 import { writeAuditLog } from '@/server/audit';
 import { User } from '@/server/models/user';
 import { verifyPassword } from '@/server/password';
-
-const disableSchema = z.object({ password: z.string().min(1) });
+import { totpDisableSchema as disableSchema } from '@/server/schemas';
 
 /**
  * Requires the current password — de-provisioning 2FA is worth
