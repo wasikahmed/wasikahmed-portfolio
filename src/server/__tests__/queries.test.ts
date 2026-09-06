@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 
@@ -15,6 +15,14 @@ import mongoose from 'mongoose';
  * be up and the env var set *before* db.ts/queries.ts are ever imported —
  * hence the dynamic `import()` inside `beforeAll` instead of a static
  * top-level one.
+ *
+ * The clock is frozen at `FIXED_NOW` for the whole file (`vi.setSystemTime`),
+ * so `visibleNow()`'s `new Date()` and the `PAST`/`FUTURE` fixtures always
+ * agree on what "now" means. Before this, both were pinned to real
+ * 2026-08-30/31 timestamps — the moment wall-clock time actually passed
+ * 2026-08-31, `FUTURE` stopped being in the future and the "not-yet-due"
+ * assertions started failing for real. The bug was in the test's premise,
+ * not in `visibleNow()` itself.
  */
 
 let mongod: MongoMemoryServer;
@@ -78,9 +86,16 @@ beforeAll(async () => {
   // here, those calls buffer against a connection that never opens and
   // hang until the hook times out.
   await connectToDatabase();
+
+  // Freeze the clock after Mongo is up — mongodb-memory-server's own
+  // readiness polling wants real timers. Only `Date` is mocked (not
+  // `setTimeout`/`setInterval`), so Mongoose's connection machinery is
+  // unaffected.
+  vi.useFakeTimers({ now: FIXED_NOW, toFake: ['Date'] });
 }, 60_000);
 
 afterAll(async () => {
+  vi.useRealTimers();
   await mongoose.disconnect();
   await mongod.stop();
 });
