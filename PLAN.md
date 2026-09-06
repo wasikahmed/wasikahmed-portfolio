@@ -1,745 +1,647 @@
 # PLAN.md
 
-Forward plan, originally written 2026-08-27 from a full review of the codebase
-as it stood then. Verified against a running system on 2026-08-30 and, across
-that single day, advanced through every item this file listed — W3, W4,
-Analytics, all of W5, and all of W6 that was going to get pursued. **Closed,
-2026-08-30: every work-plan item below is done, or investigated and explicitly
-decided against with the reasoning recorded.** One genuine action remains and
-it isn't code — see "What's actually left" below. This file stays as the
-historical record of what was done and why; treat new work as a new pass, not
-an edit to the sections below.
+Forward plan, written 2026-09-04 from a full re-read of the codebase against
+the previous plan (now archived at
+[`docs/history/PLAN-2026-08.md`](docs/history/PLAN-2026-08.md), closed
+2026-08-30).
 
-Ordering below is a recommendation based on impact, not a contract. Reorder freely.
+**This phase has one theme: turn a single-admin CMS into a real multi-user
+system.** Fixed roles with permission-based checks, a user-management surface
+that can actually invite and remove people, a Bearer-token API for
+non-browser clients, and generated API documentation. Cloudflare Access comes
+out along the way — not as a side quest, but because it structurally blocks
+multi-user (see W8).
 
----
-
-## Where the project actually is — closed out, 2026-08-30
-
-**Everything is done, deployed, and verified live — not just read, not just
-built, and not just claimed.** Seven public pages rendering entirely from
-MongoDB; a complete design token system with an enforced ambient budget and a
-tested reduced-motion contract; the typed query layer with a published/draft
-split, backed by a real test proving that split holds; a full admin CMS with
-argon2 + TOTP auth, CSRF, Zod validation, an audit log, drag reordering, an
-MDX editor with live preview, and a media library; a full SEO surface
-(sitemap, robots, RSS, JSON-LD, per-page dynamic OG images, canonical URLs);
-Umami analytics behind two optional env vars; a CI-gated, auto-rollback,
-backed-up, Node-pinned deploy pipeline; the contact form pipeline and admin
-password recovery, both real and verified end to end; and, as of today, both
-layers of Cloudflare Access confirmed genuinely active in production (not
-merely wired, as this file used to claim — see below).
-
-**Verified healthy, statically, by running it, and by deliberately breaking
-it.** `typecheck`, `lint`, `build`, `test`, and `format:check` all pass clean.
-No `any`, no `TODO`s, no stray `console.log`, no dead dependencies. Every
-change today went through the real `Dockerfile` production image — built with
-`--no-cache`, seeded, and hit directly with a real headless browser, which is
-what caught two real production bugs (below) that reading the code never
-would have. 55 Playwright E2E tests and 93 Vitest unit tests pass, both
-locally and via the real standalone server shape. Two of those tests
-(`queries.ts` visibility, `admin-crud.ts` CSRF) were each deliberately
-sabotaged once mid-implementation to confirm they actually fail when they
-should, then restored — a test suite that can't go red on its own regression
-isn't proof of anything.
-
-**Two things were wrong in this file itself, found and corrected today —
-worth knowing before trusting anything else in it:**
-
-1. **A critical, live production bug:** `/admin/login` and
-   `/admin/forgot-password` had no dynamic server call of their own, so Next
-   statically prerendered both at build time — freezing one CSP nonce into
-   their `<script>` tags forever, while `proxy.ts` issues a fresh nonce every
-   request. Under `strict-dynamic`, that mismatch silently blocks every
-   script on the page. **The admin login form could not hydrate in any
-   CSP-enforcing browser since the CSP rollout on 2026-08-27** — three days
-   of a non-interactive login page in production. Fixed with
-   `export const dynamic = 'force-dynamic'` on both pages; confirmed fixed
-   against a `--no-cache` production build, header and HTML nonce matching on
-   two separate requests. Full writeup in W2 and W6.
-2. **Cloudflare Access was never actually inactive.** This file spent several
-   revisions — including some written earlier on 2026-08-30 itself — asserting
-   Cloudflare Access was "deferred"/"no-opping" in production. It was not:
-   `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` have been real repo variables since
-   2026-08-27, flowing into every deploy since, and the Cloudflare-side Access
-   application has been live at the edge for the same three days (confirmed
-   by a direct `302` redirect to Cloudflare's own login page). Both
-   defense-in-depth layers described in AGENTS.md §7 have been active the
-   entire time this file claimed otherwise. Full correction in the
-   **Cloudflare Access** section below.
-
-**What's actually left — one item, and it isn't something this session can
-do:** walk the real Cloudflare Access login flow end to end yourself
-(`https://wasikahmed.me/admin/login`, through whatever identity provider
-Access is configured with, confirming it reaches the app's own password
-form). Everything else this file tracked is resolved. See the **Cloudflare
-Access** section for the full detail and two smaller follow-up questions
-worth a deliberate answer (fail-open vs. fail-closed; who else has access).
+Everything below is ordered by dependency, not by preference. W7 and W8 are
+prerequisites; W9 → W14 build on each other.
 
 ---
 
-## Verification pass — 2026-08-30
+## Where the project actually is — 2026-09-04
 
-A full static re-review (does the code do what PLAN.md claims) came back
-clean — see the git history around this date for the review itself. This
-section covers the follow-up: actually running the system in Docker rather
-than only reading it, plus five small things that only a live run surfaces.
+The public site, design system, data layer, admin CMS, SEO surface, contact
+pipeline, analytics, and deploy pipeline are all complete and deployed. That
+part of the archived plan holds up: I re-read it against the code and found no
+feature it claims that doesn't exist.
 
-**What was run:**
+**Four things it gets wrong, all found today:**
 
-- The existing `docker compose watch` dev stack (mongo, mongo-express, web on
-  :3300) — found with an **empty database** (0 documents); `pnpm seed` fixed
-  that. Worth remembering: a fresh `docker compose watch` up needs an explicit
-  `pnpm seed` — nothing does it automatically, and an empty DB fails silently
-  as empty states, not errors.
-- The real `Dockerfile` (production, standalone) image — built and run
-  against the same Mongo, health-checked, and hit on every public route plus
-  `/admin`, `/admin/login`, and `/api/contact`. This is what `deploy.yml`
-  actually ships; it had not been exercised locally since W2 landed.
-- `pnpm e2e` — all 54 tests pass, but only after `pnpm exec playwright
-install` (the browser binary was missing entirely on this machine).
-- A real browser driven through `/admin/login`: email + password accepted,
-  correctly reveals the TOTP step. (Didn't complete TOTP — decrypting the
-  stored secret to generate a live code touches `AUTH_SECRET` in a way this
-  session's tooling declined to script; the two-layer gate itself is
-  confirmed either way.)
+### 1. The gate is red. `pnpm test` fails 4 of 93.
 
-**Five findings, none of them contradicting anything above — small additions:**
+All four are in `src/server/__tests__/queries.test.ts` — the draft-leak guard,
+which the archived plan correctly calls the highest-value test in the repo.
 
-1. `admin-crud.ts` and `rate-limit.ts` both still pass Mongoose's deprecated
-   `new: true` to `findOneAndUpdate` instead of `returnDocument: 'after'` —
-   fires a deprecation warning on every request through either path. See W5.
-2. `pnpm e2e`'s Playwright browser binary isn't installed by default and
-   nothing in the repo documents that `pnpm exec playwright install` is a
-   one-time prerequisite. See W6.
-3. Playwright's `webServer` runs `pnpm exec next build && next start`, which
-   Next.js itself warns is incompatible with `output: 'standalone'` — so
-   `pnpm e2e` has never actually exercised the standalone server shape the
-   production Docker image runs. Tests still pass because `next start` falls
-   back to a normal server, but the coverage gap is real: nothing but a
-   manual `docker build` (done once, this pass) proves the actual production
-   artifact serves correctly. See W6.
-4. The `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in `.env` is a real, domain-locked
-   production key — Turnstile refuses to render on `localhost` (`error
-110200`), so the contact form's Turnstile handshake has never been
-   exercised end-to-end in local dev and can't be without either a
-   Cloudflare-provided test sitekey or a dashboard change. Not a code bug.
-   See W1/W6.
-5. CSP's `'unsafe-eval'` in `script-src` is dev-only (stripped via a
-   `NODE_ENV` check) and is correctly absent from the production image's
-   response headers — confirmed by actually building and hitting that image,
-   not just reading the code. No action needed; noting it because PLAN.md's
-   original W2 write-up only documents the `style-src 'unsafe-inline'`
-   trade-off, not this one.
+**It is a time bomb in the test, not a leak in production.** The fixture
+hardcodes `FIXED_NOW = 2026-08-30` and derives `FUTURE` as one day later
+(2026-08-31), but `visibleNow()` compares `publishedAt` against the real
+`new Date()`. Once wall-clock time passed 2026-08-31, the "scheduled-future"
+fixture became genuinely due, and `getProjects()` started — correctly —
+returning it. The assertion, not the filter, is what's wrong.
 
----
+**The part that matters more than the fix:** `deploy.yml`'s `verify` job runs
+`pnpm test` and gates `build-and-push`. So every push to `main` has failed at
+the gate since 2026-08-31. Either nothing has shipped in four days, or the
+gate isn't behaving the way AGENTS.md §10 describes. Confirm which before
+trusting the pipeline again.
 
-## W1 — Make the contact form real — Done
+`typecheck`, `lint`, `format:check`, and `build` are all clean.
 
-Shipped across two pushes: the API route, then an admin-side pass on top of it.
+**A second red suite the plan did not mention:** `e2e/admin.spec.ts` also
+fails — the login → create → publish → delete round trip. It fails on a clean
+tree with no working-tree changes applied, and it does not `test.skip` itself,
+because `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD` _are_ set in `.env` and
+`e2e-admin@example.com` _does_ exist in Mongo; the credentials simply no longer
+match. The remaining 54 e2e tests pass. This runs in `e2e.yml` on PRs and
+nightly rather than in the deploy gate, so it is not blocking shipping — but it
+means the one test that exercises the real admin pipeline has been dark for an
+unknown period. Re-run `pnpm seed:e2e-admin` and confirm before trusting it.
 
-- `POST /api/contact` — Zod validation, Cloudflare Turnstile verification, and
-  rate limiting by IP hash. Persists to the `Lead` model, including
-  `source`/`ipHash`/`userAgent`.
-- Notification email via Gmail SMTP (an app password, not Resend — simpler for
-  a single-admin CMS; see `src/server/email.ts` and `.env.example`).
-- `ContactForm`'s `onSubmit` submits for real, with pending/success/error
-  states. The "Not connected yet" panel is gone.
-- `/admin/leads` is a full pipeline now, not just a status dropdown:
-  - The list view (`/admin/leads`) is a compact, scannable row-per-lead list —
-    name, email, intent, timestamp, one-line message preview, a status tag,
-    and an inline status shortcut. Clicking a row opens the detail page.
-  - `/admin/leads/[id]` shows the full submission (message, company, budget,
-    notes) and auto-transitions a `new` lead to `read` the moment it's opened
-    — no separate "mark as read" action to remember.
-  - Status changes on both pages go through `LeadStatusControl`, a shared
-    segmented control (not a `<select>`) that persists on click and
-    colour-codes by status using existing design tokens (amber = new,
-    accent = replied, muted = archived).
-  - Added the missing `GET /api/admin/leads/[id]` route (`getOneHandler`,
-    already generic — just wasn't wired up for leads).
-- Replaced the bare sign-out link in the admin shell with `AdminProfile`, a
-  popover (desktop sidebar + mobile bar) showing who's signed in, live 2FA
-  status, a link to Security, and sign out.
-- Dashboard card's "pipeline lands in Phase 5" note is gone.
+### 2. There is uncommitted work on `main` that no commit describes.
 
-**Verified:** a real submission from the public form lands in `/admin/leads`,
-shows as "new," opening it marks it "read" automatically, and status/notes
-changes persist. TOTP enrollment and login enforcement verified end to end
-locally (see AGENTS.md §11).
+| File                                                                  | What it is                                                                                | Documented?                                                          |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `package.json` / `pnpm-lock.yaml`                                     | next 16.3.2→16.3.3, mongoose 9.9.3→9.9.4, zod 4.4.3→4.5.2, nodemailer, `@types/react-dom` | Archived plan claims these were "taken 2026-08-30" — never committed |
+| `src/app/globals.css`                                                 | `--color-fg-subtle` raised to clear WCAG AA (W15)                                         | W15, below                                                           |
+| `src/components/work/project-card.tsx`                                | Feature tile fills; `headingLevel` prop; headline/metric de-dupe (W15)                    | W15, below                                                           |
+| `src/components/case-study/architecture.tsx`                          | Diagram opacity floor 0.35 → 0.80 (W15)                                                   | W15, below                                                           |
+| `src/components/work/work-index.tsx` / `src/app/(site)/work/page.tsx` | `h2` cards; hardcoded "Four projects" removed (W15)                                       | W15, below                                                           |
+| `src/lib/brand.ts` / `logo.tsx` / `icon.svg` / `apple-icon.tsx`       | New bracket-W mark + tile favicon (W15)                                                   | W15, below                                                           |
+| `e2e/motion-contract.spec.ts`                                         | Accent token assertion updated to teal (W15)                                              | W15, below                                                           |
+| `src/server/cloudflare-access.ts`                                     | fail-open → fail-closed in production                                                     | Only in the uncommitted edit to the archived plan                    |
 
-**Not verifiable in local dev, 2026-08-30:** the actual Turnstile handshake.
-`.env`'s `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is a real, domain-locked production
-key — the widget refuses to render on `localhost` (`error 110200`). Either add
-a Cloudflare-provided always-pass test sitekey to `.env.example` for local
-dev, or accept this only gets exercised against the real deployed domain.
+**Correction, 2026-09-04.** An earlier draft of this section listed
+`src/components/motion/text-reveal.tsx` as an undocumented bug fix, and
+described the hero `<h1>` as invisible in production — every word parked at
+`y: 105%` behind its own `overflow-hidden` mask. **That was wrong, and the
+file is clean against `HEAD`.**
+
+What actually happened: a design review running in parallel made a temporary
+diagnostic edit to that file while chasing a hero that _appeared_ blank, and
+this section was written from that edit sitting on disk. The blank hero was an
+artifact of the review tool's browser, which freezes the animation clock —
+`getAnimations()` reported `playState: "running"` with `currentTime` stuck at
+`0`, so every mount animation sat at its initial state. The diagnostic edit was
+reverted.
+
+The committed code is correct, and the repo already proves it:
+`e2e/motion-contract.spec.ts`'s "Variant propagation" block — committed since
+Phase 1 — asserts the words settle at `translateY(0)`. Run against the
+committed file it **passes**. Do not "fix" this.
+
+### 3. Documentation that is now factually wrong.
+
+- `src/proxy.ts:137` — `"No-ops until CF_ACCESS_* is configured (Phase 7)"`.
+  Wrong twice: it is configured, and it now fails _closed_.
+- `src/server/models/user.ts:4` — `"Phase 4 — admin auth. Schema only for now"`.
+- `.env.example:8` — references `pnpm verify:env`. **That script does not exist.**
+- `.env.example:31` — points at `/admin/settings/security`. The real route is
+  `/admin/security`, and it has no email-change UI at all.
+- The archived plan's own appendix concedes 41 comments across 37 files cite
+  phase numbers that no longer resolve.
+
+### 4. The plan was a closed historical record, not a plan.
+
+It said so itself. Hence this file, and the archive.
 
 ---
 
-## Admin password recovery (email OTP) — Done, 2026-08-27
+## Decisions taken, 2026-09-04
 
-The admin account had no recovery path at all — a lost password meant a manual
-`pnpm seed:admin` from the VPS. Added a self-serve "forgot password" flow.
+Recorded here because everything below depends on them and the reasoning is
+not recoverable from the code.
 
-- **Email OTP, deliberately not TOTP.** Reusing the TOTP 2FA code as the reset
-  mechanism was considered and rejected: it collapses two independent factors
-  (password, TOTP secret) into one, and it permanently locks the account out if
-  the authenticator device itself is what's lost — the actual common case for
-  needing recovery. Email is an independent recovery channel; TOTP still gates
-  login afterward regardless of how the password was changed, so the account
-  keeps its two factors.
-- `POST /api/auth/forgot-password` — public, pre-auth (no session, no CSRF
-  cookie exists yet, same reasoning as `/api/contact`). Generates a 6-digit
-  code, stores only a salted SHA-256 hash of it (`PasswordReset` model,
-  TTL-indexed, 10-minute expiry — same pattern as `RateLimit`), and emails it
-  via a new `sendPasswordResetOtp()` in `src/server/email.ts` (same Gmail
-  transporter, same no-op-if-unset guard as `sendLeadNotification`). Always
-  returns `{ ok: true }` whether or not the email matches an account — no
-  enumeration.
-- `POST /api/auth/reset-password` — verifies the code with a constant-time
-  compare, requires a 12-char-minimum new password, hashes it with the
-  existing argon2id `hashPassword()`, deletes the used code (single-use), and
-  writes an audit log entry. TOTP is untouched, so 2FA-enabled accounts still
-  need a code to sign in after a reset.
-- **Both routes are outside `proxy.ts`'s matcher** (`/api/auth/*` — the known
-  gap in AGENTS.md §9), so they implement their own rate limiting by reusing
-  `checkRateLimit`/`hashIp`: 5 req/hour per IP and 3 req/hour per targeted
-  email on the request endpoint, 10/hour per IP and 8/hour per email on the
-  verify endpoint (the real brute-force boundary, since a 6-digit code is only
-  1e6 possibilities). Added a general-purpose `saltedHash()` to
-  `src/server/rate-limit.ts` (alongside the existing IP-specific `hashIp()`)
-  for hashing the email and the OTP itself.
-- `/admin/forgot-password` — new public admin page (added to
-  `PUBLIC_ADMIN_PATHS` in `proxy.ts`, which was the one non-obvious step: the
-  page would otherwise 302 straight back to `/admin/login` before an
-  unauthenticated visitor could ever reach it). Two-step form matching
-  `LoginForm`'s progressive-disclosure pattern; `LoginForm` now links to it.
+**Auth: keep Auth.js, add Bearer tokens alongside it.** The app already has
+JWT auth — Auth.js v5 with `strategy: 'jwt'`, a signed token in an httpOnly
+cookie, no session collection. Replacing it with a hand-rolled implementation
+would mean rewriting login, TOTP, CSRF, password reset, and `proxy.ts`, and
+discarding tested security code to arrive at roughly the same place. Instead:
+Auth.js keeps serving the browser admin UI, and a Bearer-token layer is added
+for programmatic clients (W12).
 
-**Verified in the Docker dev stack:** requested a real OTP, confirmed the
-request endpoint responds identically for an existing vs. non-existent email,
-confirmed a wrong code is rejected, decoded the stored hash with the dev
-`AUTH_SECRET` to complete a real reset, confirmed the same code can't be reused
-(single-use), confirmed the audit log entry was written, confirmed the new
-password is accepted by the credentials provider and TOTP is still required
-afterward (`TOTP_REQUIRED` on the next sign-in), and confirmed both rate limits
-trip after their configured thresholds. `pnpm seed:admin` was rerun afterward
-to restore a real credential for local dev, since the test exercised the
-actual seeded admin account rather than a disposable fixture.
+**Cloudflare: remove Access, keep Tunnel and Turnstile.**
 
-**Not done as part of this:** Turnstile on these two routes (contact form has
-it; forgot-password relies on rate limiting alone — revisit if abuse shows
-up), and session invalidation on reset (existing JWT sessions elsewhere stay
-valid until they expire — same accepted gap as the rest of W2 item 6's
-`maxAge` question).
+- **Access has to go.** It authorizes a fixed set of identities at the _edge_,
+  which means every user invited through the new system would also need a
+  Cloudflare Zero Trust seat provisioned by hand, outside this repo. It
+  directly contradicts the point of W11.
+- **Tunnel stays.** `docker-compose.prod.yml` binds `web` to `127.0.0.1` and
+  the VPS has no inbound ports open at all — `cloudflared` is the only
+  ingress. Removing it is an ops project (open 443, provision TLS, redo DNS,
+  add a firewall), not a code change, and it isn't what this phase is about.
+- **Turnstile stays.** Independent of the above, working, and the natural bot
+  gate for the invitation-acceptance page W11 introduces.
+
+**RBAC: fixed roles, permission-based checks.** Roles are constants in code,
+not a database collection. Call sites check `can(session, 'content:publish')`
+and never a role name. Two consequences worth stating: there is no naming
+collision with the existing `Role` model (job history / Experience), and the
+role→permission matrix is a pure function, so it is exhaustively testable
+without a database.
+
+**Driver: a real multi-user need.** Other people will actually log in. That
+biases every trade-off below toward operational safety — invitations,
+deactivation, immediate revocation, lockout guards — over architectural
+elegance.
 
 ---
 
-## W2 — Close the security gaps — Done, 2026-08-27
+## W7 — Truth-up
 
-Ordered by exposure in the original plan; all seven items addressed.
+Housekeeping. Cheap, and everything after it is easier once the tree is
+honest. No feature work.
 
-1. **Rate-limited authentication.** `/api/auth/*` isn't in `proxy.ts`'s
-   matcher (AGENTS.md §9), so — same pattern as `/api/auth/forgot-password` —
-   the limit lives inside `authorize()` in `src/server/auth.ts` itself,
-   checked before the DB lookup: 20 attempts/15min per IP, 8/15min per email
-   hash, using the existing `checkRateLimit`/Mongo-TTL machinery. A new
-   `RateLimitedError` (code `RATE_LIMITED`) surfaces a distinct message in
-   `login-form.tsx`. **Deliberately a fixed window, not progressive
-   backoff/lockout** — consistent with the same trade-off already accepted
-   for the password-reset endpoints above, and simple enough to reason about
-   for a single-admin account. Verified by scripting 9 rapid attempts against
-   one email in the Docker dev stack: the first 8 return the normal
-   `CredentialsSignin` error, the 9th returns `RATE_LIMITED`; a legitimate
-   login with correct credentials for a fresh email still reaches
-   `TOTP_REQUIRED` normally.
-2. **Cloudflare Access wiring — and, corrected 2026-08-30, actually
-   activated the same day this was written.** `CF_ACCESS_TEAM_DOMAIN` and
-   `CF_ACCESS_AUD` flow through `deploy.yml`'s heredoc from repo variables,
-   which were set for real on 2026-08-27 (same day as this W2 entry) —
-   `gh variable list` confirms both, and every deploy since has written
-   them into production. This repo's own PLAN.md nonetheless kept
-   describing this as "not yet activated" / "deferred" through several
-   rounds of edits, discovered wrong only on 2026-08-30 while investigating
-   the CSP bug in W6 below. See the **Cloudflare Access** section for the
-   current, verified status and what's still open.
-3. **SVG uploads dropped.** Removed from `ALLOWED_TYPES` in
-   `/api/admin/media` and the upload input's `accept`.
-4. **Security headers, CSP included.** Added in `proxy.ts` — CSP (nonce-based
-   per Next's documented middleware pattern, `strict-dynamic`, `frame-ancestors
-'none'`), `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`.
-   Required broadening the matcher off `/admin/*`+`/api/admin/*` to
-   (almost) everything — the admin-only session/CSRF/Cloudflare Access gating
-   is untouched and still scoped exactly as before; every other route now
-   only gets headers added. `style-src 'unsafe-inline'` is a deliberate,
-   documented trade-off (Framer Motion and Shiki both write the `style`
-   attribute directly, which CSP has no nonce mechanism for). Verified in the
-   Docker dev stack: every `<script>` tag Next renders carries a matching
-   nonce (checked programmatically, zero without one) across the homepage,
-   `/admin/login`, and other pages; unauthenticated `/admin` and
-   `/api/admin/*` still redirect/401 correctly; the full local gate
-   (`typecheck`/`lint`/`format:check`/`test`/`build`) stayed green throughout.
-   Not verified: live browser console CSP-violation checking — the Chrome
-   extension wasn't connected this session, so this fell back to server-side
-   HTML inspection instead. Worth a real browser pass before relying on it
-   further, especially for the Turnstile widget and TOTP QR code.
-
-   **This gap turned out to matter, 2026-08-30:** the "every script tag
-   carries a matching nonce" check above only verified a nonce was
-   _present_, not that it matched the response's actual CSP header — which
-   held for every page except `/admin/login` and `/admin/forgot-password`,
-   both statically prerendered and therefore serving one nonce forever
-   against a fresh per-request header. A real headless-browser console
-   check (which this W2 pass explicitly flagged as unverified) would have
-   caught it immediately. Fixed in W6 below.
-
-5. **Uploads validated by content.** `/api/admin/media` now rejects a file
-   `probe-image-size` can't read or whose detected `mime` isn't in
-   `ALLOWED_TYPES`, and derives the stored extension from that detected type
-   instead of the client-supplied filename — `file.type`/filename are no
-   longer trusted for anything.
-6. **Session `maxAge` set to 7 days,** down from Auth.js's 30-day default.
-7. **`verifyCsrf` now uses a constant-time compare** (manual XOR loop — Edge
-   runtime has no `node:crypto.timingSafeEqual`).
+1. **Fix the time-bombed test.** Derive `PAST`/`FUTURE` from `Date.now()` at
+   run time, or freeze the clock with `vi.setSystemTime(FIXED_NOW)` so
+   `visibleNow()` and the fixtures share one notion of "now". The second is
+   better: it makes the test deterministic rather than merely un-expired.
+   Then confirm the suite still goes red when `visibleNow()` is sabotaged —
+   the archived plan's own standard, and the reason this test exists.
+2. **Establish why CI has been green-lighting nothing for four days.** Check
+   `deploy.yml` run history. If pushes have been failing, that is the finding;
+   if they've been passing with a red suite, the gate is broken and that is a
+   bigger one.
+3. **Commit the pending work** as three separate commits with real messages —
+   dependency bumps, the `TextReveal` fix, the fail-closed change — rather
+   than one lump. The `TextReveal` commit should carry the explanation above;
+   it's the only record that bug ever existed.
+4. **Fix the four wrong doc references** listed in §3 above. Either add
+   `verify:env` or delete the reference to it; decide, don't leave it dangling.
+5. **Retire the phase numbers.** The archived plan's appendix maps them. Sweep
+   the 41 comments in one pass rather than "opportunistically as you touch each
+   file" — that instruction has been in place since 2026-08-27 and has
+   demonstrably not happened.
 
 ---
 
-## Cloudflare Access — active, status corrected 2026-08-30
+## W8 — Remove Cloudflare Access
 
-**Read this before touching anything Cloudflare-related — it corrects
-every earlier version of this file, including several written earlier in
-this same day.** The short version: it is already on. Do not "activate"
-it again; do not re-wire `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` thinking
-they're unset. Verify, don't redo.
+Mechanical, but touches security-relevant code, so it gets its own workstream
+and its own verification.
 
-**What's actually confirmed, and how:**
+- Delete `src/server/cloudflare-access.ts`.
+- Remove layer 1 from `src/proxy.ts` (the `verifyCloudflareAccess` call and its
+  redirect/403 branch). The session gate below it is untouched.
+- Remove `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` from `.env.example` and from
+  `.github/workflows/deploy.yml` (both the docs comment and the `.env`
+  heredoc). Delete the GitHub repo variables afterward — otherwise they sit
+  there looking meaningful.
+- **Tear down the Cloudflare-side Access application in the dashboard.** This
+  is the step that is easy to forget and the only one that actually stops the
+  edge from gating `/admin`. Leaving the app live while removing the origin
+  check means users get redirected to a Cloudflare login they can't pass.
+  This is outside the repo and needs doing by hand.
+- Rewrite AGENTS.md §7. It currently describes three layers; there are now two
+  (session, credentials). Say that plainly rather than leaving a gap where
+  layer 1 was.
+- `jose` becomes unused — **keep it.** W12 needs it to sign and verify access
+  tokens. Note this in the commit so nobody prunes it as a dead dependency.
 
-- `CF_ACCESS_TEAM_DOMAIN=wasikahmed.cloudflareaccess.com` and
-  `CF_ACCESS_AUD` are set as real GitHub repo variables — `gh variable list`
-  confirms both, dated 2026-08-27. Every deploy since (`deploy.yml`'s
-  heredoc) has written them into the VPS's `.env`.
-- `src/server/cloudflare-access.ts`'s `cloudflareAccessConfigured()` is
-  `Boolean(CF_ACCESS_TEAM_DOMAIN && CF_ACCESS_AUD)` — both being set means
-  `verifyCloudflareAccess()` has been actively verifying the
-  `Cf-Access-Jwt-Assertion` header's JWT (signature, audience) against
-  Cloudflare's own JWKS on every `/admin/*` and `/api/admin/*` request
-  reaching the origin, not no-opping, since 2026-08-27.
-- **The Cloudflare-side Access application exists too** — confirmed
-  2026-08-30 by hitting `https://wasikahmed.me/admin/login` directly (no
-  cookies, no auth) and getting a real `302` to
-  `wasikahmed.cloudflareaccess.com`'s own hosted login page, with a
-  `CF_AppSession` cookie set and a `WWW-Authenticate: Cloudflare-Access`
-  header. That is Cloudflare's edge itself gating the route — this is not
-  something the app or `deploy.yml` could produce on its own; someone
-  configured an actual Access application in the Cloudflare dashboard for
-  this hostname/path, outside this repo, at some point on or before
-  2026-08-27.
-
-**So both defense-in-depth layers described in AGENTS.md §7 — edge-level
-Cloudflare Access, and the app's own JWT verification — have been live for
-three days.** This directly contradicts every prior claim in this file
-("deferred," "no-opping," "not yet activated"); those were wrong, not
-this correction.
-
-**What is NOT yet confirmed, and is the actual remaining TODO:**
-
-- **Nobody has walked the real end-to-end flow** in this session: Cloudflare
-  Access login (whatever identity provider it's configured with — Google,
-  a one-time PIN, GitHub, etc.) → origin receives a valid
-  `Cf-Access-Jwt-Assertion` → the app's own password + TOTP layer still
-  applies on top. This needs the actual site owner, since it requires a
-  real Access-authorized identity — nothing this session can script or
-  fake. **Action: log in through `https://wasikahmed.me/admin/login`
-  yourself once, end to end, and confirm it reaches the password form
-  after Access clears you.**
-- **Whether fail-open is still the right default is now a live question,
-  not a hypothetical one.** `verifyCloudflareAccess()` returns `true` when
-  the env vars are unset (fail-open) — reasonable when nothing was
-  configured, but the vars _are_ configured now, in production, meaning a
-  future accidental unset (a botched `.env` rewrite, a variable deleted in
-  the GitHub UI) would silently fall back to open rather than failing
-  closed. Worth deciding deliberately: alert if `NODE_ENV=production` and
-  these vars are missing, at minimum.
-- **Which identity provider Access is configured with, and who besides the
-  site owner has access** — not visible from this repo or from the outside
-  and not addressed here.
-- Update AGENTS.md §7 if it still describes this as inactive (check before
-  the next edit there — this correction was made directly to PLAN.md,
-  worth propagating).
+**Verify by breaking it:** with Access removed, an unauthenticated request to
+`/admin` must still redirect to `/admin/login`, and to `/api/admin/*` must
+still 401. The session layer was always doing that work; confirm it still is
+on its own.
 
 ---
 
-## W3 — SEO, sharing, and discoverability — Done, 2026-08-30
+## W9 — Permissions core and the user model
 
-Shipped in one pass and verified three ways: the local gate green, `pnpm e2e`
-54/54 (twice), and — critically, see the bug this caught below — the actual
-production `Dockerfile` image built, seeded, and hit directly, not just
-`next dev`.
+The foundation. No behaviour changes for the existing admin until W10 wires it
+up — this workstream is pure addition, which makes it safe to land early.
 
-- **`src/app/sitemap.ts`** — generated from `getProjects()`/`getPosts()` (the
-  public `get*` family, so a draft can never appear), excludes
-  `/design-system`. Marked `force-dynamic` deliberately: without it, Next
-  statically generates the route once during `next build`, inside Docker,
-  with no database reachable — production would serve an empty sitemap
-  forever.
-- **`src/app/robots.ts`** — allows everything except `/admin`; deliberately
-  does **not** disallow `/design-system` (see below). **Caught a real
-  production bug while verifying this in the actual Docker image**: without
-  its own `force-dynamic`, Next fully static-generates `robots.txt` at build
-  time (no DB dependency to force it dynamic otherwise) and bakes in
-  whatever `NEXT_PUBLIC_SITE_URL` happened to be set to in the _build_
-  stage — always empty, per the Dockerfile's design — into the `Sitemap:`
-  line, permanently, regardless of the real value in the running
-  container's `.env`. Fixed with the same `force-dynamic` export
-  `sitemap.ts` already needed for a different reason. Confirmed fixed by
-  rebuilding the production image and hitting `/robots.txt` directly.
-- **`/writing/feed.xml`** — RSS 2.0, same `get*`-family safety, `force-dynamic`
-  (Route Handlers already default to dynamic, so no fix needed there — only
-  the two metadata-route files above had the static-generation trap).
-  Linked from `/writing`'s `<head>` via `alternates.types`.
-- **Per-page dynamic OG images** — `work/[slug]/opengraph-image.tsx` and
-  `writing/[slug]/opengraph-image.tsx`, sharing the root's font-loading logic
-  (extracted to `src/lib/og-font.ts`). Each honors a CMS-set `seo.ogImage` if
-  present (the schema field existed but `publish-fields.tsx` never grew a UI
-  for it — Satori composites a remote URL as an `<img>` the same way it
-  already does the brand mark's data URI) and otherwise generates a card from
-  the project's headline metric or the post's excerpt. Verified: fetched both
-  generated PNGs directly, viewed them, confirmed the design holds.
-- **JSON-LD** — `Person` on the homepage, `Article` on every post
-  (`src/lib/json-ld.ts`). Verified present in the rendered HTML.
-- **Canonical URLs** on every page in `(site)` via a shared `canonical()`
-  helper (`src/lib/seo.ts`) — home, work, work/[slug], writing, writing/[slug],
-  about, contact. Deliberately **not** on `/design-system` (see below).
-- **The seven hardcoded `— Wasik Ahmed` titles replaced** with
-  `settings.name` via a shared `pageTitle()` helper: `contact`, `about`,
-  `work`, `writing`, `work/[slug]`, `writing/[slug]`, `design-system`.
-  `work/[slug]` and `writing/[slug]` also now read the CMS's `seo.title`/
-  `seo.description` overrides — the other half of "read nowhere" from the
-  original write-up, alongside `ogImage` above.
-- **`/design-system` decided: kept public, kept noindexed, not moved.** It's
-  a real showcase linked from the public footer, not an internal tool — but
-  it's also not content anyone should land on from search, and the page
-  already sets `robots: { index: false }`. Deliberately **not** disallowed in
-  `robots.txt` either: doing so would stop a crawler from ever fetching the
-  page to see that meta tag, which is worse (an un-crawlable URL can still
-  get indexed from an external link, with no snippet). `e2e/motion-contract.spec.ts`'s
-  dependency on the route is now moot — nothing moved.
+### `src/server/permissions.ts`
 
-Analytics (Phase 6's other half) was deliberately left out of this pass as
-out of scope for "SEO, sharing, and discoverability" specifically — see
-below, done the same day.
+Permission strings shaped `<resource>:<action>`, exported as a `const`
+tuple so the type is a union of literals rather than `string`.
 
----
+Proposed resources: `content`, `lead`, `media`, `settings`, `user`, `audit`,
+`apikey`.
 
-## Analytics — Done, 2026-08-30
+**One `content:` bucket rather than per-collection permissions.** Projects,
+posts, testimonials, experience, tech, and skill groups all go through the
+same factory and the same forms; nobody realistically needs "can edit projects
+but not posts." Six collections × five actions would be a 30-entry matrix
+maintained to express a distinction no one wants. If that need appears later,
+splitting `content:` is a mechanical change; collapsing 30 permissions back
+into 5 is not.
 
-Umami, self-hosted or cloud, behind two optional env vars — the last piece
-of the old Phase 6 "polish" bucket.
+**`content:publish` is separate from `content:write`.** This is the
+distinction that earns its keep in a CMS — draft freely, but pushing to the
+live site is a different act — and it maps exactly onto the existing
+`get*` / `getAll*` split (AGENTS.md §6). It also leaves room for a
+contributor-style role later without another schema change.
 
-- **`src/app/(site)/layout.tsx`** injects the tracking script via
-  `next/script` (`strategy="afterInteractive"`), only when both
-  `NEXT_PUBLIC_UMAMI_SCRIPT_URL` and `NEXT_PUBLIC_UMAMI_WEBSITE_ID` are
-  set — same no-op-if-unset pattern as email/Turnstile elsewhere. Lives in
-  the `(site)` layout specifically, not the root one, so admin usage is
-  never counted alongside real visitor traffic.
-- **`src/proxy.ts`'s CSP** allow-lists the script's origin (parsed once from
-  `NEXT_PUBLIC_UMAMI_SCRIPT_URL` at module load) in `connect-src` — the
-  nonce'd `<script>` tag itself loads fine under `strict-dynamic` regardless
-  of host, but the tracking beacon it fires is a same-origin `fetch`/`XHR`
-  by default, which `connect-src` has to separately allow.
-- Added to `.env.example` (with a comment saying what reads it) and
-  `deploy.yml`'s variable-docs comment and `.env` heredoc, per AGENTS.md §8.
-- **Verified in the actual production Docker image with a real headless
-  browser** (not just `curl` — a `<script>` tag with `strategy=
-"afterInteractive"` is injected client-side after hydration, so it never
-  appears in the raw SSR HTML): the script renders with the correct
-  `src`/`data-website-id` attributes, fires a request to the configured
-  origin, produces zero CSP-violation console errors, and is confirmed
-  absent from `/admin`. Also confirmed the script is absent entirely from
-  the homepage when both env vars are unset (today's actual production
-  state — nobody has set these yet).
+### Role matrix
+
+| Role     | Grants                                                                                                    |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| `viewer` | `content:read`, `lead:read`, `media:read`                                                                 |
+| `editor` | viewer + `content:write`, `content:publish`, `content:reorder`, `media:write`                             |
+| `admin`  | editor + `content:delete`, `lead:write`, `media:delete`, `settings:*`, `user:*`, `audit:read`, `apikey:*` |
+| `owner`  | admin + ownership transfer; cannot be demoted or deleted                                                  |
+
+`owner` is a singleton, is set by `pnpm seed:admin`, and is the one role the
+UI must never offer as a choice — it moves only through an explicit transfer
+action (W11).
+
+Export one function, `can(session, permission)`. Nothing else reads the
+matrix directly.
+
+### `User` model changes
+
+Additive; existing documents stay valid.
+
+- `name` — a user list showing only email addresses is unusable.
+- `role` — widen the enum from `['admin']`. **Migration note:** every existing
+  document has `role: 'admin'`; the seeded account must become `owner`. Write
+  this as a real migration step in `seed-admin.ts`, not an assumption.
+- `status` — `'invited' | 'active' | 'suspended'`. Deactivation must not be a
+  delete: audit-log entries reference the user, and losing the account loses
+  the trail.
+- `passwordHash` — becomes **optional**. An invited user has no password until
+  they accept. `authorize()` must reject a passwordless account explicitly
+  rather than falling through to `verifyPassword` with `undefined`.
+- `lastLoginAt`, `invitedBy`, `createdAt` (already present via `timestamps`).
+
+Zod and Mongoose schemas are maintained by hand and in parallel (AGENTS.md §6)
+— change both.
+
+### Audit log
+
+`writeAuditLog` currently records `userEmail` only. Add `userId`, keeping the
+email as a denormalised snapshot: emails change, and an audit entry should
+say who acted at the time it happened, not who owns that address now.
 
 ---
 
-## W4 — Put a gate back in front of `main` — Done, 2026-08-30
+## W10 — Make the session authoritative, then enforce
 
-Every item shipped in one pass, verified locally (`typecheck`/`lint`/
-`format:check`/`test`/`build` all green, `pnpm e2e` — 54/54 — run twice
-against the real standalone server shape, `deploy.yml`/`e2e.yml` both checked
-with `actionlint` and a YAML parser).
+The hard part, and the one with a real design decision in it.
 
-- **`verify` job added to `deploy.yml`,** gating `build-and-push`:
-  `typecheck`, `lint`, `format:check`, `test`, `build`. Uses
-  `actions/setup-node`'s built-in pnpm-store caching rather than a hand-rolled
-  cache step. A push to `main` now fails before Docker Hub ever sees an image
-  if any of these fail — CI is a real backstop, not just the local gate in
-  AGENTS.md §2 (which is still the one that should catch things first).
-- **E2E split into its own `e2e.yml`,** deliberately out of the deploy path so
-  it never gates a hotfix: runs on PRs into `main`, on a daily schedule, and
-  on `workflow_dispatch`. Spins up a real `mongo:7` service container, seeds
-  it (`pnpm seed`), installs the Playwright browser explicitly
-  (`pnpm exec playwright install --with-deps chromium` — confirmed 2026-08-30
-  this isn't present by default), and uploads the HTML report as an artifact
-  on failure.
-- **`playwright.config.ts`'s `webServer` now runs the actual standalone
-  output,** not `next start`. Next.js itself warns `next start` is
-  incompatible with `output: 'standalone'` (next.config.ts) — it "worked"
-  before only because `next start` silently falls back to a normal server, so
-  E2E was never exercising the artifact shape the production `Dockerfile`
-  ships. The command now builds, copies `public/` and `.next/static` into
-  `.next/standalone` (same as the `Dockerfile` already does — standalone
-  output doesn't include either), and runs
-  `node .next/standalone/server.js` directly. Verified: all 54 tests pass
-  against this shape, both locally and via `e2e.yml`'s CI run.
-- **Automatic rollback on a failed healthcheck.** `deploy.yml`'s "Write .env
-  and deploy" step stashes the outgoing `IMAGE_TAG` into `.env.prev_tag` on
-  the VPS before overwriting `.env`; "Health check" reads it back and
-  redeploys that tag if the new image never goes healthy within 60s. The job
-  still fails either way — a rollback means production is safe, not that the
-  push was good. Manual rollback to some _other_ tag is still just editing
-  `.env` and re-running pull + up.
-- **Backups — local retention only,** decided 2026-08-30 after asking: an
-  off-box destination (S3/R2/B2 via rclone) needs credentials this session
-  can't create on the user's behalf, so that's deferred rather than guessed
-  at. `scripts/vps-backup.sh` runs nightly via a cron entry `deploy.yml`'s
-  "Install the backup cron job" step installs idempotently (greps out any
-  prior line for the script before re-adding it, so redeploys never
-  duplicate the crontab). Each run: `mongodump --archive --gzip` from inside
-  the `mongo` container, a tarball of the `media-uploads` volume via a
-  disposable `alpine` container, both dated under
-  `$DEPLOY_PATH/backups/`, with anything older than `BACKUP_RETENTION_DAYS`
-  (default 7) deleted after. This protects against a bad migration or an
-  admin-CMS mistake — **not** against losing the VPS itself, since nothing
-  leaves the box. Revisit off-box shipping as its own task if that risk
-  becomes worth carrying.
-- **Node version pinned.** Added `.nvmrc` (`22`, matching the Docker base
-  image) and `"engines": { "node": "22.x" }` in `package.json`; both CI
-  workflows read `.nvmrc` via `setup-node`'s `node-version-file`. Bumped
-  `@types/node` from `^20` to `^22` to match — confirmed `pnpm typecheck`
-  stays clean. Local dev Node (24) still works; `engines` documents intent,
-  it isn't `engine-strict`.
+### The stale-role problem
 
-**Also fixed while here, matching the existing `admin-crud.ts`/`rate-limit.ts`
-pattern (see the verification-pass findings above):** the settings route
-(`src/app/api/admin/settings/route.ts`) had the same deprecated Mongoose
-`new: true` option; switched to `returnDocument: 'after'` alongside the other
-two.
+A JWT is a bearer of claims frozen at issue time. Demote a user, suspend
+them, or delete their account, and their existing token still says
+`role: 'admin'` for up to seven days. The archived plan already flags the
+sibling case — a password reset doesn't invalidate live sessions — as an
+accepted gap. For a single-admin CMS that was defensible. For a system whose
+whole point is managing other people's access, it is not: "remove this
+person's access" must mean _now_, not _within a week_.
+
+### The decision: `getAdminSession()` becomes database-backed
+
+The JWT stays the transport — it proves _which_ user is calling. The database
+becomes the authority on _what that user may do_: `getAdminSession()` reads
+the user document and returns the current role and status, ignoring the role
+claim baked into the token.
+
+That is one indexed `findById` per admin request. Wrap it in React `cache()`
+— the same pattern `queries.ts` already uses — so multiple calls within a
+single render or route hit Mongo once. For a system with a handful of users
+this cost is invisible, and it buys instant revocation of role changes,
+suspension, and deletion, with no token-versioning scheme, no refresh-cycle
+latency, and no separate invalidation path to get wrong.
+
+`proxy.ts` stays cookie-only and coarse — it runs in the Edge runtime and
+cannot reach Mongoose (AGENTS.md §7). It answers "is anyone logged in?"; the
+route handlers answer "may _this_ user do _this_?"
+
+A suspended or deleted user must be rejected here, not merely
+permission-denied — status is checked before permissions.
+
+### Enforcement
+
+- `admin-crud.ts`'s `requireSession()` becomes `requirePermission(perm)`. The
+  factory already funnels six collections through one place; extend
+  `CrudConfig` with the permission each handler needs, and every collection
+  is covered at once. This is the single highest-leverage edit in the whole
+  phase.
+- Hand-written routes — `leads`, `media`, `settings`, `password`, `totp/*`,
+  `audit-log`, `mdx-preview` — each get an explicit check. **Enumerate them
+  and check them off; a route silently left on a bare session check is
+  exactly the bug this workstream exists to prevent.**
+- `content:publish` is enforced at the _schema_ boundary, not just the route:
+  a user without it may submit a document, but `status` may not move to
+  `published` or `scheduled`. Doing this in the Zod layer means it holds for
+  create, update, and any future path that writes a status.
+- The sidebar and dashboard filter by permission — **presentation only.**
+  Hiding a link is not access control and must never be the only thing
+  standing between a viewer and a delete endpoint.
 
 ---
 
-## W5 — Consistency and code health — Done, 2026-08-30
+## W11 — User management
 
-None of this was urgent; all of it was cheap. Every item is now resolved —
-either fixed, or investigated and explicitly decided against, with the
-reasoning recorded below rather than left as a silent "won't fix."
+The visible deliverable. `/admin/users`, gated on `user:read`.
 
-- ~~**Fix `getAdjacentProjects`.**~~ — **done.** Dropped the wrap-around (a
-  site with one published project no longer links to itself as "Next
-  project"), matching `getAdjacentPosts`'s existing behavior. Two tests in
-  `queries.test.ts`.
-- ~~**Audit-log reorder operations.**~~ — **done.** `reorderHandler` now
-  takes an `entityType` (all six call sites updated) and writes one audit
-  entry per reorder — not per item — plus switched N sequential
-  `findByIdAndUpdate` calls to a single `bulkWrite`. Three tests in
-  `admin-crud.test.ts`.
-- ~~Write a `README.md`.~~ — **done.** Quick-start, stack summary, pointers
-  to AGENTS.md/PLAN.md.
-- ~~**Replace deprecated Mongoose `new: true`.**~~ — **done.** Fixed in
-  `admin-crud.ts`, `rate-limit.ts`, and the settings route.
-- ~~Run `pnpm format`~~ / ~~drop the stale `_reference/**` exclude~~ — **done.**
-- ~~**Type the Mongoose models.**~~ — **Partially done, 2026-08-30, with the
-  trade-off recorded rather than forced.** `Media`, `AuditLog`, `User`,
-  `PasswordReset`, `RateLimit`, and `Settings` now pass their inferred
-  document type to `mongoose.model<T>()` — none of these six are ever
-  passed to `admin-crud.ts`'s generic factory, so nothing else needed to
-  change. This removed one of the twelve `as unknown as` casts in
-  `queries.ts` (`getSettings`, now a single `as SettingsType`).
-  **The other six** (`Project`, `Post`, `Testimonial`, `Role`, `TechItem`,
-  `SkillGroup`) were typed too, and then **reverted** — typing them breaks
-  `admin-crud.ts`'s shared `Model<Record<string, unknown>>` parameter type
-  (`createHandler`/`updateHandler`/`deleteHandler`/`listHandler`/
-  `getOneHandler`/`reorderHandler` all take it), because Mongoose's own
-  `Model<T>` type is not covariant enough for a concretely-typed model to
-  satisfy that broader signature. Fixing it properly means either (a)
-  making six generic factory functions doubly-generic over both the Zod
-  input type and the Mongoose document type — a real change to a
-  security-critical, heavily-shared file, for a "not urgent" cleanup item
-  — or (b) widening `admin-crud.ts`'s model parameter to `Model<any>`,
-  which contradicts this repo's own "no `any`" standard (AGENTS.md,
-  PLAN.md's "verified healthy" checklist) to fix a cosmetic issue in a
-  different file. Neither trade was worth it for six remaining casts that
-  are already covered by real tests (`admin-crud.test.ts`,
-  `queries.test.ts`) and have never caused an actual bug.
-- ~~**Reconcile Zod and Mongoose schemas.**~~ — **done, 2026-08-30 — the
-  actual bug fixed, not just documented.** The real issue wasn't the
-  `publishedAt: z.string().datetime()` (Zod) vs. `Date` (Mongoose)
-  declaration — validating an ISO string on the way in and storing a
-  `Date` is normal. The real issue was `normalizeDoc()` passing every
-  `Date` field through untouched: every public interface in
-  `src/lib/types.ts` declares `createdAt`/`publishedAt` as `string`, but
-  Server Components calling `queries.ts` directly (no JSON-serialization
-  boundary in between) got a live `Date` object instead — silently
-  tolerated everywhere it was actually used (`new Date(...)`,
-  `JSON.stringify`, Next's sitemap builder all accept both), but one
-  `.slice()`/`.startsWith()` call away from a type-checked crash.
-  `normalizeDoc()` now converts every top-level `Date` field to an ISO
-  string, so the runtime value matches the declared type everywhere, not
-  just after incidental serialization. Four new tests in
-  `mongo-utils.test.ts`. Separately: `Lead`'s `source`/`ipHash`/`userAgent`
-  were never really "drift" — `leadSchema` is deliberately the _public
-  submission_ contract (`POST /api/contact`), which correctly excludes
-  fields the server sets itself. What was a real, if small, gap: those
-  three fields were captured on every submission and then never surfaced
-  anywhere. Added to the `Lead` interface and to a new "Technical details"
-  panel on the admin lead-detail page — verified against a real production
-  Docker image with a real contact-form submission.
-- ~~**Settle the Role/Experience/Post/Writing naming.**~~ — **investigated,
-  decided against a rename, 2026-08-30.** On inspection this isn't actually
-  an inconsistency: "Experience" is the human-facing nav label for the
-  _section_ (a person's work history), and `Role` is the correct technical
-  name for each _document_ in it (one employer, one title) — precisely the
-  same relationship as "Writing" (the nav label for the section) and `Post`
-  (the model for each article/TIL). Testimonials/Skills follow the same
-  pattern. Renaming either would trade a real, working, sensibly-modeled
-  system for surface consistency, and `entityType: 'role'` is already
-  written into every historical audit log entry — changing it retroactively
-  changes what old records mean. Not touching this.
-- ~~**Move hardcoded copy into the CMS, or accept it explicitly.**~~ —
-  **done, 2026-08-30 — one fixed, two accepted explicitly.**
-  `SelectedWork`'s "Four systems, still in production." was the one that
-  actually mattered: it's a _fact_ (a live count) hardcoded as prose, so it
-  silently goes wrong the moment a project ships or is unpublished — unlike
-  `Process.STEPS` and About's `STORY`, which are authored narrative copy
-  that doesn't reference live data and isn't the kind of thing a CMS field
-  makes more correct, only slower to edit. Fixed the headline with a new
-  `spelledOutCount()` helper (`src/lib/format.ts`) — spells out 0–10,
-  digit fallback above that — so it now reads "Four systems..." or "Five
-  systems..." correctly as the count changes; verified live against the
-  seeded 4-project database. `Process.STEPS`/About's `STORY` are left as
-  deliberately hardcoded — moving them into the CMS would mean a new
-  model, schema, and admin UI for content that's edited by code review a
-  few times a year, not the kind of thing this CMS exists to make fast to
-  change.
-- ~~`formatDate` hardcodes `en-GB`.~~ — **investigated, decided to keep,
-  2026-08-30.** This is a deliberate fixed editorial format, not a gap —
-  the site should read the same date shape ("15 Nov 2024") for every
-  visitor regardless of browser locale, the same way a printed CV doesn't
-  reformat per reader. Documented directly in `format.ts` so the next
-  person to look doesn't wonder the same thing.
+- **List** — name, email, role, status, last login. Roles editable inline for
+  anyone with `user:write`.
+- **Invite** — email + role. Creates a `status: 'invited'` user with no
+  password and emails a single-use, TTL-indexed, salted-hash token. This is
+  exactly the `PasswordReset` pattern already in the repo (`src/server/models/
+password-reset.ts`); reuse the shape rather than inventing a second one.
+- **Accept** — `/admin/accept-invite/[token]`: set a name and a password
+  (12-char minimum, matching the existing reset flow), then land on `/admin`.
+  Must be added to `PUBLIC_ADMIN_PATHS` in `proxy.ts` — the archived plan
+  records this as the one non-obvious step when `/admin/forgot-password` was
+  added, and the same trap applies here. Turnstile-gated, since it is a
+  public, unauthenticated, account-creating endpoint.
+- **Suspend / reactivate** — a status flip, not a delete. Takes effect on the
+  suspended user's very next request, courtesy of W10.
+- **Delete** — hard delete of the user document, audit entries preserved.
+
+**Guards, all of which need tests:**
+
+- The `owner` cannot be demoted, suspended, or deleted — by anyone, including
+  themselves. Ownership moves only by explicit transfer, which promotes the
+  target and demotes the current owner to `admin` in one atomic operation.
+- No user may change their own role. Otherwise `user:write` is just a slow
+  path to `owner`.
+- Deleting or suspending yourself is refused with a clear message rather than
+  silently signing you out.
+- **Force 2FA is deferred, deliberately.** The `totp-nag` component already
+  exists and prompts. Making TOTP mandatory before the invitation flow is
+  proven end to end risks locking a real person out of a real account on
+  their first login. Revisit once W11 has actually been used.
+
+Every mutation here writes an audit entry — `user:invite`, `user:role-change`,
+`user:suspend`, `user:delete`. This is the log that matters most; content
+edits are recoverable, access changes are not.
 
 ---
 
-## W6 — Testing
+## W12 — Bearer tokens
 
-Items 1–5 done, 2026-08-30 — item 6 decided rather than pursued (see below).
-Before this pass, three unit tests existed and all three covered `clamp()`;
-now 93 do, across eight files (two more landed during the W5 pass right
-after this one — `mongo-utils.test.ts` and `format.test.ts` — same rigor,
-same day), plus a fifth E2E spec covering the real admin path. The E2E suite
-is genuinely good — route sweep, horizontal-overflow checks at four
-viewports, command palette, a real reduced-motion contract, and now a full
-admin login → create → publish → delete round trip — and no longer stops at
-the public site.
+Programmatic access, for clients that have no cookie jar.
 
-Priority order, by what would actually catch a costly bug:
+**One API surface, two ways to authenticate.** `/api/admin/*` stays where it
+is and learns to accept either a session cookie or a Bearer token. Standing up
+a parallel `/api/v1/*` would double the routes and guarantee the two drift.
 
-1. ~~**`queries.ts` visibility rules.**~~ — **Done, 2026-08-30.**
-   `src/server/__tests__/queries.test.ts`, against a real ephemeral
-   MongoDB (`mongodb-memory-server`) rather than a mock — covers
-   `getProjects`/`getPosts`/`getAllProjects`/`getAllPosts`/`getProject`/
-   `getPost`/`getProjectSlugs`/`getPostSlugs` across draft,
-   scheduled-future, scheduled-past-due, and published status combinations,
-   plus (added same day, folded in alongside the W5 fix) `getAdjacentProjects`'s
-   wrap-around removal. Deliberately sabotaged `visibleNow()` once
-   mid-implementation to confirm 6/10 tests actually fail when the filter
-   is broken, then restored it — a green test suite that can't go red on
-   its own regression isn't worth having. Required two small infra
-   additions: `vitest.config.ts` now aliases `server-only` to its own empty
-   `react-server` export (every `import 'server-only'` module — `db.ts`,
-   `queries.ts` — threw immediately on import in Vitest otherwise, since
-   Vite doesn't resolve that package's export condition the way Next's
-   bundler does), and `mongodb-memory-server`'s postinstall is disabled in
-   `pnpm-workspace.yaml`'s `allowBuilds` (confirmed it would otherwise
-   download a ~75MB mongod binary on every `pnpm install`, including inside
-   the Docker build, which never runs a test) — the binary instead
-   downloads on demand the first time a real test run needs it, confirmed
-   both ways.
-2. ~~**`admin-crud.ts`**~~ — **Done, 2026-08-30.**
-   `src/server/__tests__/admin-crud.test.ts` — the four things AGENTS.md §4
-   rule 5 requires (session check, CSRF, Zod, audit log) proven against the
-   real generic factory, plus 409 on a duplicate key and (added alongside
-   the W5 reorder fix) the reorder handler's own 401/422/bulk-write/
-   single-audit-entry behavior. `getAdminSession` is mocked (its own
-   integration surface, not what this file tests); CSRF and the database
-   side are real, via the same `mongodb-memory-server` pattern as item 1.
-3. ~~**`totp.ts`** encrypt/decrypt round-trip and drift window;
-   **`password.ts`** hash/verify.~~ — **Done, 2026-08-30.**
-   `totp.test.ts`: AES-256-GCM round-trip, a fresh IV each call, GCM
-   auth-tag tamper detection, drift window (accepts one period back,
-   rejects three), whitespace trimming. `password.test.ts`: argon2id
-   round-trip, wrong-password rejection, per-call salt, and
-   `generatePassword`'s excluded-character set.
-4. ~~**Zod schemas**~~ — **Done, 2026-08-30.** `schemas.test.ts`, 40 tests —
-   every exported schema, a happy path plus a representative rejection per
-   constraint (enum, regex, min/max length, required field).
-5. ~~**An admin E2E path**~~ — **Done, 2026-08-30.** `e2e/admin.spec.ts`:
-   log in with a deterministic no-TOTP account
-   (`scripts/seed-e2e-admin.ts` / `pnpm seed:e2e-admin`), create a project
-   through the real form, publish it, confirm it's live on `/work`, delete
-   it, confirm 404 on both the admin list and the public route. **This is
-   what surfaced the critical CSP bug** documented at the top of this
-   file and in W2 — the test could not get past the login page at all
-   until `admin/login/page.tsx` and `admin/forgot-password/page.tsx` were
-   fixed with `force-dynamic`.
-6. **Decided, not pursued further, 2026-08-30:** making E2E seed its own
-   fixtures independent of the real seed-data. `site.spec.ts`'s specific
-   content assertions (exact headline metrics, filter counts, command-palette
-   results) are deliberately coupled to the actual seed-data — correct for a
-   single-tenant site with fixed, versioned content, since decoupling them
-   would trade real content-regression coverage for marginal robustness
-   benefit. `pnpm seed` is already a required, documented step everywhere
-   E2E actually runs (both locally, per AGENTS.md §2, and in `e2e.yml`), so
-   the practical form of "fails outright against a fresh database" is
-   already handled — a fresh database is never what any real run uses.
+The path name is a little odd for a documented public API. Renaming it would
+touch every route file, `admin-fetch.ts`, and `proxy.ts`'s matcher, for
+cosmetics — not worth the churn now. Revisit if the API ever gets consumers
+who aren't us.
+
+- **`resolveAuth(request)`** — one function, ahead of every permission check.
+  Cookie → existing Auth.js path, CSRF required. Bearer → verify the access
+  token, CSRF **not** required and must not be, since a request with no
+  ambient cookie cannot be forged cross-site. Write that reasoning into the
+  code; a future reader will otherwise "fix" the missing CSRF check.
+- **`POST /api/admin/auth/token`** — email + password (+ TOTP when enabled) →
+  a 15-minute access token (JWT, signed with `AUTH_SECRET` via `jose`) and an
+  opaque refresh token. Reuses `authorize()`'s existing rate limiting; the
+  same brute-force surface deserves the same protection.
+- **Refresh tokens are stored hashed and rotate on use.** A reused refresh
+  token revokes the whole chain — the standard detection for a stolen token,
+  and cheap to implement given the hashing helpers already exist.
+- **Scopes are permission strings**, and are always intersected with the
+  user's current role at request time. A token issued while its owner was an
+  admin must not survive their demotion — same principle as W10, applied to
+  the token layer.
+- **`/admin/security` grows a token section** — list active tokens with
+  last-used timestamps, revoke individually or all at once.
 
 ---
 
-## Dependencies
+## W13 — API documentation
 
-In good shape overall. Patch-level drift only on the things that matter:
-`next` and `eslint-config-next` 16.3.2 → 16.3.3, `mongoose` 9.9.3 → 9.9.4,
-`@types/react-dom`. Take these routinely.
+**Generated from the Zod schemas, not written by hand.** AGENTS.md §6 already
+makes Zod the write-side validation boundary, so a generated spec cannot drift
+from what the API actually accepts. Hand-written Markdown would be wrong
+within a month — the archived plan is a 755-line demonstration of exactly
+that.
 
-Majors available, none urgent, each its own small piece of work:
-`eslint` 9 → 10, `typescript` 5 → 7, `vitest` 3 → 4, `@vitejs/plugin-react` 5 → 6,
-`prettier-plugin-tailwindcss` 0.6 → 0.8. `@types/node` 20 → 22 — **done, W4.**
+- `zod-openapi` (or `@asteasolutions/zod-to-openapi`) to build the document
+  from the existing schemas plus a small per-route metadata registry: method,
+  path, permission, response shape. AGENTS.md §8 says don't add a dependency
+  for something the stack already does — the stack does not do this, so the
+  addition is justified. Record that reasoning in the commit.
+- `GET /api/openapi.json` — the spec.
+- `/docs` — Scalar or Stoplight Elements. **Self-host the bundle.** Both
+  default to a CDN `<script>`, which `proxy.ts`'s CSP will block outright
+  under `strict-dynamic`, and loosening the CSP to accommodate a docs page is
+  the wrong trade. Expect to need a `worker-src` or `blob:` allowance; verify
+  in a real browser console, not by reading headers — the archived plan
+  records a three-day production outage caused by exactly that shortcut.
+- Document the auth model prominently: both mechanisms, when CSRF applies,
+  the permission each endpoint requires, and the refresh-rotation behaviour.
 
-`next-auth` is pinned at `5.0.0-beta.32` — a beta in production. Auth.js v5 has
-been beta for a long time and there is no v4 path back worth taking; the risk is
-real but accepted. Pin it exactly (it already is) and read the changelog before
-any bump.
+**Open question, worth a deliberate answer before building:** public docs or
+admin-gated? Public is the honest default — security here comes from
+authentication, not from concealing endpoint names — and it makes the work
+legible from outside. But it does publish a complete map of the admin surface.
+Decide explicitly; don't drift into one.
 
 ---
 
-## Appendix — decoding the old phase numbers
+## W14 — Tests
 
-41 comments across 37 source files reference a `PLAN.md` section or a "Phase N"
-that no longer exists. They are not wrong, just unresolvable. Rather than
-rewrite all of them, here is the mapping; clean the references up opportunistically
-as you touch each file.
+Not an afterthought: this phase changes who can do what, and every bug in it
+is a security bug.
 
-| Old reference         | What it meant                                          | Status                                                                                            |
-| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Phase 0               | Next.js foundations, tooling, TypeScript config        | Done                                                                                              |
-| Phase 1 / §2.8        | Design system — tokens, primitives, motion             | Done                                                                                              |
-| Phase 2 / §2.x        | Public site — seven pages, signature interactions      | Done                                                                                              |
-| Phase 3               | Data layer — MongoDB, Mongoose, seed, typed queries    | Done                                                                                              |
-| Phase 4 / §3          | Admin CMS — auth, TOTP, CRUD, MDX editor, media, audit | Done                                                                                              |
-| Phase 5               | Leads pipeline — contact API, Turnstile, notifications | **Done — W1**                                                                                     |
-| Phase 6               | Polish — SEO, OG, RSS, analytics                       | Done — W3 (SEO/OG/RSS) and the Analytics section                                                  |
-| Phase 7 / §4          | Production Docker image, CI/CD, VPS deploy             | Done — W2/W4 finished it                                                                          |
-| Phase 8               | Real photography and final content                     | Not started                                                                                       |
-| §2.10                 | Ambient budget (max two layers per section)            | Done, type-enforced                                                                               |
-| §3 "defense in depth" | The three auth layers                                  | All three active — Cloudflare Access confirmed live 2026-08-30, see the Cloudflare Access section |
+1. **The permission matrix, exhaustively.** `can()` is a pure function — assert
+   every role against every permission. Roughly 4 × 25 assertions, generated
+   from the tuples, and the cheapest security test in the repo.
+2. **Enforcement, per route.** Extend `admin-crud.test.ts`: for each handler,
+   a role that may and a role that may not. The existing file already proves
+   session/CSRF/Zod/audit; permission becomes the fifth thing it proves.
+3. **The publish boundary.** An `editor` without `content:publish` submitting
+   `status: 'published'` must be rejected — through the API, not just in the
+   UI. This is the one that protects the public site.
+4. **Revocation is immediate.** Suspend a user mid-session; their next request
+   must 401. This is the whole justification for W10's design, and it is
+   worthless unproven.
+5. **The owner guards.** Owner cannot be demoted, suspended, deleted, or
+   self-role-changed. One test each.
+6. **E2E: the invitation round trip.** Invite → accept → log in → hit a
+   permission ceiling → get refused. `e2e/admin.spec.ts` already establishes
+   the pattern (deterministic no-TOTP account via `seed:e2e-admin`); extend it
+   with a second seeded account at a lower role.
+7. **Bearer parity.** The same permission checks hold whether the caller
+   presents a cookie or a token. Two auth paths into one permission layer is
+   precisely where a gap hides.
 
-The `AGENTS.md` reference in `.github/workflows/deploy.yml:8` is valid again —
-the local pre-push gate lives in AGENTS.md §2.
+Sabotage-test the important ones — break the check, confirm the test goes red,
+restore. The archived plan set that standard and it caught real bugs.
+
+---
+
+## W15 — Design pass
+
+Independent of W7–W14. Nothing here touches auth, permissions, or the data
+layer, so it can land in any order relative to them — including first, since
+none of it is blocked.
+
+Source: a full visual review of the seven public routes on 2026-09-04, run
+against the Docker stack with a seeded database and measured in real Chromium
+(Playwright, 1440×900 and 390×844) rather than read off the source. Contrast
+was computed per text node against its true composited background, including
+inherited opacity.
+
+**What the review found working, and should not be traded away:** the token
+layer is genuinely enforced (no stray hex found in components); `density` is
+used as a real design tool rather than uniform padding; the
+metric-with-baseline pattern is the strongest idea on the site; no horizontal
+overflow at 390px or 1440px on any route; exactly one `h1` per page; form
+labels correctly associated; focus states never removed.
+
+### Landed 2026-09-04 — uncommitted, in the working tree
+
+Five defects. All measured in the running app, all small diffs.
+`typecheck`, `lint`, `format:check`, and `build` are clean with them applied.
+
+1. **`--color-fg-subtle` missed WCAG AA on every surface.** `#6b7a73` measured
+   4.31:1 on `bg` and fell to 3.26:1 by `surface-4` — never reaching 4.5:1
+   anywhere, while carrying real copy (the project card's problem line, the
+   constellation hint, every footer meta label). Raised to `#82928a`: 5.95:1
+   on `bg` → 4.51:1 on `surface-4`, still visibly a step below `fg-muted`
+   (7.12:1). The home page went from 41 sub-AA text nodes to zero.
+
+   Note that AGENTS.md §5 and `globals.css` both claimed all three foregrounds
+   were AA. That was true of two of them. W7's truth-up should not re-assert
+   the claim without re-measuring.
+
+2. **The featured project tile was ~600px of empty card.** The lead tile is
+   `lg:row-span-2`, stretched to the height of the three cards beside it, with
+   content only at its top and bottom — it read as a failed image load. It now
+   shows its `problem` outright (progressive disclosure still governs the small
+   tiles, where hiding it is what keeps them scannable) plus two supporting
+   metrics. Two smaller bugs fell out of the same work: `justify-between` across
+   three children opened _two_ gaps rather than one (now `mt-auto`), and
+   `metrics[0]` duplicates `headline`, which printed `$140k` twice.
+
+3. **The case-study architecture diagram never lit up on a tall display.**
+   The scroll range `['start 0.85', 'center 0.4']` does not complete on a
+   1440×1800 viewport — measured min 0.35, max 0.67, so on a large monitor the
+   dim state was permanent. At 0.35 the detail line is 1.9:1. The floor is now
+   0.80 (≈5:1); the sequence still visibly lights up and the gradient rule
+   still draws. Fixing the offset instead would be the more principled repair
+   and is still open — the floor guarantees legibility either way.
+
+4. **`/work` skipped a heading level.** Cards render `h3`, correct on the home
+   page where they sit under a section `h2`; `/work` has no `h2` between its
+   `h1` and the cards. `ProjectCard` now takes a `headingLevel` prop.
+
+5. **`"Four projects"` was hardcoded on `/work`.** The same content drift the
+   archived plan's W5 fixed on the home page and missed here — wrong the moment
+   a fifth project ships or one is unpublished. Now `spelledOutCount()`.
+
+### Open — in priority order
+
+1. **There is not a single image on the site.** Across all six public routes:
+   zero `<img>` elements. Everything is type and inline SVG. It is a coherent
+   choice and part of why the site reads as disciplined — but it also means a
+   personal portfolio with no face on it, and four case studies about systems
+   nobody can see. The InventoryPulse case study is 4,022px of unbroken prose.
+
+   Highest leverage on this entire list: one portrait on `/about`, then one
+   visual per project (a screenshot, a real dashboard, a schema). Note this
+   lands on infrastructure that already exists — `media` upload, `probe-image-size`,
+   and the admin media library are all built and currently hold zero records.
+
+2. **`/work` is thinner than the site it belongs to.** 1,604px tall on a 900px
+   viewport — four uniform tiles, then ~200px of dead space before the footer.
+   For a portfolio this page has to do the most persuading and currently says
+   less per project than the home page does. The card already knows `year`,
+   `role`, `timeline`, and `categories` and shows none of them.
+
+3. **The contact form is hidden behind a click.** `/contact` shows a heading,
+   a line of copy, and two intent cards; the form only appears after choosing
+   one. The form underneath is well built (labels associated, 41–48px controls,
+   honest helper text) — but this is the page whose entire job is to receive a
+   message, and it asks for a click before showing the thing it wants.
+   Consider rendering it immediately with intent as its first field: same
+   qualifying signal, one fewer step.
+
+4. **11px type is doing too much work.** 126 text nodes on the home page render
+   below 12px. `text-2xs` is right for mono eyebrows and stack chips, where it
+   reads as instrumentation; it is also carrying metric baselines, footer meta,
+   and the constellation hint — lines you actually want read. Promoting those
+   to `text-xs` costs almost no vertical space.
+
+5. **Tall sections leave stranded columns.** The same pattern that produced the
+   featured-card void, in three more places: `/about`'s right column empties
+   below the fact card (~350px), Process holds a heading and one sentence
+   against four steps, and `/contact`'s right column ends at the availability
+   card. None is broken; each would read as composed rather than left over with
+   either a deliberate filler or a narrower container.
+
+6. **The home page is a 7,534px scroll on mobile.** Nine screens on a 390×844
+   device, and Experience is repeated in full on `/about` as a timeline. Decide
+   which page owns that content and trim the other.
+
+7. **Brand: favicon and navbar logo — done 2026-09-04.** The old mark failed
+   for three measurable reasons, not taste: five nodes at `r=3` on a 32-unit
+   grid (6px each, ~20% of the canvas) against a 1.8px stroke, so it read as
+   beads rather than a letter; a centre apex at `y=14` against outer tips at
+   `y=9`, too shallow for a W; and one `accent-bright` node that read as a
+   status light at logo scale.
+
+   Replaced with a bracketed W for the nav, footer, and OG cards, plus a solid
+   accent tile for the favicon and iOS icon — a mark and its small-size
+   variant, which the `MARK_DEFAULT` / `MARK_SMALL` split already assumed.
+   Verified as rendered at 16 / 24 / 32px on both light and dark browser
+   chrome, and on the generated 180px iOS icon.
+
+   Structural notes for whoever touches it next: `markSvg()` still drives all
+   four `next/og` routes, so those followed automatically; `tileSvg()` is new
+   and is what `icon.svg` mirrors by hand (a static asset cannot read a
+   `@theme` token — keep the literal in sync); the iOS route renders the tile
+   full-bleed at `radius: 0` because iOS applies its own corner mask and a tile
+   carrying its own radius inside that mask leaves a dead ring at the corners;
+   and the mark is now entirely `currentColor`, so the `accent-bright`
+   exception that used to be documented in `logo.tsx` is gone rather than
+   re-homed.
+
+8. **Accent moved to teal `#14b8a6` — done 2026-09-04.** Previously spring
+   green `#0fbf7a`. Eight candidates were measured against `bg` and
+   `surface-4`; all eight cleared 4.5:1, so contrast did not decide it. Teal
+   keeps the terminal lineage, steps off the near-black-plus-acid-green palette
+   this genre has converged on, and stops 11px mono eyebrows and chips
+   competing with the primary CTA.
+
+   The full ramp was re-derived, not just the base value: `accent-bright`
+   `#7ce86a` → `#5eead4` (13.13:1 on `bg`, matching the old 12.59:1),
+   `accent-deep` `#0b5c4e` → `#115e59` (2.56:1 — a shadow tone, never text, and
+   it must stay that way), plus all three `border-*` tokens, both
+   `--shadow-glow` layers, and `BRAND_COLORS` in `src/lib/brand.ts`.
+
+   **Amber `#f5a524` was ruled out** and should stay ruled out: it is
+   byte-identical to `--color-signal-amber`, so the brand colour and the
+   warning colour would be the same value.
+
+   The contrast sweep was re-run across seven routes at both breakpoints after
+   the change, with no regressions. `e2e/motion-contract.spec.ts` asserts
+   `--color-accent` exactly, which is what stops the accent drifting silently —
+   that assertion was updated deliberately, and all 9 tests in the file pass.
+
+### Not worth doing
+
+- **Chasing the remaining gap in the featured tile.** It is still ~430px, and
+  that is fine: the numbers are anchored at the foot and the composition now
+  reads as deliberate. Closing it entirely means not stretching the card, which
+  is the asymmetric grid the design deliberately wants.
+- **A light theme.** Out of scope and contradicted by AGENTS.md §5. Every
+  contrast figure above is against the dark surfaces and would need redoing.
+
+---
+
+## Open questions
+
+Answer these as they come up; don't let them block earlier workstreams.
+
+- **Are public API docs the right call?** (W13.) Recommendation: yes.
+- **Should `/api/admin` be renamed** once it has non-browser consumers? (W12.)
+  Recommendation: not now.
+- **Force-2FA for non-owner roles** — deferred from W11 until the invitation
+  flow has been used by a real person at least once.
+- **Off-box backups.** Still local-retention only (AGENTS.md §10). Unchanged by
+  this phase, but the risk grows with every additional user whose work lives
+  on that one VPS.
+- **Who owns the Experience/timeline content?** (W15 open item 6.) It renders
+  in full on both `/` and `/about`. Recommendation: `/about` owns it, the home
+  page keeps a three-role summary.
+- **`next-auth` is pinned at `5.0.0-beta.32`** — a beta, in production, now
+  carrying multi-user auth rather than single-admin auth. The risk was accepted
+  when one person used it. Re-examine that acceptance before W12, and read the
+  changelog before any bump.
