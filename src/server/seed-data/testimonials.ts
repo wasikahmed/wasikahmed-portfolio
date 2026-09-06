@@ -1,6 +1,6 @@
 import type { Testimonial } from '@/lib/types';
 
-/** PLACEHOLDER — replaced in Phase 8. */
+/** PLACEHOLDER — this is only the initial state `pnpm seed` writes; edit or replace it through the admin UI. */
 export const testimonials: Omit<Testimonial, 'id'>[] = [
   {
     quote:

@@ -5,7 +5,8 @@ import type { Project } from '@/lib/types';
  * new design needs: metric baselines, architecture graphs, and real case-study
  * bodies (the prototype hardcoded one body and reused it for every slug).
  *
- * PLACEHOLDER CONTENT — replaced through the admin UI in Phase 8.
+ * PLACEHOLDER CONTENT — this is only the initial state `pnpm seed` writes;
+ * edit or replace it through the admin UI.
  */
 export const projects: Omit<Project, 'id'>[] = [
   {

@@ -39,8 +39,8 @@ const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password'];
  * tunnel or real attacker surface in front of `pnpm dev`.
  *
  * Umami's origin (when `NEXT_PUBLIC_UMAMI_SCRIPT_URL` is set — see the root
- * layout's analytics script, PLAN.md's former Phase 6 gap) is derived once
- * at module load rather than parsed per request: the nonce'd `<script>` tag
+ * layout's analytics script) is derived once at module load rather than
+ * parsed per request: the nonce'd `<script>` tag
  * itself loads fine under `strict-dynamic` regardless of host, but the
  * tracking beacon it fires is a `fetch`/`XHR` to that same origin by
  * default, which `connect-src` has to explicitly allow.
@@ -134,7 +134,8 @@ export default auth(async (request: NextAuthRequest) => {
     return response;
   }
 
-  // Layer 1 — edge trust. No-ops until CF_ACCESS_* is configured (Phase 7).
+  // Layer 1 — edge trust. Verifies the Cf-Access-Jwt-Assertion header that
+  // Cloudflare Access attaches at the edge (see cloudflare-access.ts).
   const accessOk = await verifyCloudflareAccess(request);
   if (!accessOk) {
     const response = isApi

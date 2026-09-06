@@ -24,8 +24,8 @@ import type {
 } from '@/lib/types';
 
 /**
- * The typed query layer — PLAN.md Phase 3 exit criteria: "site renders
- * entirely from the database." Every function here is server-only and
+ * The typed query layer — the site renders entirely from the database.
+ * Every function here is server-only and
  * wrapped in React's `cache()`, so calling e.g. `getProjects()` from three
  * different Server Components in one request hits Mongo once.
  *

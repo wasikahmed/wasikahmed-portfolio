@@ -1,8 +1,9 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 /**
- * Phase 4 — admin auth. Schema only for now; seeded by a CLI script, never
- * through a public signup route (PLAN.md §3 "Auth — defense in depth").
+ * Admin auth. Seeded only by `pnpm seed:admin`, never through a public
+ * signup route (AGENTS.md §7) — there is no signup route and there must
+ * not be one.
  */
 const userSchema = new Schema(
   {

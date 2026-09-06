@@ -23,7 +23,7 @@ const caseStudySectionSchema = new Schema(
     id: { type: String, required: true },
     title: { type: String, required: true },
     // MDX source, not an array of paragraphs — PLAN.md's locked editor
-    // decision ("Bodies stored as MDX text"), materialized in Phase 4.
+    // decision ("Bodies stored as MDX text").
     bodyMdx: { type: String, required: true },
   },
   { _id: false },

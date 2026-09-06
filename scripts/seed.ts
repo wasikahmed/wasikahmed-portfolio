@@ -1,7 +1,7 @@
 /**
  * Seeds the database from src/server/seed-data/* — the content that used
- * to be static imports in Phase 2, now the source of truth for the
- * initial state of each collection (PLAN.md §6, Phase 3).
+ * to be static imports, now the source of truth for the initial state of
+ * each collection (AGENTS.md §6).
  *
  * Idempotent: upserts by each collection's natural key, so running this
  * repeatedly converges rather than duplicating. Validates every record

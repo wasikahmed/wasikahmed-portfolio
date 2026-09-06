@@ -23,8 +23,8 @@ test.describe('Routes', () => {
 test.describe('Responsive', () => {
   /*
    * One test per (viewport, route) pair rather than looping routes inside
-   * a single test. Every page now does a live query at request time
-   * (Phase 3), so a 7-route loop was sharing one 30s budget across seven
+   * a single test. Every page does a live query at request time, so a
+   * 7-route loop was sharing one 30s budget across seven
    * separate page loads — a single slow one failed the whole batch and
    * pointed at the wrong route. Splitting gives each navigation its own
    * timeout and names the actual failing route directly, instead of

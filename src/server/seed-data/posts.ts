@@ -1,6 +1,6 @@
 import type { Post } from '@/lib/types';
 
-/** PLACEHOLDER CONTENT — replaced through the admin UI in Phase 8. */
+/** PLACEHOLDER CONTENT — this is only the initial state `pnpm seed` writes; edit or replace it through the admin UI. */
 export const posts: Omit<Post, 'id'>[] = [
   {
     slug: 'when-to-build-vs-buy-ai',

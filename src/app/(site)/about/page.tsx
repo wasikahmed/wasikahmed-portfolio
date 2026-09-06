@@ -63,7 +63,7 @@ export default async function AboutPage() {
              * Facts panel instead of a stock portrait. The prototype used an
              * Unsplash headshot of someone else, which is the single biggest
              * credibility leak a portfolio can have. A real photo goes here
-             * in Phase 8.
+             * once one exists — see PLAN.md W15 open item 1.
              */}
             <Reveal delay={0.1}>
               <dl className="divide-border-subtle border-border-subtle bg-surface-1 flex flex-col divide-y rounded-lg border">

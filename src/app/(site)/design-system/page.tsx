@@ -84,9 +84,7 @@ export default function DesignSystemPage() {
           </p>
           <div className="mt-8 flex items-center gap-2">
             <StatusDot />
-            <span className="text-2xs text-fg-muted font-mono">
-              Phase 1 · dark only · ambient budget 2
-            </span>
+            <span className="text-2xs text-fg-muted font-mono">Dark only · ambient budget 2</span>
           </div>
         </Container>
       </Section>

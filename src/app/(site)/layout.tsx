@@ -4,8 +4,8 @@ import { Footer } from '@/components/layout/footer';
 import { getSettings, getProjects, getPosts } from '@/server/queries';
 
 /*
- * Umami analytics (PLAN.md's former Phase 6 gap, closed 2026-08-30). Both
- * env vars unset = no script at all, same no-op-if-unset pattern as
+ * Umami analytics. Both env vars unset = no script at all, same
+ * no-op-if-unset pattern as
  * email/Turnstile elsewhere. Lives in this layout rather than the root
  * one deliberately — it wraps only `(site)`, so admin usage is never
  * counted alongside real visitor traffic. `next/script` picks up the

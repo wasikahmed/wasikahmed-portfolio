@@ -1,4 +1,4 @@
-/** Seed data for the settings singleton. Edited live via the admin from Phase 4 onward. */
+/** Seed data for the settings singleton. Edited live via the admin thereafter. */
 export const settingsSeed = {
   name: 'Wasik Ahmed',
   initials: 'WA',
