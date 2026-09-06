@@ -12,12 +12,13 @@ import { can, PERMISSIONS, ROLES, type Permission, type Role } from '../permissi
 
 const EXPECTED: Record<Role, ReadonlySet<Permission>> = {
   viewer: new Set(['content:read', 'lead:read', 'media:read']),
+  // content:publish deliberately excluded — an editor drafts but does not
+  // push live; see permissions.ts's comment on EDITOR_PERMISSIONS.
   editor: new Set([
     'content:read',
     'lead:read',
     'media:read',
     'content:write',
-    'content:publish',
     'content:reorder',
     'media:write',
   ]),

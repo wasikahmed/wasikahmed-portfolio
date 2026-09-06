@@ -12,6 +12,10 @@ const changeSchema = z.object({
   newPassword: z.string().min(12, 'At least 12 characters.'),
 });
 
+// Deliberately no `can()` check beyond the session itself (PLAN.md W10):
+// changing your own password is a base right of every role, not a
+// permission — it acts only on the caller's own account (`session.id`),
+// never anyone else's, so there's nothing here for `user:write` to gate.
 export async function PATCH(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });

@@ -2,7 +2,11 @@
 // leak — see https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
 import 'server-only';
 
+import { cache } from 'react';
+import mongoose from 'mongoose';
 import { auth } from './auth';
+import { connectToDatabase } from './db';
+import { User } from './models/user';
 import { ROLES, type Role } from './permissions';
 
 /**
@@ -16,14 +20,6 @@ import { ROLES, type Role } from './permissions';
  * empirically while wiring this up, not assumed. Rather than scatter `as`
  * casts through every admin page and API route, the cast happens once,
  * here, and everything downstream gets a real, narrow type.
- *
- * `role` widened from the literal `'admin'` to the full `Role` union
- * (PLAN.md W9) — still read straight off the JWT claim here, exactly as
- * before, so this is not yet the stale-role fix: a demoted or suspended
- * user's existing token still reports their old role until it expires.
- * PLAN.md W10 makes this function re-read the user document from the
- * database instead, which is the actual fix; landing the wider type now
- * without the DB read is what keeps W9 a no-behaviour-change addition.
  */
 export interface AdminSession {
   id: string;
@@ -32,18 +28,44 @@ export interface AdminSession {
   totpEnabled: boolean;
 }
 
-export async function getAdminSession(): Promise<AdminSession | null> {
+/**
+ * Database-backed, not JWT-trusting (PLAN.md W10 — "the stale-role
+ * problem"). The JWT cookie still proves *which* user is calling; this
+ * function re-reads the User document on every call to decide *what they
+ * may currently do*, ignoring whatever role/status the token itself
+ * claims. A demoted, suspended, or deleted user is rejected here on their
+ * very next request — no token-versioning scheme, no refresh-cycle
+ * latency, no separate invalidation path to get wrong.
+ *
+ * That's one indexed `findById` per admin request, wrapped in React's
+ * `cache()` exactly like `queries.ts` — multiple calls within a single
+ * render or route handler hit Mongo once. For a system with a handful of
+ * users this cost is invisible.
+ *
+ * `proxy.ts` deliberately does NOT call this — it runs in the Edge
+ * runtime and cannot load Mongoose (AGENTS.md §7), so it stays
+ * cookie-only and coarse ("is anyone logged in?"). This function answers
+ * the finer question ("may *this* user do *this*?") for every route
+ * handler and Server Component that needs it.
+ */
+export const getAdminSession = cache(async (): Promise<AdminSession | null> => {
   const session = await auth();
-  const user = session?.user as
-    { id?: string; email?: string | null; role?: string; totpEnabled?: boolean } | undefined;
+  const jwtUser = session?.user as { id?: string; email?: string | null } | undefined;
+  if (!jwtUser?.id || !mongoose.Types.ObjectId.isValid(jwtUser.id)) return null;
 
-  if (!user?.id || !user.email) return null;
+  await connectToDatabase();
+  const user = await User.findById(jwtUser.id).lean();
+
+  // Deleted since the token was issued, suspended, or (defensively) stuck
+  // with a role value outside the current enum — all three mean "not a
+  // valid admin session," not "permission denied for a valid one."
+  if (!user || user.status === 'suspended') return null;
   if (!ROLES.includes(user.role as Role)) return null;
 
   return {
-    id: user.id,
+    id: String(user._id),
     email: user.email,
     role: user.role as Role,
-    totpEnabled: Boolean(user.totpEnabled),
+    totpEnabled: Boolean(user.totpSecret),
   };
-}
+});

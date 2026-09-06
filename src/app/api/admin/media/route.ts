@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import probe from 'probe-image-size';
 import { connectToDatabase } from '@/server/db';
 import { getAdminSession } from '@/server/session';
+import { can } from '@/server/permissions';
 import { verifyCsrf } from '@/server/csrf';
 import { writeAuditLog } from '@/server/audit';
 import { Media } from '@/server/models/media';
@@ -28,6 +29,9 @@ const EXT_BY_MIME: Record<string, string> = {
 export async function GET() {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  if (!can(session, 'media:read')) {
+    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
+  }
 
   await connectToDatabase();
   const docs = await Media.find().sort({ createdAt: -1 }).lean();
@@ -37,6 +41,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  if (!can(session, 'media:write')) {
+    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
+  }
   const csrfError = verifyCsrf(request);
   if (csrfError) return csrfError;
 

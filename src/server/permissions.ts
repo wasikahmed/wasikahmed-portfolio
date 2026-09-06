@@ -64,16 +64,28 @@ export type Role = (typeof ROLES)[number];
 
 const VIEWER_PERMISSIONS: readonly Permission[] = ['content:read', 'lead:read', 'media:read'];
 
+// `content:publish` deliberately excluded here — an editor drafts freely
+// (content:write) and can reorder the published list, but pushing a draft
+// live is admin's call. PLAN.md's original W9 role-matrix table listed
+// `content:publish` under `editor`, which would make the permission a
+// no-op today (every role that can write could also publish, and the
+// stated rationale for splitting it — "draft freely, but pushing to the
+// live site is a different act" — would describe nothing any role
+// actually can't do). Corrected here to match that rationale and PLAN.md
+// W14's own acceptance test ("an editor without content:publish
+// submitting status: 'published' must be rejected"), which only makes
+// sense if editor lacks it. Caught by that exact test going red before
+// this fix landed.
 const EDITOR_PERMISSIONS: readonly Permission[] = [
   ...VIEWER_PERMISSIONS,
   'content:write',
-  'content:publish',
   'content:reorder',
   'media:write',
 ];
 
 const ADMIN_PERMISSIONS: readonly Permission[] = [
   ...EDITOR_PERMISSIONS,
+  'content:publish',
   'content:delete',
   'lead:write',
   'media:delete',

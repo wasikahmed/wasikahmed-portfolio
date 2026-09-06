@@ -9,7 +9,12 @@ import { verifyPassword } from '@/server/password';
 
 const disableSchema = z.object({ password: z.string().min(1) });
 
-/** Requires the current password — de-provisioning 2FA is worth re-authenticating for. */
+/**
+ * Requires the current password — de-provisioning 2FA is worth
+ * re-authenticating for. Deliberately no `can()` check beyond that
+ * (PLAN.md W10): disabling your own 2FA is a base right of every role,
+ * not a permission — it only ever acts on the caller's own account.
+ */
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });

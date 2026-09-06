@@ -7,10 +7,12 @@ import type { Model } from 'mongoose';
 import type { ZodType } from 'zod';
 import { z } from 'zod';
 import { connectToDatabase } from './db';
-import { getAdminSession } from './session';
+import { getAdminSession, type AdminSession } from './session';
 import { verifyCsrf } from './csrf';
 import { writeAuditLog } from './audit';
 import { normalizeDoc } from './mongo-utils';
+import { can, type Permission } from './permissions';
+import { withPublishGuard } from './schemas';
 
 /**
  * Generic CRUD route factory for the admin API.
@@ -24,7 +26,18 @@ import { normalizeDoc } from './mongo-utils';
  * Auth is checked again here even though middleware already gates
  * `/api/admin/*` — defense in depth, and it also gives us the session's
  * email for the audit log, which middleware doesn't expose to the route.
+ *
+ * PLAN.md W10 added permission enforcement on top of that session check.
+ * `listHandler`/`createHandler`/`deleteHandler`/`reorderHandler` are only
+ * ever called for the six `content:` collections (verified against every
+ * call site when this landed), so they hardcode the matching `content:*`
+ * permission rather than threading a parameter through every route file
+ * that calls them. `getOneHandler`/`updateHandler` are the two shared with
+ * `leads/[id]/route.ts`, so those take an explicit `resource` and default
+ * to `'content'` — the one call site that isn't gets it passed explicitly.
  */
+
+type Resource = 'content' | 'lead';
 
 interface CrudConfig<T> {
   entityType: string;
@@ -33,14 +46,40 @@ interface CrudConfig<T> {
   summarize: (doc: T) => string;
   /** Default sort for the list endpoint. */
   sort?: Record<string, 1 | -1>;
+  /**
+   * Which resource's permissions gate create/update. Defaults to
+   * `'content'` — every collection through this factory except leads.
+   * Controls both the base read/write permission *and* whether the
+   * `content:publish` schema guard applies (leads' `status` field is a
+   * triage state, not a publish gate, and must never require it).
+   */
+  resource?: Resource;
 }
 
-async function requireSession() {
+const READ_PERMISSION: Record<Resource, Permission> = {
+  content: 'content:read',
+  lead: 'lead:read',
+};
+
+const WRITE_PERMISSION: Record<Resource, Permission> = {
+  content: 'content:write',
+  lead: 'lead:write',
+};
+
+async function requirePermission(
+  permission: Permission,
+): Promise<{ session: AdminSession; response: null } | { session: null; response: NextResponse }> {
   const session = await getAdminSession();
   if (!session) {
     return {
       session: null,
       response: NextResponse.json({ error: 'Not authenticated.' }, { status: 401 }),
+    };
+  }
+  if (!can(session, permission)) {
+    return {
+      session: null,
+      response: NextResponse.json({ error: 'Not permitted.' }, { status: 403 }),
     };
   }
   return { session, response: null };
@@ -52,7 +91,7 @@ function isDuplicateKeyError(err: unknown): boolean {
 
 export function listHandler<T>(model: Model<Record<string, unknown>>, config: CrudConfig<T>) {
   return async function GET() {
-    const { response } = await requireSession();
+    const { response } = await requirePermission('content:read');
     if (response) return response;
 
     await connectToDatabase();
@@ -66,13 +105,16 @@ export function listHandler<T>(model: Model<Record<string, unknown>>, config: Cr
 
 export function createHandler<T>(model: Model<Record<string, unknown>>, config: CrudConfig<T>) {
   return async function POST(request: NextRequest) {
-    const { session, response } = await requireSession();
+    const { session, response } = await requirePermission('content:write');
     if (response) return response;
     const csrfError = verifyCsrf(request);
     if (csrfError) return csrfError;
 
     const body = await request.json().catch(() => null);
-    const result = config.schema.safeParse(body);
+    // Always content — createHandler is never called for leads (see the
+    // module comment) — so the publish guard is always in play, and it's
+    // a no-op for schemas with no `status` field.
+    const result = withPublishGuard(config.schema, session).safeParse(body);
     if (!result.success) {
       return NextResponse.json({ error: z.prettifyError(result.error) }, { status: 422 });
     }
@@ -103,12 +145,15 @@ export function createHandler<T>(model: Model<Record<string, unknown>>, config: 
   };
 }
 
-export function getOneHandler(model: Model<Record<string, unknown>>) {
+export function getOneHandler(
+  model: Model<Record<string, unknown>>,
+  resource: Resource = 'content',
+) {
   return async function GET(
     _request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) {
-    const { response } = await requireSession();
+    const { response } = await requirePermission(READ_PERMISSION[resource]);
     if (response) return response;
 
     const { id } = await params;
@@ -120,18 +165,24 @@ export function getOneHandler(model: Model<Record<string, unknown>>) {
 }
 
 export function updateHandler<T>(model: Model<Record<string, unknown>>, config: CrudConfig<T>) {
+  const resource = config.resource ?? 'content';
   return async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) {
-    const { session, response } = await requireSession();
+    const { session, response } = await requirePermission(WRITE_PERMISSION[resource]);
     if (response) return response;
     const csrfError = verifyCsrf(request);
     if (csrfError) return csrfError;
 
     const { id } = await params;
     const body = await request.json().catch(() => null);
-    const result = config.schema.safeParse(body);
+    // Only apply the publish guard for content — leadUpdateSchema's
+    // `status` is a triage state, not a publish gate (see the module
+    // comment and withPublishGuard's own doc comment in schemas.ts).
+    const schema =
+      resource === 'content' ? withPublishGuard(config.schema, session) : config.schema;
+    const result = schema.safeParse(body);
     if (!result.success) {
       return NextResponse.json({ error: z.prettifyError(result.error) }, { status: 422 });
     }
@@ -172,7 +223,7 @@ export function deleteHandler(model: Model<Record<string, unknown>>, entityType:
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) {
-    const { session, response } = await requireSession();
+    const { session, response } = await requirePermission('content:delete');
     if (response) return response;
     const csrfError = verifyCsrf(request);
     if (csrfError) return csrfError;
@@ -206,7 +257,7 @@ const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });
  */
 export function reorderHandler(model: Model<Record<string, unknown>>, entityType: string) {
   return async function POST(request: NextRequest) {
-    const { session, response } = await requireSession();
+    const { session, response } = await requirePermission('content:reorder');
     if (response) return response;
     const csrfError = verifyCsrf(request);
     if (csrfError) return csrfError;

@@ -10,6 +10,9 @@ import { decryptTotpSecret, verifyTotpCode } from '@/server/totp';
 const PENDING_COOKIE = 'totp-pending';
 const confirmSchema = z.object({ code: z.string().min(6).max(6) });
 
+// Deliberately no `can()` check beyond the session itself (PLAN.md W10):
+// confirming your own 2FA enrollment is a base right of every role, not a
+// permission — it only ever acts on the caller's own account.
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });

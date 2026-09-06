@@ -5,6 +5,9 @@ import { generateTotpEnrollment, encryptTotpSecret } from '@/server/totp';
 
 const PENDING_COOKIE = 'totp-pending';
 
+// Deliberately no `can()` check beyond the session itself (PLAN.md W10):
+// enrolling your own 2FA is a base right of every role, not a permission
+// — it only ever acts on the caller's own account.
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });

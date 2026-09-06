@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import { z, type ZodType } from 'zod';
+import { can, type Role } from './permissions';
 
 /**
  * Zod schemas — the validation boundary for every content collection.
@@ -93,6 +94,42 @@ export const postSchema = z.object({
   order: z.number().int().default(0),
   ...publishFields,
 });
+
+/**
+ * `content:publish` enforced at the schema boundary, not just the route
+ * (PLAN.md W10) — a session without it may still submit `status: 'draft'`,
+ * but not `'scheduled'`/`'published'`. Wrapping `projectSchema`/
+ * `postSchema` here (rather than checking `result.data.status` after the
+ * fact in `admin-crud.ts`) means the rule holds for create, update, and
+ * any future path that validates against these two schemas directly —
+ * not only the two call sites that happen to exist today.
+ *
+ * Only ever applied to `projectSchema`/`postSchema` — never to
+ * `leadUpdateSchema`, whose own `status` field is a triage state (new/
+ * read/replied/archived), not a publish gate, and must never require
+ * `content:publish` to change.
+ */
+export function withPublishGuard<T>(
+  schema: ZodType<T>,
+  session: { role: Role } | null,
+): ZodType<T> {
+  return schema.superRefine((data, ctx) => {
+    // Not `T extends { status?: string }` on the signature above: TS
+    // treats an all-optional-properties object type as "weak" and refuses
+    // to accept a schema whose output has no properties in common with it
+    // (testimonial/role/tech/skill-group all have this at every call
+    // site). Checking `status` at runtime, on a value TS otherwise sees as
+    // `T`, gets the same safety without that false-positive constraint.
+    const status = (data as { status?: unknown }).status;
+    if (typeof status === 'string' && status !== 'draft' && !can(session, 'content:publish')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['status'],
+        message: 'You do not have permission to publish or schedule content.',
+      });
+    }
+  });
+}
 
 export const testimonialSchema = z.object({
   quote: z.string().min(1),

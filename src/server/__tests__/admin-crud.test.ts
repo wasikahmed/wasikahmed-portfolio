@@ -24,10 +24,15 @@ const getAdminSessionMock = vi.mocked(getAdminSession);
 const CSRF_TOKEN = 'test-csrf-token';
 
 function authed() {
+  authedAs('admin');
+}
+
+/** PLAN.md W10/W14 — same mocked session, a different role's permissions. */
+function authedAs(role: 'viewer' | 'editor' | 'admin' | 'owner') {
   getAdminSessionMock.mockResolvedValue({
     id: '1',
     email: 'admin@example.com',
-    role: 'admin',
+    role,
     totpEnabled: true,
   });
 }
@@ -158,6 +163,48 @@ describe('createHandler', () => {
     // The failed attempt must not have logged as if it succeeded.
     expect(await AuditLog.countDocuments()).toBe(0);
   });
+
+  // PLAN.md W10/W14 — permission enforcement, not just session enforcement.
+  it('403s for a role without content:write (viewer)', async () => {
+    authedAs('viewer');
+    const res = await admin.createHandler(Project, config())(req('POST', { body: validProject }));
+    expect(res.status).toBe(403);
+    expect(await Project.countDocuments()).toBe(0);
+  });
+
+  it('201s for a role with content:write but not content:publish (editor), submitting a draft', async () => {
+    authedAs('editor');
+    const res = await admin.createHandler(
+      Project,
+      config(),
+    )(req('POST', { body: { ...validProject, status: 'draft' } }));
+    expect(res.status).toBe(201);
+  });
+
+  // The publish boundary (PLAN.md W14 item 3) — enforced through the API,
+  // not just hidden in the UI. An editor has content:write but not
+  // content:publish, so a draft is fine and a published/scheduled status
+  // is not, and this must be a 422 (a rejected submission), not a 403 (a
+  // blocked request) — the editor is allowed to call this endpoint, just
+  // not with this status value.
+  it('422s when an editor (no content:publish) submits status: "published"', async () => {
+    authedAs('editor');
+    const res = await admin.createHandler(
+      Project,
+      config(),
+    )(req('POST', { body: { ...validProject, status: 'published' } }));
+    expect(res.status).toBe(422);
+    expect(await Project.countDocuments()).toBe(0);
+  });
+
+  it('201s when an admin (has content:publish) submits status: "published"', async () => {
+    authed();
+    const res = await admin.createHandler(
+      Project,
+      config(),
+    )(req('POST', { body: { ...validProject, status: 'published' } }));
+    expect(res.status).toBe(201);
+  });
 });
 
 describe('updateHandler', () => {
@@ -183,6 +230,28 @@ describe('updateHandler', () => {
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ action: 'update', summary: 'DocFlow AI v2' });
   });
+
+  it('403s for a role without content:write (viewer)', async () => {
+    authedAs('viewer');
+    const created = await Project.create(validProject);
+    const res = await admin.updateHandler(Project, config())(req('PATCH', { body: validProject }), {
+      params: Promise.resolve({ id: created._id.toString() }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('422s when an editor (no content:publish) moves status to "scheduled"', async () => {
+    authedAs('editor');
+    const created = await Project.create({ ...validProject, status: 'draft' });
+    const res = await admin.updateHandler(Project, config())(
+      req('PATCH', {
+        body: { ...validProject, status: 'scheduled', publishedAt: new Date().toISOString() },
+      }),
+      { params: Promise.resolve({ id: created._id.toString() }) },
+    );
+    expect(res.status).toBe(422);
+    expect(await Project.findById(created._id).lean()).toMatchObject({ status: 'draft' });
+  });
 });
 
 describe('deleteHandler', () => {
@@ -207,6 +276,16 @@ describe('deleteHandler', () => {
     const logs = await AuditLog.find().lean();
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ action: 'delete' });
+  });
+
+  it('403s for a role without content:delete (editor)', async () => {
+    authedAs('editor');
+    const created = await Project.create(validProject);
+    const res = await admin.deleteHandler(Project, 'project')(req('DELETE'), {
+      params: Promise.resolve({ id: created._id.toString() }),
+    });
+    expect(res.status).toBe(403);
+    expect(await Project.findById(created._id)).not.toBeNull();
   });
 });
 
@@ -243,6 +322,15 @@ describe('reorderHandler', () => {
     authed();
     const res = await admin.reorderHandler(Project, 'project')(req('POST', { body: { ids: [] } }));
     expect(res.status).toBe(422);
+  });
+
+  it('403s for a role without content:reorder (viewer)', async () => {
+    authedAs('viewer');
+    const res = await admin.reorderHandler(
+      Project,
+      'project',
+    )(req('POST', { body: { ids: ['x'] } }));
+    expect(res.status).toBe(403);
   });
 
   it('writes order by array position and one audit log entry for the whole batch', async () => {

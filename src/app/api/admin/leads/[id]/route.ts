@@ -7,7 +7,10 @@ const config = {
   schema: leadUpdateSchema,
   summarize: (l: { status?: string; notes?: string }) =>
     l.status ? `Marked lead as ${l.status}` : 'Updated lead notes',
+  // Not content — status here is a triage state (new/read/replied/
+  // archived), not a publish gate. See admin-crud.ts's module comment.
+  resource: 'lead' as const,
 };
 
-export const GET = getOneHandler(Lead);
+export const GET = getOneHandler(Lead, 'lead');
 export const PATCH = updateHandler(Lead, config);
