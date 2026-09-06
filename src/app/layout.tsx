@@ -31,7 +31,7 @@ const jetbrainsMono = JetBrains_Mono({
  * build` (which runs with no env in Docker) does not warn on every route.
  */
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000'),
   title: 'Wasik Ahmed',
   description: 'Software engineer building AI and automation systems.',
   openGraph: {

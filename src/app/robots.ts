@@ -11,7 +11,7 @@ import type { MetadataRoute } from 'next';
  * `/admin` gets the disallow instead: it's authenticated, has nothing to
  * index, and there is no meta tag protecting it from crawl budget waste.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 
 // Confirmed 2026-08-30 by actually building and running the production
 // image: without this, Next fully static-generates robots.txt during

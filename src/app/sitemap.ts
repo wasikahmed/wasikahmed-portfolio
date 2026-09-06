@@ -14,7 +14,7 @@ import { getProjects, getPosts } from '@/server/queries';
  * with no env inside Docker, so this must not throw on an unset
  * NEXT_PUBLIC_SITE_URL, only produce URLs nobody will ever hit.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 
 // Without this, Next statically generates the sitemap once at build time —
 // inside Docker, with no database reachable (see the Dockerfile's comment

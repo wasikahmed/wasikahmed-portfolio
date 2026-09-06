@@ -7,7 +7,7 @@ import type { Settings, Post } from '@/lib/types';
  * here means it's trivial to unit test without a DOM.
  */
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 
 export function personJsonLd(settings: Settings) {
   return {

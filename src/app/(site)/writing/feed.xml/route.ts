@@ -10,7 +10,7 @@ import { getPosts, getSettings } from '@/server/queries';
  */
 export const dynamic = 'force-dynamic';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 
 /** Minimal XML entity escaping — every field below is plain-text CMS content. */
 function escapeXml(value: string): string {
