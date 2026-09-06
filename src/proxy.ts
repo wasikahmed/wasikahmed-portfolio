@@ -2,7 +2,6 @@ import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
 import type { NextAuthRequest } from 'next-auth';
 import { authConfig } from '@/server/auth.config';
-import { verifyCloudflareAccess } from '@/server/cloudflare-access';
 import { ensureCsrfCookie } from '@/server/csrf';
 
 // Edge-safe instance — built from auth.config.ts (no providers, no argon2,
@@ -116,8 +115,7 @@ export default auth(async (request: NextAuthRequest) => {
 
   // Everything outside /admin and /api/admin (the public site, /api/auth/*,
   // /api/contact, the generated icon/OG routes) only needs the security
-  // headers — none of the session/CSRF/Cloudflare Access gating below
-  // applies to it.
+  // headers — none of the session/CSRF gating below applies to it.
   if (!isAdminArea) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, nonce);
@@ -134,19 +132,9 @@ export default auth(async (request: NextAuthRequest) => {
     return response;
   }
 
-  // Layer 1 — edge trust. Verifies the Cf-Access-Jwt-Assertion header that
-  // Cloudflare Access attaches at the edge (see cloudflare-access.ts).
-  const accessOk = await verifyCloudflareAccess(request);
-  if (!accessOk) {
-    const response = isApi
-      ? NextResponse.json({ error: 'Access denied.' }, { status: 403 })
-      : NextResponse.redirect(new URL('/', request.url));
-    applySecurityHeaders(response, nonce);
-    return response;
-  }
-
-  // Layer 2 — app session. `auth()` wrapping this handler populates
-  // `request.auth` from the JWT session cookie; no DB call needed here.
+  // Session — the only gate now that Cloudflare Access is gone (AGENTS.md
+  // §7). `auth()` wrapping this handler populates `request.auth` from the
+  // JWT session cookie; no DB call needed here.
   if (!request.auth?.user) {
     let response: NextResponse;
     if (isApi) {

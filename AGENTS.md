@@ -171,19 +171,17 @@ Fonts: Inter (`font-sans`), Space Grotesk (`font-display`), JetBrains Mono
 
 ## 7. Auth architecture
 
-Three layers, in order:
+Two layers, in order. A third — Cloudflare Access, edge-level JWT
+verification — was removed 2026-09 (PLAN.md W8): it authorizes a fixed set
+of identities at the edge, which structurally blocks the multi-user work
+this phase exists to do (every invited user would also need a Cloudflare
+Zero Trust seat provisioned by hand, outside this repo). The Cloudflare
+Tunnel itself is unaffected and still the only ingress to the VPS.
 
-1. **Cloudflare Access** (`src/server/cloudflare-access.ts`) — verifies the
-   `Cf-Access-Jwt-Assertion` JWT at the origin. No-ops only when `CF_ACCESS_*`
-   is unset — which it is **not** in production: both vars have been set as
-   real repo variables since 2026-08-27, confirmed active (edge-level
-   Cloudflare Access application + app-level JWT verification, both live).
-   See PLAN.md's "Cloudflare Access" section for the full correction and
-   what's still unverified.
-2. **Session** — Auth.js JWT cookie, checked in `src/proxy.ts` for
+1. **Session** — Auth.js JWT cookie, checked in `src/proxy.ts` for
    `/admin/*` and `/api/admin/*`, then re-checked in the dashboard layout and
    again in every API route.
-3. **Credentials** — argon2id via `@node-rs/argon2`, plus optional TOTP whose
+2. **Credentials** — argon2id via `@node-rs/argon2`, plus optional TOTP whose
    secret is AES-256-GCM encrypted at rest with a key derived from `AUTH_SECRET`.
 
 The `auth.ts` / `auth.config.ts` split exists because `proxy.ts` runs in the Edge
@@ -265,9 +263,9 @@ The public site, design system, data layer, and admin CMS are complete and
 deployed. The contact form is real end to end (Turnstile + rate limiting +
 Gmail SMTP notifications + a working `/admin/leads` list/detail/status
 pipeline), and TOTP has been verified working in dev. `/admin` is protected by
-all three layers described in §7 — Cloudflare Access, session, credentials —
-Cloudflare Access included, confirmed active in production 2026-08-30 (see
-PLAN.md's "Cloudflare Access" section). The SEO surface is done (sitemap,
+both layers described in §7 — session and credentials; Cloudflare Access was
+removed 2026-09 (PLAN.md W8) to unblock multi-user auth, and the Cloudflare
+Tunnel is unaffected. The SEO surface is done (sitemap,
 robots, per-page dynamic OG images, RSS, JSON-LD, canonical URLs) — see
 PLAN.md W3. CI now gates every push to `main`
 (typecheck/lint/format:check/test/build) before it ships, with E2E running

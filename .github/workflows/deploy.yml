@@ -30,14 +30,6 @@ name: Build and deploy
 #   NEXT_PUBLIC_SITE_URL   e.g. https://wasikahmed.me
 #   ADMIN_EMAIL             Bootstrap admin account email
 #   MONGO_ROOT_USER         Mongo root username for the prod container
-#   CF_ACCESS_TEAM_DOMAIN   Cloudflare Zero Trust team domain, e.g.
-#                           yourteam.cloudflareaccess.com — from the Access
-#                           application configured over /admin in the
-#                           Cloudflare dashboard. Unset = verifyCloudflareAccess
-#                           no-ops (PLAN.md W2 item 2); this is not wired up
-#                           by this workflow alone.
-#   CF_ACCESS_AUD           The Access application's Audience (AUD) tag,
-#                           from the same dashboard page.
 #   NEXT_PUBLIC_UMAMI_SCRIPT_URL   Self-hosted or cloud Umami script URL.
 #                                  Unset = no analytics script at all (see
 #                                  src/app/(site)/layout.tsx) — optional.
@@ -211,8 +203,6 @@ jobs:
             GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
             NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
             TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
-            CF_ACCESS_TEAM_DOMAIN=${{ vars.CF_ACCESS_TEAM_DOMAIN }}
-            CF_ACCESS_AUD=${{ vars.CF_ACCESS_AUD }}
             NEXT_PUBLIC_UMAMI_SCRIPT_URL=${{ vars.NEXT_PUBLIC_UMAMI_SCRIPT_URL }}
             NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
             ENVEOF
