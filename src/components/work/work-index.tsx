@@ -87,7 +87,7 @@ export function WorkIndex({ projects }: { projects: Project[] }) {
               exit={{ opacity: 0, scale: 0.97 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
-              <ProjectCard project={project} className="h-full" />
+              <ProjectCard project={project} headingLevel="h2" className="h-full" />
             </motion.li>
           ))}
         </AnimatePresence>

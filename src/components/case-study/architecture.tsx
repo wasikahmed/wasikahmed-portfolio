@@ -25,7 +25,17 @@ function Stage({
   still: boolean;
 }) {
   const start = index / total;
-  const opacity = useTransform(drawn, [start, start + 0.12], [0.35, 1]);
+  /*
+   * The dim state is 0.8, not the 0.35 it used to be. On a tall viewport
+   * (1440x1800) the scroll range above never completes — the diagram is
+   * already past `center 0.4` before enough scroll exists to drive it, so
+   * the last stages topped out around 0.67 and the first sat at 0.35 for
+   * the whole visit. At 0.35 the detail line measured 1.9:1; the stage was
+   * decorative-looking text nobody could read. 0.8 keeps the light-up
+   * legible (the gradient rule beside it still draws the sequence) while
+   * guaranteeing ~5:1 even if progress never advances at all.
+   */
+  const opacity = useTransform(drawn, [start, start + 0.12], [0.8, 1]);
   const x = useTransform(drawn, [start, start + 0.12], [-6, 0]);
 
   return (

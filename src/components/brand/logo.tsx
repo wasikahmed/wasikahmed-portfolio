@@ -1,14 +1,15 @@
-import { MARK_DEFAULT, MARK_NODES, MARK_PATH, MARK_SMALL, MARK_VIEWBOX } from '@/lib/brand';
+import { MARK_BRACKETS, MARK_DEFAULT, MARK_LETTER, MARK_SMALL, MARK_VIEWBOX } from '@/lib/brand';
 import { cn } from '@/lib/cn';
 
 /**
- * The logo mark — a "W" built as a pipeline. See `src/lib/brand.ts` for the
+ * The logo mark — a "W" inside a bracket pair. See `src/lib/brand.ts` for the
  * geometry and the reasoning behind it.
  *
- * Colours come from `currentColor` and the accent tokens rather than literals,
- * per AGENTS.md §4.2. The terminal node is the one deliberate exception to
- * monochrome: it is `accent-bright` because it encodes the output stage, not
- * because a second colour looked nice. Keep it.
+ * Monochrome, deliberately: the whole mark takes `currentColor`, so a caller
+ * recolours it by setting `text-*` and nothing here has to know about the
+ * accent ramp. The previous drawing carried one node in `accent-bright` to
+ * encode a shipped output; at logo scale that reads as a status light, and it
+ * is not coming back.
  */
 export function LogoMark({
   className,
@@ -25,26 +26,23 @@ export function LogoMark({
       className={cn('text-accent', className)}
       {...props}
     >
-      <path
-        d={MARK_PATH}
-        stroke="currentColor"
-        strokeWidth={weights.stroke}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {MARK_NODES.map(({ cx, cy }, i) => (
-        <circle
-          key={`${cx}-${cy}`}
-          cx={cx}
-          cy={cy}
-          r={weights.node}
-          className={
-            i === MARK_NODES.length - 1
-              ? 'fill-accent-bright duration-fast transition-colors'
-              : 'fill-current'
-          }
+      {MARK_BRACKETS.map((d) => (
+        <path
+          key={d}
+          d={d}
+          stroke="currentColor"
+          strokeWidth={weights.bracket}
+          strokeLinecap="square"
+          opacity={weights.bracketOpacity}
         />
       ))}
+      <path
+        d={MARK_LETTER}
+        stroke="currentColor"
+        strokeWidth={weights.letter}
+        strokeLinecap="square"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

@@ -18,23 +18,46 @@
 
   /* ── Foreground ───────────────────────────────────────────────────────
      fg-muted lightened from the original #7C8B84 (4.8:1) to clear
-     WCAG AA at the 12–14px sizes it actually gets used at. */
+     WCAG AA at the 12–14px sizes it actually gets used at.
+
+     fg-subtle was #6b7a73, which measured 4.31:1 on `bg` and fell to
+     3.26:1 by `surface-4` — under AA everywhere, despite carrying real
+     copy (the project card's problem line, the constellation hint, every
+     footer meta label). #82928a clears 4.5:1 against all five surfaces
+     (5.95 on bg → 4.51 on surface-4) while staying visibly a step below
+     fg-muted's 7.12. Re-measure against the darkest *and* lightest
+     surface if any of these move. */
   --color-fg: #eaf2ed;
   --color-fg-muted: #93a49c;
-  --color-fg-subtle: #6b7a73;
+  --color-fg-subtle: #82928a;
 
   /* ── Accent ramp ──────────────────────────────────────────────────────
-     Five steps so emphasis has gradation instead of one flat value. */
-  --color-accent-whisper: color-mix(in oklab, #0fbf7a 6%, transparent);
-  --color-accent-soft: color-mix(in oklab, #0fbf7a 14%, transparent);
-  --color-accent: #0fbf7a;
-  --color-accent-bright: #7ce86a;
-  --color-accent-deep: #0b5c4e;
+     Five steps so emphasis has gradation instead of one flat value.
+
+     Teal since 2026-09-04, previously spring green #0fbf7a. The green was
+     legible but sat on the most-travelled palette in this genre — near-black
+     plus one acid green — and its saturation made 11px mono eyebrows and
+     chips shout as loudly as the primary CTA. Teal keeps the terminal
+     lineage and calms the small type.
+
+     Measured on `bg` / `surface-4` (the darkest and lightest grounds the
+     accent lands on): accent 7.80 / 5.92, accent-bright 13.13 / 9.95. Both
+     clear AA at every size they are used. accent-deep is a shadow tone at
+     2.56 and is never text — keep it that way.
+
+     Every literal below is the same value. If the accent moves again, all
+     eight change together, and `BRAND_COLORS` in `src/lib/brand.ts` mirrors
+     them for the `next/og` routes. */
+  --color-accent-whisper: color-mix(in oklab, #14b8a6 6%, transparent);
+  --color-accent-soft: color-mix(in oklab, #14b8a6 14%, transparent);
+  --color-accent: #14b8a6;
+  --color-accent-bright: #5eead4;
+  --color-accent-deep: #115e59;
 
   /* ── Borders ──────────────────────────────────────────────────────────*/
-  --color-border-subtle: color-mix(in oklab, #0fbf7a 8%, transparent);
-  --color-border: color-mix(in oklab, #0fbf7a 16%, transparent);
-  --color-border-strong: color-mix(in oklab, #0fbf7a 34%, transparent);
+  --color-border-subtle: color-mix(in oklab, #14b8a6 8%, transparent);
+  --color-border: color-mix(in oklab, #14b8a6 16%, transparent);
+  --color-border-strong: color-mix(in oklab, #14b8a6 34%, transparent);
 
   /* ── Signal ───────────────────────────────────────────────────────────*/
   --color-signal-amber: #f5a524;
@@ -97,8 +120,8 @@
   --shadow-e3: 0 12px 40px rgb(0 0 0 / 0.45);
   --shadow-e4: 0 24px 68px rgb(0 0 0 / 0.55);
   --shadow-glow:
-    0 0 0 1px color-mix(in oklab, #0fbf7a 22%, transparent),
-    0 8px 44px color-mix(in oklab, #0fbf7a 14%, transparent);
+    0 0 0 1px color-mix(in oklab, #14b8a6 22%, transparent),
+    0 8px 44px color-mix(in oklab, #14b8a6 14%, transparent);
 }
 
 @theme inline {

@@ -1,16 +1,17 @@
 import { ImageResponse } from 'next/og';
-import { BRAND_COLORS, markDataUri } from '@/lib/brand';
+import { tileDataUri } from '@/lib/brand';
 
 /*
  * Apple touch icon — 180×180, generated rather than committed as a PNG.
  *
  * iOS ignores `icon.svg` and squares off whatever it gets, so this needs its
- * own route: a solid ground (no transparency, or iOS composites it on black)
- * with the mark inset to roughly 60% so it survives the home-screen mask.
+ * own route. It renders the tile variant full-bleed with `radius: 0`: iOS
+ * applies its own corner mask, and a tile carrying its own 7.5-unit radius
+ * inside that mask leaves a visible ring of dead space at the corners.
  *
- * Default weights, not `MARK_SMALL` — the mark lands at 112px here, nowhere
- * near the tab-strip sizes the thickened variant exists for. Using it made the
- * nodes read as blobs.
+ * Full-bleed also removes the old need for a separate background layer — the
+ * tile *is* the ground, so there is no transparency for iOS to composite onto
+ * black.
  */
 
 export const size = { width: 180, height: 180 };
@@ -18,18 +19,13 @@ export const contentType = 'image/png';
 
 export default function AppleIcon() {
   return new ImageResponse(
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: BRAND_COLORS.bg,
-      }}
-    >
-      <img src={markDataUri({ size: 112 })} width={112} height={112} alt="" />
-    </div>,
+    <img
+      src={tileDataUri({ size: 180, radius: 0 })}
+      width={180}
+      height={180}
+      alt=""
+      style={{ width: '100%', height: '100%' }}
+    />,
     size,
   );
 }

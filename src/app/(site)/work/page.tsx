@@ -5,6 +5,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { WorkIndex } from '@/components/work/work-index';
 import { getProjects, getSettings } from '@/server/queries';
 import { pageTitle, canonical } from '@/lib/seo';
+import { spelledOutCount } from '@/lib/format';
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
@@ -17,6 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function WorkPage() {
   const projects = await getProjects();
+  const count = spelledOutCount(projects.length);
 
   return (
     <Section density="spacious" ambient={['grid']} className="pt-10 sm:pt-16">
@@ -26,7 +28,12 @@ export default async function WorkPage() {
           Systems that removed a problem.
         </h1>
         <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">
-          Four projects, each still running. Every number below is paired with what it replaced.
+          {/* Was hardcoded "Four" — the same drift PLAN.md W5 fixed on the
+              home page, still live here. Wrong the moment a project ships
+              or is unpublished from the CMS. */}
+          {count.charAt(0).toUpperCase() + count.slice(1)} project
+          {projects.length === 1 ? '' : 's'}, each still running. Every number below is paired with
+          what it replaced.
         </p>
 
         <div className="mt-14">

@@ -84,7 +84,9 @@ test.describe('Design tokens', () => {
       };
     });
 
-    expect(tokens.accent).toBe('#0fbf7a');
+    // Teal since 2026-09-04, was #0fbf7a. This assertion is the reason the
+    // accent cannot drift silently — update it deliberately or not at all.
+    expect(tokens.accent).toBe('#14b8a6');
     expect(tokens.surface2).toBe('#131c17');
     expect(tokens.bodyBg).toBe('rgb(10, 14, 12)');
     // Self-hosted via next/font, not a system fallback.
