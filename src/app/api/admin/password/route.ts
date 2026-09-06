@@ -26,7 +26,15 @@ export async function PATCH(request: NextRequest) {
 
   await connectToDatabase();
   const user = await User.findById(session.id);
-  if (!user || !(await verifyPassword(user.passwordHash, result.data.currentPassword))) {
+  // `passwordHash` is optional at the schema level for an invited user
+  // with no password yet (PLAN.md W9) — unreachable in practice, since
+  // authorize() rejects a passwordless login before a session can exist,
+  // but the type is honest about it, so narrow explicitly rather than
+  // asserting.
+  if (
+    !user?.passwordHash ||
+    !(await verifyPassword(user.passwordHash, result.data.currentPassword))
+  ) {
     return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 401 });
   }
 

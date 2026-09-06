@@ -3,6 +3,7 @@
 import 'server-only';
 
 import { auth } from './auth';
+import { ROLES, type Role } from './permissions';
 
 /**
  * The one typed shape the rest of the app uses for the logged-in admin.
@@ -15,11 +16,19 @@ import { auth } from './auth';
  * empirically while wiring this up, not assumed. Rather than scatter `as`
  * casts through every admin page and API route, the cast happens once,
  * here, and everything downstream gets a real, narrow type.
+ *
+ * `role` widened from the literal `'admin'` to the full `Role` union
+ * (PLAN.md W9) — still read straight off the JWT claim here, exactly as
+ * before, so this is not yet the stale-role fix: a demoted or suspended
+ * user's existing token still reports their old role until it expires.
+ * PLAN.md W10 makes this function re-read the user document from the
+ * database instead, which is the actual fix; landing the wider type now
+ * without the DB read is what keeps W9 a no-behaviour-change addition.
  */
 export interface AdminSession {
   id: string;
   email: string;
-  role: 'admin';
+  role: Role;
   totpEnabled: boolean;
 }
 
@@ -28,12 +37,13 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   const user = session?.user as
     { id?: string; email?: string | null; role?: string; totpEnabled?: boolean } | undefined;
 
-  if (!user?.id || !user.email || user.role !== 'admin') return null;
+  if (!user?.id || !user.email) return null;
+  if (!ROLES.includes(user.role as Role)) return null;
 
   return {
     id: user.id,
     email: user.email,
-    role: 'admin',
+    role: user.role as Role,
     totpEnabled: Boolean(user.totpEnabled),
   };
 }

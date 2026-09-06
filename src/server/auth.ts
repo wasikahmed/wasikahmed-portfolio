@@ -82,14 +82,29 @@ export const {
         await connectToDatabase();
         const user = await User.findOne({ email }).lean();
 
-        // Same generic error whether the email doesn't exist or the
-        // password is wrong — distinguishing the two lets an attacker
-        // enumerate valid admin emails for zero benefit to a real user.
+        // Same generic error whether the email doesn't exist, the account
+        // has no password yet, or the password is wrong — distinguishing
+        // any of those lets an attacker enumerate valid admin emails (or
+        // find pending invitations) for zero benefit to a real user.
         const invalid = new CredentialsSignin('Incorrect email or password.');
         if (!user) throw invalid;
 
+        // An invited user (PLAN.md W11) has no password until they accept
+        // — `passwordHash` is optional at the schema level for exactly
+        // that state. Reject explicitly rather than calling
+        // `verifyPassword(undefined, ...)`, which throws instead of
+        // cleanly denying the login.
+        if (!user.passwordHash) throw invalid;
+
         const passwordOk = await verifyPassword(user.passwordHash, password);
         if (!passwordOk) throw invalid;
+
+        // A suspended account keeps its password — rejecting it here (not
+        // just on the next permission check) means suspension can never
+        // be raced by logging in again before the suspending admin's own
+        // request completes. PLAN.md W10 covers the harder half of this
+        // problem: revoking a session that was already issued.
+        if (user.status === 'suspended') throw invalid;
 
         if (user.totpSecret) {
           if (!code) throw new TotpRequiredError();
@@ -98,6 +113,14 @@ export const {
             throw new CredentialsSignin('Incorrect authentication code.');
           }
         }
+
+        // Best-effort — a failed write here shouldn't fail a login that
+        // otherwise succeeded. Populates PLAN.md W9's `lastLoginAt`, which
+        // the W11 user list reads; unset until the first login after this
+        // shipped.
+        await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } }).catch(
+          () => {},
+        );
 
         return {
           id: String(user._id),

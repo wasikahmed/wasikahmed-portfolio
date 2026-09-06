@@ -1,11 +1,22 @@
 /**
- * Bootstraps the single admin account. Deliberately the only way one gets
- * created — PLAN.md §3 "single admin seeded by a CLI script — no public
- * signup route exists."
+ * Bootstraps the single `owner` account. Deliberately the only way one
+ * gets created — AGENTS.md §7 "no signup route and there must not be
+ * one." Every other account (PLAN.md W11) comes from the invite flow
+ * instead; this script is only ever for the one owner.
  *
  * Idempotent by email: rerunning updates the existing account's password
  * rather than creating a duplicate, so it also doubles as a password-reset
  * tool if you ever lose the generated one.
+ *
+ * Migration (PLAN.md W9): before roles existed, the one account this
+ * script bootstraps was seeded with `role: 'admin'`. The upsert below
+ * forces that specific document to `role: 'owner'` on every run,
+ * regardless of what it was before — that's the whole migration.
+ * Deliberately scoped to just this one email rather than a blanket
+ * `updateMany({ role: 'admin' })`: a local/e2e database can easily have
+ * other legacy `admin`-role documents (the seeded e2e test account, for
+ * one) that must stay `admin`, not all become `owner` — `owner` is a
+ * singleton (see the ROLES comment in permissions.ts).
  *
  * Usage:
  *   pnpm seed:admin                       # uses ADMIN_EMAIL from .env
@@ -36,7 +47,14 @@ async function main() {
   await mongoose.connect(uri);
 
   const existing = await User.findOne({ email });
-  await User.findOneAndUpdate({ email }, { email, passwordHash, role: 'admin' }, { upsert: true });
+  if (existing && existing.role !== 'owner') {
+    console.log(`✓ Migrating ${email} from role '${existing.role}' to 'owner'.`);
+  }
+  await User.findOneAndUpdate(
+    { email },
+    { email, passwordHash, role: 'owner', status: 'active' },
+    { upsert: true },
+  );
 
   await mongoose.disconnect();
 
