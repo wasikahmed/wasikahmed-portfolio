@@ -150,7 +150,7 @@ describe('GET /api/admin/users — list', () => {
       passwordHash: 'a-real-hash',
       totpSecret: 'a-real-secret',
     });
-    const res = await usersRoute.GET();
+    const res = await usersRoute.GET(req('GET'));
     const body = await res.json();
     expect(body.items).toHaveLength(1);
     expect(body.items[0].passwordHash).toBeUndefined();

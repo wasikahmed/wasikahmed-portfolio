@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextAuthRequest } from 'next-auth';
 import { authConfig } from '@/server/auth.config';
 import { ensureCsrfCookie } from '@/server/csrf';
+import { verifyAccessToken } from '@/server/access-token';
 
 // Edge-safe instance — built from auth.config.ts (no providers, no argon2,
 // no Mongoose). See auth.config.ts's comment: importing the full config
@@ -11,7 +12,17 @@ import { ensureCsrfCookie } from '@/server/csrf';
 // neither runs in Edge.
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_ADMIN_PATHS = ['/admin/login', '/admin/forgot-password', '/admin/accept-invite'];
+const PUBLIC_ADMIN_PATHS = [
+  '/admin/login',
+  '/admin/forgot-password',
+  '/admin/accept-invite',
+  // Bearer token issuance/refresh (PLAN.md W12) — pre-auth by design, like
+  // the page paths above, even though it lives under /api/admin. Does NOT
+  // match '/api/admin/auth/tokens' (list/revoke, plural) — that route is
+  // cookie-session-gated and must stay behind this check; the prefix
+  // match below requires a trailing '/', which 'tokens' never has.
+  '/api/admin/auth/token',
+];
 
 /**
  * Nonce-based CSP, wired up per Next.js's documented middleware pattern
@@ -127,6 +138,36 @@ export default auth(async (request: NextAuthRequest) => {
   );
 
   if (isPublicAdminPage) {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    applySecurityHeaders(response, nonce);
+    return response;
+  }
+
+  // Bearer token (PLAN.md W12) — checked before the cookie-session gate,
+  // API routes only (a page request has nowhere to put an Authorization
+  // header). This is a cheap, stateless signature/expiry check so a
+  // garbage or expired token 401s here rather than reaching the route; it
+  // does NOT confirm the user still exists or isn't suspended — jwtVerify
+  // can't do a DB lookup and Mongoose can't run in the Edge runtime this
+  // file executes in anyway. That check, plus re-deriving current scopes
+  // from the live role, happens once in resolve-auth.ts's resolveAuth(),
+  // which every route already calls before it does anything permission-
+  // gated. Skipping the cookie-session check for a request that clears
+  // this is correct, not just convenient: `request.auth?.user` is always
+  // empty for a Bearer-only client, since it never had a session cookie
+  // to begin with.
+  const authHeader = request.headers.get('authorization');
+  const bearerToken = isApi && authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (bearerToken) {
+    const payload = await verifyAccessToken(bearerToken);
+    if (!payload) {
+      const response = NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+      applySecurityHeaders(response, nonce);
+      return response;
+    }
+    // No CSRF cookie to set or verify: a Bearer request carries no ambient
+    // cookie, so it can't be forged cross-site (resolve-auth.ts's
+    // `authorized()` comment makes the same point for the route side).
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, nonce);
     return response;

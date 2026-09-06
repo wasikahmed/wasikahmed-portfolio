@@ -2,9 +2,7 @@ import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse, type NextRequest } from 'next/server';
 import { connectToDatabase } from '@/server/db';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
-import { verifyCsrf } from '@/server/csrf';
+import { requirePermission } from '@/server/resolve-auth';
 import { writeAuditLog } from '@/server/audit';
 import { Media } from '@/server/models/media';
 
@@ -14,13 +12,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'media:delete')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
-  const csrfError = verifyCsrf(request);
-  if (csrfError) return csrfError;
+  const { session, response } = await requirePermission(request, 'media:delete');
+  if (response) return response;
 
   const { id } = await params;
   await connectToDatabase();

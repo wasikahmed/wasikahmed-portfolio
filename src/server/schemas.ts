@@ -1,5 +1,5 @@
 import { z, type ZodType } from 'zod';
-import { can, type Role } from './permissions';
+import { can, PERMISSIONS, type Role } from './permissions';
 
 /**
  * Zod schemas — the validation boundary for every content collection.
@@ -236,4 +236,23 @@ export const acceptInviteSchema = z.object({
   name: z.string().min(1).max(200),
   password: z.string().min(12, 'At least 12 characters.'),
   turnstileToken: z.string().optional(),
+});
+
+/**
+ * POST /api/admin/auth/token — issues a Bearer token pair (PLAN.md W12).
+ * `scopes`, when given, must be a subset of what the caller's role
+ * currently grants — validated in the route (schemas.ts has no access to
+ * the caller's role), not here.
+ */
+export const tokenRequestSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  code: z.string().optional(),
+  scopes: z.array(z.enum(PERMISSIONS)).min(1).optional(),
+  label: z.string().max(100).optional(),
+});
+
+/** POST /api/admin/auth/token/refresh. */
+export const refreshTokenRequestSchema = z.object({
+  refreshToken: z.string().min(1),
 });

@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { connectToDatabase } from '@/server/db';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
-import { verifyCsrf } from '@/server/csrf';
+import { requirePermission } from '@/server/resolve-auth';
 import { writeAuditLog } from '@/server/audit';
 import { User } from '@/server/models/user';
 import { Invite } from '@/server/models/invite';
@@ -28,13 +26,8 @@ import { safeUserFields } from '@/server/user-fields';
  *   no one else able to undo it from inside the app.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'user:write')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
-  const csrfError = verifyCsrf(request);
-  if (csrfError) return csrfError;
+  const { session, response } = await requirePermission(request, 'user:write');
+  if (response) return response;
 
   const { id } = await params;
   const body = await request.json().catch(() => null);
@@ -107,13 +100,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'user:delete')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
-  const csrfError = verifyCsrf(request);
-  if (csrfError) return csrfError;
+  const { session, response } = await requirePermission(request, 'user:delete');
+  if (response) return response;
 
   const { id } = await params;
   await connectToDatabase();

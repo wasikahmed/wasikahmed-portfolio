@@ -1,20 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { connectToDatabase } from '@/server/db';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
-import { verifyCsrf } from '@/server/csrf';
+import { requirePermission } from '@/server/resolve-auth';
 import { writeAuditLog } from '@/server/audit';
 import { Settings, SETTINGS_SINGLETON_ID } from '@/server/models/settings';
 import { settingsSchema } from '@/server/schemas';
 import { normalizeDoc } from '@/server/mongo-utils';
 
-export async function GET() {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'settings:read')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
+export async function GET(request: NextRequest) {
+  const { response } = await requirePermission(request, 'settings:read');
+  if (response) return response;
 
   await connectToDatabase();
   const doc = await Settings.findById(SETTINGS_SINGLETON_ID).lean();
@@ -22,13 +17,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'settings:write')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
-  const csrfError = verifyCsrf(request);
-  if (csrfError) return csrfError;
+  const { session, response } = await requirePermission(request, 'settings:write');
+  if (response) return response;
 
   const body = await request.json().catch(() => null);
   const result = settingsSchema.safeParse(body);

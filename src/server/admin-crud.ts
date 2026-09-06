@@ -7,11 +7,10 @@ import type { Model } from 'mongoose';
 import type { ZodType } from 'zod';
 import { z } from 'zod';
 import { connectToDatabase } from './db';
-import { getAdminSession, type AdminSession } from './session';
-import { verifyCsrf } from './csrf';
+import { requirePermission } from './resolve-auth';
 import { writeAuditLog } from './audit';
 import { normalizeDoc } from './mongo-utils';
-import { can, type Permission } from './permissions';
+import type { Permission } from './permissions';
 import { withPublishGuard } from './schemas';
 
 /**
@@ -35,6 +34,15 @@ import { withPublishGuard } from './schemas';
  * that calls them. `getOneHandler`/`updateHandler` are the two shared with
  * `leads/[id]/route.ts`, so those take an explicit `resource` and default
  * to `'content'` — the one call site that isn't gets it passed explicitly.
+ *
+ * PLAN.md W12 added Bearer-token support on top of that: `requirePermission`
+ * (resolve-auth.ts) resolves either a session cookie or an `Authorization:
+ * Bearer` header to the same shape, and CSRF is only checked for the cookie
+ * path — a Bearer request carries no ambient cookie, so it cannot be forged
+ * cross-site the way CSRF requires, and requiring the header would just
+ * break every legitimate API client for no security benefit. That helper
+ * moved out of this file into resolve-auth.ts once every other permission-
+ * gated hand-written route needed the exact same thing.
  */
 
 type Resource = 'content' | 'lead';
@@ -66,32 +74,13 @@ const WRITE_PERMISSION: Record<Resource, Permission> = {
   lead: 'lead:write',
 };
 
-async function requirePermission(
-  permission: Permission,
-): Promise<{ session: AdminSession; response: null } | { session: null; response: NextResponse }> {
-  const session = await getAdminSession();
-  if (!session) {
-    return {
-      session: null,
-      response: NextResponse.json({ error: 'Not authenticated.' }, { status: 401 }),
-    };
-  }
-  if (!can(session, permission)) {
-    return {
-      session: null,
-      response: NextResponse.json({ error: 'Not permitted.' }, { status: 403 }),
-    };
-  }
-  return { session, response: null };
-}
-
 function isDuplicateKeyError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 }
 
 export function listHandler<T>(model: Model<Record<string, unknown>>, config: CrudConfig<T>) {
-  return async function GET() {
-    const { response } = await requirePermission('content:read');
+  return async function GET(request: NextRequest) {
+    const { response } = await requirePermission(request, 'content:read');
     if (response) return response;
 
     await connectToDatabase();
@@ -105,10 +94,8 @@ export function listHandler<T>(model: Model<Record<string, unknown>>, config: Cr
 
 export function createHandler<T>(model: Model<Record<string, unknown>>, config: CrudConfig<T>) {
   return async function POST(request: NextRequest) {
-    const { session, response } = await requirePermission('content:write');
+    const { session, response } = await requirePermission(request, 'content:write');
     if (response) return response;
-    const csrfError = verifyCsrf(request);
-    if (csrfError) return csrfError;
 
     const body = await request.json().catch(() => null);
     // Always content — createHandler is never called for leads (see the
@@ -149,11 +136,8 @@ export function getOneHandler(
   model: Model<Record<string, unknown>>,
   resource: Resource = 'content',
 ) {
-  return async function GET(
-    _request: NextRequest,
-    { params }: { params: Promise<{ id: string }> },
-  ) {
-    const { response } = await requirePermission(READ_PERMISSION[resource]);
+  return async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { response } = await requirePermission(request, READ_PERMISSION[resource]);
     if (response) return response;
 
     const { id } = await params;
@@ -170,10 +154,8 @@ export function updateHandler<T>(model: Model<Record<string, unknown>>, config: 
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) {
-    const { session, response } = await requirePermission(WRITE_PERMISSION[resource]);
+    const { session, response } = await requirePermission(request, WRITE_PERMISSION[resource]);
     if (response) return response;
-    const csrfError = verifyCsrf(request);
-    if (csrfError) return csrfError;
 
     const { id } = await params;
     const body = await request.json().catch(() => null);
@@ -223,10 +205,8 @@ export function deleteHandler(model: Model<Record<string, unknown>>, entityType:
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) {
-    const { session, response } = await requirePermission('content:delete');
+    const { session, response } = await requirePermission(request, 'content:delete');
     if (response) return response;
-    const csrfError = verifyCsrf(request);
-    if (csrfError) return csrfError;
 
     const { id } = await params;
     await connectToDatabase();
@@ -257,10 +237,8 @@ const reorderSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });
  */
 export function reorderHandler(model: Model<Record<string, unknown>>, entityType: string) {
   return async function POST(request: NextRequest) {
-    const { session, response } = await requirePermission('content:reorder');
+    const { session, response } = await requirePermission(request, 'content:reorder');
     if (response) return response;
-    const csrfError = verifyCsrf(request);
-    if (csrfError) return csrfError;
 
     const body = await request.json().catch(() => null);
     const result = reorderSchema.safeParse(body);

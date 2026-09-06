@@ -130,3 +130,14 @@ export function can(session: { role: Role } | null | undefined, permission: Perm
   if (!session) return false;
   return ROLE_PERMISSIONS[session.role].has(permission);
 }
+
+/**
+ * Every permission a role currently grants — the default scope set for a
+ * Bearer token issued to that role (PLAN.md W12), and the ceiling a
+ * caller-requested narrower scope list is validated against. Returns a
+ * fresh array (not the internal `Set`) since callers store this in a
+ * token payload or a Mongoose document.
+ */
+export function permissionsForRole(role: Role): Permission[] {
+  return [...ROLE_PERMISSIONS[role]];
+}

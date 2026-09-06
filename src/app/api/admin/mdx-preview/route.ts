@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
+import { resolveAuth, authorized } from '@/server/resolve-auth';
 import { renderMdxToHtml } from '@/server/mdx-render';
 
 /**
@@ -13,11 +12,16 @@ import { renderMdxToHtml } from '@/server/mdx-render';
  * Gated on `content:write` (PLAN.md W10) — this only ever renders a draft
  * an editor is actively composing in the project/post forms, not a
  * standalone capability someone without write access has any use for.
+ *
+ * Checked with `resolveAuth`/`authorized` directly rather than the shared
+ * `requirePermission` (resolve-auth.ts) used elsewhere: this route has no
+ * CSRF check even on the cookie path, deliberately — it neither mutates
+ * anything nor writes an audit entry, and `requirePermission` would add one.
  */
 export async function POST(request: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'content:write')) {
+  const auth = await resolveAuth(request);
+  if (!auth.session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+  if (!authorized(auth, 'content:write')) {
     return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
   }
 

@@ -23,6 +23,16 @@ import { safeUserFields } from '@/server/user-fields';
  * between them is an accepted trade-off rather than an oversight. If the
  * second write fails, both accounts are re-fetched and logged rather than
  * silently left inconsistent.
+ *
+ * Deliberately still `getAdminSession()` only, not `resolveAuth()` — unlike
+ * every other permission-gated route (PLAN.md W12), this one stays cookie-
+ * session-only and does not accept a Bearer token. The check above is a
+ * role comparison, not a `Permission` string, so it doesn't fit a scoped
+ * token's model at all; more to the point, handing ownership of the whole
+ * CMS to another account is the single most consequential action in this
+ * system, and requiring an interactive, cookie-bearing session for it —
+ * the same reasoning already applied to password/TOTP changes and the API
+ * session list/revoke routes — is a deliberate floor, not a gap.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getAdminSession();

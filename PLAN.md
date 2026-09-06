@@ -20,9 +20,9 @@ prerequisites; W9 → W14 build on each other.
 ## Progress — 2026-09-06
 
 **W7 (truth-up), W8 (Cloudflare Access removed), W9 (permissions core), W10
-(database-backed sessions + enforcement), and W11 (user management) are done,
-tested, and verified live against the Docker dev stack.** W12 (Bearer
-tokens), W13 (API docs), and the remaining items of W14 (tests) are not
+(database-backed sessions + enforcement), W11 (user management), and W12
+(Bearer tokens) are done, tested, and verified live against the Docker dev
+stack.** W13 (API docs) and the remaining items of W14 (tests) are not
 started. One addition not in the original plan, done alongside W11:
 
 **W11a — Google sign-in**, added mid-session at the user's request. A second
@@ -77,11 +77,50 @@ doesn't distinguish which provider was used.
   (`sitemap.ts`, `robots.ts`, root `layout.tsx`, `writing/feed.xml/route.ts`,
   `lib/json-ld.ts`) — never hit in practice since the env var is always set,
   but wrong all the same.
+- **W12 — Bearer tokens.** `POST /api/admin/auth/token` (email + password +
+  TOTP, reusing `verifyCredentials` — extracted out of `auth.ts`'s
+  `authorize()` into `credentials.ts` so both entry points share the same
+  rate limiting and checks) issues a 15-minute JWT access token
+  (`access-token.ts`, `jose`/`AUTH_SECRET`) and a 30-day opaque refresh
+  token, stored hashed. `POST /api/admin/auth/token/refresh` rotates on
+  every use; presenting an already-rotated token revokes its whole family
+  (reuse detection), and a demotion or suspension shrinks or kills the
+  token's scopes on its very next refresh, not just at issuance.
+  `resolveAuth()`/`authorized()` (`resolve-auth.ts`) resolve a cookie or a
+  Bearer header to the same shape, intersecting a token's captured scopes
+  with the user's _current_ role every time. `/admin/security` grew an API
+  sessions panel (list, revoke one, revoke all).
+
+  **Found and fixed live, not by the unit suite:** the first live check
+  (`curl` with a real Bearer token against `/api/admin/projects`) 401'd —
+  Vitest calls route handlers directly and never exercises `proxy.ts`, so
+  nothing had caught that the Edge middleware's cookie-session gate ran
+  _before_ any route got a chance to check `Authorization: Bearer` at all.
+  Fixed by verifying the access token's signature/expiry in `proxy.ts`
+  itself (`jose` is Edge-safe; the full user/suspension/scope check still
+  happens once, in `resolveAuth()`) and letting a request that clears it
+  skip the cookie check. A second live pass then found every _hand-written_
+  admin route (`audit-log`, `leads`, `media`, `settings`, `mdx-preview`,
+  `users`) still calling `getAdminSession()`/`can()` directly — only the six
+  `content:`/`lead:` collections behind `admin-crud.ts`'s factory had ever
+  been wired to `resolveAuth()`. Fixed by lifting that factory's private
+  `requirePermission()` helper into `resolve-auth.ts` as the one shared
+  gate and switching every one of those routes onto it. `transfer-ownership`
+  stays cookie-only, deliberately — it's a role comparison, not a
+  `Permission` string, and the single most consequential action in the
+  system is a reasonable place to require an interactive session. This is
+  exactly the class of gap W14 item 7 ("Bearer parity") exists to catch;
+  it surfaced from running the thing, not from reading the diff.
 
 **Verified:** full local gate, unit suite, and the full 55-test e2e suite all
 green; the real invite → accept-invite → role-change → suspend flow driven
 live against the Docker dev stack (screenshots taken at each step); Google
 sign-in's env-gated button correctly absent with no client ID configured.
+Bearer tokens verified live too: issue → use on a real permission-gated
+route → refresh/rotate → reuse-detection revokes the family → demotion
+shrinks scopes on next refresh, exercised with `curl` against every
+permission-gated `/api/admin/*` route (not just the ones covered by
+`admin-crud.ts`) after the gap above was found and fixed.
 
 ---
 
@@ -457,6 +496,10 @@ edits are recoverable, access changes are not.
 ---
 
 ## W12 — Bearer tokens
+
+**Done, 2026-09-06 — see "Progress" above, including the two gaps live
+verification found and fixed (the Edge middleware gate, and hand-written
+routes never wired to `resolveAuth()`).**
 
 Programmatic access, for clients that have no cookie jar.
 

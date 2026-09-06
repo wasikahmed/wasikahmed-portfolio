@@ -2,9 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { connectToDatabase } from '@/server/db';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
-import { verifyCsrf } from '@/server/csrf';
+import { requirePermission } from '@/server/resolve-auth';
 import { writeAuditLog } from '@/server/audit';
 import { saltedHash } from '@/server/rate-limit';
 import { User } from '@/server/models/user';
@@ -17,12 +15,9 @@ import { sendInviteEmail } from '@/server/email';
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 
-export async function GET() {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'user:read')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
+export async function GET(request: NextRequest) {
+  const { response } = await requirePermission(request, 'user:read');
+  if (response) return response;
 
   await connectToDatabase();
   const docs = await User.find().sort({ createdAt: -1 }).lean();
@@ -38,13 +33,8 @@ export async function GET() {
  * before this handler makes a decision either way.
  */
 export async function POST(request: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'user:write')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
-  const csrfError = verifyCsrf(request);
-  if (csrfError) return csrfError;
+  const { session, response } = await requirePermission(request, 'user:write');
+  if (response) return response;
 
   const body = await request.json().catch(() => null);
   const result = inviteSchema.safeParse(body);

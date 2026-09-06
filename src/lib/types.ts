@@ -194,3 +194,16 @@ export interface AuditLogEntry {
   summary: string;
   createdAt: string;
 }
+
+/**
+ * One row from GET /api/admin/auth/tokens — a Bearer token session (PLAN.md
+ * W12). Never carries `tokenHash`; the API strips it before responding.
+ */
+export interface ApiToken {
+  id: string;
+  scopes: string[];
+  label?: string;
+  expiresAt: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}

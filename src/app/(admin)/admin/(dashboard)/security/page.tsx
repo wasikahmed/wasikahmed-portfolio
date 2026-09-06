@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
+import { DeleteButton } from '@/components/admin/delete-button';
 import { adminFetch, adminFetchJson } from '@/lib/admin-fetch';
+import type { ApiToken } from '@/lib/types';
 
 type EnrollState = { qrDataUrl: string; manualEntryKey: string } | null;
 
@@ -27,6 +29,7 @@ export default function SecurityPage() {
 
       <TotpSection enabled={totpEnabled} onChange={() => update({})} />
       <PasswordSection />
+      <ApiTokensSection />
     </div>
   );
 }
@@ -255,6 +258,115 @@ function PasswordSection() {
           {saved ? <span className="text-2xs text-accent">Changed.</span> : null}
         </div>
       </form>
+    </Card>
+  );
+}
+
+/**
+ * Lists this user's own active API sessions (PLAN.md W12) — one row per
+ * token family, since a family only ever has one non-revoked, unexpired
+ * member at a time (rotation replaces it in place). Revoking here calls the
+ * same routes a stolen-token incident response would use, so "sign out of
+ * everywhere" is a real, working button rather than a hypothetical.
+ */
+function ApiTokensSection() {
+  const [tokens, setTokens] = useState<ApiToken[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  useEffect(() => {
+    adminFetchJson<{ items: ApiToken[] }>('/api/admin/auth/tokens')
+      .then((res) => setTokens(res.items))
+      .catch((err) => {
+        setTokens([]);
+        setError(err instanceof Error ? err.message : 'Could not load API sessions.');
+      });
+  }, []);
+
+  const revokeAll = async () => {
+    if (!window.confirm('Revoke every API session? Any client using a token must sign in again.'))
+      return;
+    setRevokingAll(true);
+    setError(null);
+    try {
+      await adminFetchJson('/api/admin/auth/tokens', { method: 'DELETE' });
+      setTokens([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not revoke API sessions.');
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
+  return (
+    <Card variant="raised" padding="lg">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-2xs text-fg-muted font-mono tracking-widest uppercase">API sessions</p>
+        {tokens && tokens.length > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={revokingAll}
+            onClick={revokeAll}
+          >
+            {revokingAll ? 'Revoking…' : 'Sign out everywhere'}
+          </Button>
+        ) : null}
+      </div>
+
+      <p className="text-fg-muted mt-3 text-sm">
+        Bearer tokens for programmatic access — issued via{' '}
+        <code className="text-2xs bg-surface-3 rounded-xs px-1 py-0.5">
+          POST /api/admin/auth/token
+        </code>{' '}
+        with this account&apos;s email and password. Each row below is one active session; a session
+        survives token refreshes (rotation keeps it going without a new login) until it is revoked
+        here or its 30-day lifetime runs out.
+      </p>
+
+      {error ? <p className="text-signal-rose mt-3 text-sm">{error}</p> : null}
+
+      <div className="mt-5 flex flex-col gap-2">
+        {tokens === null ? (
+          <p className="text-fg-subtle text-2xs">Loading…</p>
+        ) : tokens.length === 0 ? (
+          <p className="text-fg-subtle text-2xs">No active API sessions.</p>
+        ) : (
+          tokens.map((token) => (
+            <Card
+              key={token.id}
+              variant="flat"
+              padding="sm"
+              className="flex flex-wrap items-center justify-between gap-4"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-fg truncate text-sm">{token.label || 'Unlabeled session'}</p>
+                <p className="text-2xs text-fg-subtle truncate font-mono">
+                  {token.scopes.join(', ')}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-4">
+                <div className="text-2xs text-fg-subtle text-right">
+                  <p>
+                    Last used:{' '}
+                    {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : 'never'}
+                  </p>
+                  <p>Expires: {new Date(token.expiresAt).toLocaleDateString()}</p>
+                </div>
+                <DeleteButton
+                  apiPath={`/api/admin/auth/tokens/${token.id}`}
+                  label="Revoke"
+                  confirmLabel={token.label || 'this session'}
+                  onDeleted={() =>
+                    setTokens((prev) => prev?.filter((t) => t.id !== token.id) ?? [])
+                  }
+                />
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
     </Card>
   );
 }

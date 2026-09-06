@@ -8,9 +8,7 @@ import Google from 'next-auth/providers/google';
 import { authConfig } from './auth.config';
 import { connectToDatabase } from './db';
 import { User } from './models/user';
-import { verifyPassword } from './password';
-import { checkRateLimit, getClientIp, hashIp, saltedHash } from './rate-limit';
-import { decryptTotpSecret, verifyTotpCode } from './totp';
+import { verifyCredentials } from './credentials';
 
 /**
  * The full config — Credentials provider, argon2, Mongoose. Only ever
@@ -66,78 +64,28 @@ export const {
       // `authorize()` is the actual code path for POST /api/auth/callback/
       // credentials — `/api/auth/*` isn't in proxy.ts's matcher (AGENTS.md
       // §9), so this route has no rate limiting unless it's self-implemented,
-      // same reasoning and pattern as /api/auth/forgot-password. Checked
-      // before the DB lookup so a rate-limited request costs one Mongo
-      // round trip, not an argon2 hash comparison too.
+      // same reasoning and pattern as /api/auth/forgot-password. The actual
+      // rate limit / password / TOTP / suspension logic lives in
+      // credentials.ts, shared with POST /api/admin/auth/token (PLAN.md
+      // W12) — this just translates the result into Auth.js's
+      // CredentialsSignin subclasses, which only this provider needs.
       async authorize(raw, request) {
-        const email = typeof raw?.email === 'string' ? raw.email.trim().toLowerCase() : '';
+        const email = typeof raw?.email === 'string' ? raw.email : '';
         const password = typeof raw?.password === 'string' ? raw.password : '';
         const code = typeof raw?.code === 'string' ? raw.code : '';
 
-        if (!email || !password) throw new CredentialsSignin('Email and password are required.');
-
-        const ipOk = await checkRateLimit(`login-ip:${hashIp(getClientIp(request))}`, {
-          limit: 20,
-          windowMs: 15 * 60 * 1000,
-        });
-        if (!ipOk) throw new RateLimitedError();
-
-        // Second limit keyed by the targeted email, independent of IP, so a
-        // rotating-IP attacker still can't brute-force one account.
-        const emailOk = await checkRateLimit(`login-email:${saltedHash(email)}`, {
-          limit: 8,
-          windowMs: 15 * 60 * 1000,
-        });
-        if (!emailOk) throw new RateLimitedError();
-
-        await connectToDatabase();
-        const user = await User.findOne({ email }).lean();
-
-        // Same generic error whether the email doesn't exist, the account
-        // has no password yet, or the password is wrong — distinguishing
-        // any of those lets an attacker enumerate valid admin emails (or
-        // find pending invitations) for zero benefit to a real user.
-        const invalid = new CredentialsSignin('Incorrect email or password.');
-        if (!user) throw invalid;
-
-        // An invited user (PLAN.md W11) has no password until they accept
-        // — `passwordHash` is optional at the schema level for exactly
-        // that state. Reject explicitly rather than calling
-        // `verifyPassword(undefined, ...)`, which throws instead of
-        // cleanly denying the login.
-        if (!user.passwordHash) throw invalid;
-
-        const passwordOk = await verifyPassword(user.passwordHash, password);
-        if (!passwordOk) throw invalid;
-
-        // A suspended account keeps its password — rejecting it here (not
-        // just on the next permission check) means suspension can never
-        // be raced by logging in again before the suspending admin's own
-        // request completes. PLAN.md W10 covers the harder half of this
-        // problem: revoking a session that was already issued.
-        if (user.status === 'suspended') throw invalid;
-
-        if (user.totpSecret) {
-          if (!code) throw new TotpRequiredError();
-          const secret = decryptTotpSecret(user.totpSecret);
-          if (!verifyTotpCode(secret, code)) {
-            throw new CredentialsSignin('Incorrect authentication code.');
-          }
+        const result = await verifyCredentials(email, password, code, request);
+        if (!result.ok) {
+          if (result.reason === 'totp_required') throw new TotpRequiredError();
+          if (result.reason === 'rate_limited') throw new RateLimitedError();
+          throw new CredentialsSignin('Incorrect email or password.');
         }
 
-        // Best-effort — a failed write here shouldn't fail a login that
-        // otherwise succeeded. Populates PLAN.md W9's `lastLoginAt`, which
-        // the W11 user list reads; unset until the first login after this
-        // shipped.
-        await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } }).catch(
-          () => {},
-        );
-
         return {
-          id: String(user._id),
-          email: user.email,
-          role: user.role,
-          totpEnabled: Boolean(user.totpSecret),
+          id: String(result.user._id),
+          email: result.user.email,
+          role: result.user.role,
+          totpEnabled: Boolean(result.user.totpSecret),
         };
       },
     }),

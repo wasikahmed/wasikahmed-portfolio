@@ -198,13 +198,37 @@ session is ever issued. Once past that gate it produces the exact same JWT
 session shape as credentials — `getAdminSession()` doesn't know or care which
 provider was used.
 
+**A third way in for programmatic clients: Bearer tokens (PLAN.md W12).**
+`POST /api/admin/auth/token` (email + password + TOTP, public route,
+exempted from `proxy.ts`'s session gate) exchanges credentials for a
+15-minute JWT access token plus a 30-day opaque refresh token, stored
+hashed and rotated on every use — presenting an already-rotated one revokes
+its whole family (reuse detection). `src/server/resolve-auth.ts`'s
+`resolveAuth()` resolves either a session cookie or an `Authorization:
+Bearer` header to the same shape, and `requirePermission()` is the one
+shared gate every permission-checked route — `admin-crud.ts`'s factory and
+every hand-written route alike — calls before doing anything the caller
+might not be allowed to do. A Bearer token's scopes are always intersected
+with the user's _current_ role at request time, never trusted from the
+token payload alone, so a demotion or suspension shrinks or kills it on the
+token's very next use, the same guarantee W10 gives the cookie session.
+CSRF is required for the cookie path and skipped for Bearer — a Bearer
+request carries no ambient cookie, so it cannot be forged cross-site.
+`proxy.ts` verifies a Bearer token's signature/expiry itself (`jose` is
+Edge-safe) before the cookie-session gate would otherwise reject it
+outright; the full user/suspension/scope check still happens exactly once,
+in `resolveAuth()`. `/admin/security` lists and revokes a user's own active
+API sessions.
+
 **Permissions, not roles, gate everything past the session check.**
 `src/server/permissions.ts` defines the fixed `viewer`/`editor`/`admin`/`owner`
-role matrix and the one `can(session, permission)` function; `admin-crud.ts`
-and every hand-written admin route call it before doing anything the caller
-might not be allowed to do (PLAN.md W10). `owner` is a singleton — set only by
-`pnpm seed:admin` — and can only change hands via the dedicated
-transfer-ownership route, never a role-change PATCH.
+role matrix and the one `can(session, permission)` function that
+`requirePermission()`/`authorized()` call internally (PLAN.md W10). `owner`
+is a singleton — set only by `pnpm seed:admin` — and can only change hands
+via the dedicated transfer-ownership route, never a role-change PATCH; that
+route (and password/TOTP self-service, and the API-session list/revoke
+routes) stay cookie-session-only on purpose — see each route's own comment
+for why.
 
 The `auth.ts` / `auth.config.ts` split exists because `proxy.ts` runs in the Edge
 runtime and cannot load argon2's native bindings or Mongoose. **Do not import
@@ -296,9 +320,12 @@ W9–W11): fixed roles with real permission enforcement on every admin route
 takes effect on the changed user's very next request, and a full
 invite → accept → suspend/reactivate → delete → transfer-ownership
 `/admin/users` surface, plus optional Google sign-in as a second login path
-(never a signup path — see §7). The SEO surface is done (sitemap,
-robots, per-page dynamic OG images, RSS, JSON-LD, canonical URLs) — see
-PLAN.md W3. CI now gates every push to `main`
+(never a signup path — see §7). **Programmatic clients can now authenticate
+too** (PLAN.md W12): Bearer tokens with rotation, reuse detection, and
+per-token scopes intersected with the caller's live role, resolved through
+the same permission layer the cookie session uses — see §7. The SEO surface
+is done (sitemap, robots, per-page dynamic OG images, RSS, JSON-LD,
+canonical URLs) — see PLAN.md W3. CI now gates every push to `main`
 (typecheck/lint/format:check/test/build) before it ships, with E2E running
 separately on PRs and a daily schedule — see PLAN.md W4. See
 `PLAN.md` for what is left and in what order.

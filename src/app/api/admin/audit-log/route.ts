@@ -1,18 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { connectToDatabase } from '@/server/db';
-import { getAdminSession } from '@/server/session';
-import { can } from '@/server/permissions';
+import { requirePermission } from '@/server/resolve-auth';
 import { AuditLog } from '@/server/models/audit-log';
 import { normalizeDoc } from '@/server/mongo-utils';
 
 const PAGE_SIZE = 50;
 
 export async function GET(request: NextRequest) {
-  const session = await getAdminSession();
-  if (!session) return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
-  if (!can(session, 'audit:read')) {
-    return NextResponse.json({ error: 'Not permitted.' }, { status: 403 });
-  }
+  const { response } = await requirePermission(request, 'audit:read');
+  if (response) return response;
 
   const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') ?? '1'));
 

@@ -302,7 +302,7 @@ describe('getOneHandler / listHandler', () => {
   it('listHandler returns every record regardless of status', async () => {
     authed();
     await Project.create([validProject, { ...validProject, slug: 'other', status: 'draft' }]);
-    const res = await admin.listHandler(Project, config())();
+    const res = await admin.listHandler(Project, config())(req('GET'));
     const body = await res.json();
     expect(body.items).toHaveLength(2);
   });
