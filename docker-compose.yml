@@ -1,18 +1,19 @@
 # Development stack, driven by `docker compose watch`.
-# Production compose (Cloudflare Tunnel topology, backups) is Phase 7 —
-# see PLAN.md §4. Mongo here runs without auth, a named volume, and its
-# port published to the host — fine for a local-only dev database, not
-# how it runs in production.
+# Production compose (Cloudflare Tunnel topology, backups) is
+# docker-compose.prod.yml — see AGENTS.md §10. Mongo here runs without
+# auth, a named volume, and its port published to the host — fine for a
+# local-only dev database, not how it runs in production.
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      # Host 3300, not 3000 — this machine already has another project's
-      # container bound to 3000. Override with PORT_HOST=xxxx if 3300 is
-      # also taken.
-      - '${PORT_HOST:-3300}:3000'
+      # Host 4000, not 3000 — this machine already has another project's
+      # container bound to 3000, and port 5000 is squatted on by macOS's
+      # own AirPlay Receiver (ControlCenter) on every modern Mac. Override
+      # with PORT_HOST=xxxx if 4000 is also taken.
+      - '${PORT_HOST:-4000}:3000'
     # Everything in .env (AUTH_SECRET, ADMIN_EMAIL, and future Resend/
     # Turnstile keys) flows into the container automatically — new secrets
     # never need a matching line added here.

@@ -31,8 +31,8 @@ of a host-side Mongo:
 docker compose watch
 ```
 
-Then visit `http://localhost:3300` (or `3000` for a host-side `pnpm dev`) and
-`/admin/login` for the CMS.
+Then visit `http://localhost:4000` (both the Docker stack and a host-side
+`pnpm dev` use the same port) and `/admin/login` for the CMS.
 
 ## Commands
 

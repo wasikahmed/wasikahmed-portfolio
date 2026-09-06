@@ -66,7 +66,7 @@ failing the whole suite.
 **Docker dev stack** (Mongo + mongo-express + hot reload):
 
 ```bash
-docker compose watch          # app on :3300, mongo-express on :8081
+docker compose watch          # app on :4000, mongo-express on :8081
 ```
 
 ---
