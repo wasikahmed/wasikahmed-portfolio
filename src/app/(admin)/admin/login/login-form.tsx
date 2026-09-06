@@ -14,7 +14,7 @@ import { Card } from '@/components/ui/card';
  * (signaled by the `TOTP_REQUIRED` error code from src/server/auth.ts).
  * Nothing about whether an email exists is revealed before that point.
  */
-export function LoginForm() {
+export function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState('');
@@ -23,6 +23,18 @@ export function LoginForm() {
   const [needsCode, setNeedsCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Redirect-based, not `redirect: false` like credentials above — Google's
+  // flow leaves the app entirely and comes back via
+  // /api/auth/callback/google, so there's no local result to branch on. A
+  // rejected sign-in (see auth.ts's `signIn` callback — no matching User
+  // document, or a suspended one) lands back here with `?error=` in the
+  // URL, which Auth.js's own default error handling covers; this app
+  // doesn't currently render a custom message for it, matching the
+  // generic "Incorrect email or password" treatment credentials gets.
+  const onGoogle = () => {
+    void signIn('google', { callbackUrl: params.get('from') ?? '/admin' });
+  };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,6 +136,25 @@ export function LoginForm() {
           </Button>
         ) : null}
       </form>
+
+      {googleEnabled && !needsCode ? (
+        <>
+          <div className="text-fg-subtle text-2xs my-5 flex items-center gap-3">
+            <span className="bg-border-subtle h-px flex-1" />
+            or
+            <span className="bg-border-subtle h-px flex-1" />
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            className="w-full justify-center"
+            onClick={onGoogle}
+          >
+            Sign in with Google
+          </Button>
+        </>
+      ) : null}
     </Card>
   );
 }

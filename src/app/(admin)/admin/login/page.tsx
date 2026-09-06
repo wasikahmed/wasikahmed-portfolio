@@ -22,6 +22,11 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default function AdminLoginPage() {
+  // Read here, not in the (client) form itself — a boolean flag is fine to
+  // pass down, but AUTH_GOOGLE_ID/SECRET themselves must never reach the
+  // client bundle. Both unset = no button, rather than one that 404s.
+  const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
+
   return (
     <main className="bg-bg text-fg flex min-h-screen flex-col items-center justify-center gap-8 px-6">
       <div className="text-center">
@@ -31,7 +36,7 @@ export default function AdminLoginPage() {
         <h1 className="font-display text-xl font-bold tracking-tight">Admin</h1>
       </div>
       <Suspense fallback={null}>
-        <LoginForm />
+        <LoginForm googleEnabled={googleEnabled} />
       </Suspense>
     </main>
   );

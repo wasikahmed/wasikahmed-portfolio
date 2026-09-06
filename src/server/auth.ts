@@ -4,6 +4,7 @@ import 'server-only';
 
 import NextAuth, { CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import Google from 'next-auth/providers/google';
 import { authConfig } from './auth.config';
 import { connectToDatabase } from './db';
 import { User } from './models/user';
@@ -38,6 +39,15 @@ export class RateLimitedError extends CredentialsSignin {
   code = 'RATE_LIMITED';
 }
 
+/**
+ * Google sign-in is entirely optional (PLAN.md W11a) — registered only
+ * when both env vars are set, same no-op-if-unset pattern as Turnstile/
+ * Umami/email elsewhere in this repo. `login/page.tsx` reads the same
+ * two vars to decide whether to render the button at all, so an unset
+ * config never shows a button that would 404.
+ */
+const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
+
 export const {
   handlers: { GET, POST },
   auth,
@@ -46,6 +56,7 @@ export const {
 } = NextAuth({
   ...authConfig,
   providers: [
+    ...(googleConfigured ? [Google({})] : []),
     Credentials({
       credentials: {
         email: {},
@@ -133,7 +144,44 @@ export const {
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger }) {
+    /**
+     * Google's own OAuth flow proves *who* someone is; it says nothing
+     * about whether this app should let them in. AGENTS.md §7 — no
+     * signup route, ever — applies here exactly as it does to Credentials:
+     * an email with no existing User document (or a suspended one) is
+     * rejected outright, never silently turned into a new account. No
+     * database adapter is configured (session strategy is `jwt`, not
+     * `database`), so returning `false` here is the only place this can
+     * be stopped — there's no separate "create account" step to skip.
+     */
+    async signIn({ user, account }) {
+      if (account?.provider !== 'google') return true; // Credentials gates itself in authorize().
+      if (!user.email) return false;
+
+      await connectToDatabase();
+      const dbUser = await User.findOne({ email: user.email.toLowerCase() }).lean();
+      if (!dbUser || dbUser.status === 'suspended') return false;
+
+      return true;
+    },
+    async jwt({ token, user, account, trigger }) {
+      // Google: `user` here is only what the provider's profile mapping
+      // produced (id/name/email/image from the Google account) — none of
+      // our role/status data. Re-fetch by email (already vetted by
+      // `signIn` above, run moments earlier in the same request) and
+      // overwrite `sub` so every downstream `session.user.id` is this
+      // app's real User document id, never Google's `sub` claim.
+      if (account?.provider === 'google' && user?.email) {
+        await connectToDatabase();
+        const dbUser = await User.findOne({ email: user.email.toLowerCase() }).lean();
+        if (dbUser) {
+          token.sub = String(dbUser._id);
+          token.role = dbUser.role;
+          token.totpEnabled = Boolean(dbUser.totpSecret);
+        }
+        return token;
+      }
+
       // `user` is typed `User | AdapterUser` by Auth.js; only the shape
       // `authorize()` actually returns (above) carries these fields, so
       // narrow with `in` rather than depending on ambient module
