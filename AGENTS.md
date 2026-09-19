@@ -122,8 +122,9 @@ scripts/             seed.ts, seed-admin.ts
    makes a third a compile error. Do not widen that type.
 5. **Every admin mutation gets all four:** session check, `verifyCsrf`, Zod
    `safeParse`, `writeAuditLog`. The factory in `admin-crud.ts` does this for
-   you — use it rather than hand-rolling a route. (`reorderHandler` currently
-   skips the audit log; that is a known gap, not a precedent.)
+   you — use it rather than hand-rolling a route. (`reorderHandler` also
+   writes one audit entry per reorder, fixed under PLAN.md W5 — this rule
+   used to note it as a gap; it no longer is one.)
 6. **Client calls to `/api/admin/*` go through `adminFetch`/`adminFetchJson`**
    (`src/lib/admin-fetch.ts`), never bare `fetch` — that is what attaches the
    CSRF header.
@@ -188,6 +189,17 @@ Tunnel itself is unaffected and still the only ingress to the VPS.
    deleted user is rejected on their very next request.
 2. **Credentials** — argon2id via `@node-rs/argon2`, plus optional TOTP whose
    secret is AES-256-GCM encrypted at rest with a key derived from `AUTH_SECRET`.
+
+**`AUTH_URL` is required in production, not optional.** Auth.js v5's
+`createActionURL()` falls back to the request's `Host` header when
+`AUTH_URL`/`NEXTAUTH_URL` is unset — and under this app's required
+`HOSTNAME=0.0.0.0` Docker binding, that fallback leaks the container's own
+bind address into absolute URLs it builds instead of the real domain
+(caught live, 2026-09-20: sign-out redirecting to `http://0.0.0.0:<port>/
+admin/login` in production). `deploy.yml` sets it from the existing
+`NEXT_PUBLIC_SITE_URL` value rather than a second variable that could drift
+from it. Not needed locally — `pnpm dev` and the dev compose stack don't hit
+this, since neither binds to `0.0.0.0`.
 
 **Two ways to authenticate, one session model.** Alongside credentials,
 Google sign-in (PLAN.md W11a) is an optional second entry point — registered
@@ -260,8 +272,28 @@ too.
 ## 9. Known traps
 
 - `src/proxy.ts`, not `middleware.ts` — Next 16 renamed it.
-- Its matcher covers `/admin/*` and `/api/admin/*` only. **`/api/auth/*` is not
-  covered by anything**, which is why login has no rate limiting today.
+- Its matcher covers `/admin/*` and `/api/admin/*` only — `/api/auth/*` gets
+  no CSRF/session gate from it. That does **not** mean login is unprotected:
+  `src/server/rate-limit.ts`'s database-backed fixed-window counter
+  (`credentials.ts`, shared by the cookie and Bearer-token login paths) caps
+  attempts per IP and per targeted email independently, 15-minute windows —
+  confirmed live, not just by reading the code, by tripping it during
+  testing. This line used to claim login had no rate limiting; it does.
+- `next build` classifies a page static (`○`) unless something forces it
+  dynamic, and a static page's HTML is generated once, at build time — which
+  matters a lot for `proxy.ts`'s nonce-based CSP: the nonce it stamps into
+  script tags is fresh per request, so a statically prerendered page's
+  baked-in nonce can never match, and every script on it gets blocked
+  outright. `/docs` hit this for real (PLAN.md, 2026-09-20) — a Client
+  Component with no data dependency, silently prerendered, rendering as a
+  totally blank page in production while working fine in dev (which always
+  renders per request, static classification or not). Fixed with
+  `src/app/docs/layout.tsx` exporting `dynamic = 'force-dynamic'` — in a
+  layout, not the page itself, since the page is a Client Component and
+  Next only reads route-segment config from a Server Component. Any new
+  page with no per-request data need is still a candidate for this exact
+  trap; force dynamic rendering explicitly rather than relying on data
+  fetching to imply it.
 - `next build` runs `generateStaticParams()` with no reachable database (by
   design, inside Docker). Those functions catch and return `[]`. Any new
   `generateStaticParams` must do the same.
@@ -334,3 +366,19 @@ canonical URLs) — see PLAN.md W3. CI now gates every push to `main`
 (typecheck/lint/format:check/test/build) before it ships, with E2E running
 separately on PRs and a daily schedule — see PLAN.md W4. See
 `PLAN.md` for what is left and in what order.
+
+**All of the above is deployed and live, not just committed, as of
+2026-09-20** — W7 through W15 sat on local `main`, unpushed, for two weeks
+before that. Deploying surfaced and fixed three real bugs no code review
+caught: a stale Cloudflare Access env config left over from before W8 that
+was fail-closed and locking every real admin out of `/admin` in production;
+two of four new GitHub Actions secrets landed in the wrong namespace
+(`vars.*` vs `secrets.*`), which would have silently disabled Turnstile and
+lead-notification email in production; and `/docs` rendering as a
+completely blank page because it was statically prerendered against a CSP
+whose nonce is generated fresh per request (§9, and PLAN.md's 2026-09-20
+progress note has the full account of each). Worth internalizing: "verified
+live" only means what it says if it was checked against the actual
+production runtime, not the dev server — the two diverge exactly on static
+vs. dynamic rendering and on `HOSTNAME=0.0.0.0` binding behavior, neither of
+which is visible from reading source.

@@ -17,6 +17,105 @@ prerequisites; W9 → W14 build on each other.
 
 ---
 
+## Progress — 2026-09-20
+
+**Everything below was written and verified 2026-09-06, then sat on local
+`main` for two weeks, never pushed.** Today was the actual deploy day, and it
+surfaced three real bugs that no amount of re-reading the diff would have
+caught — all three needed the running app, not the code, to find.
+
+**Before deploying:** a full functional pass against the Docker dev stack,
+driving the app directly rather than reading the tests — login (password +
+TOTP, full round trip), content CRUD with draft/publish visibility and the
+audit log, media upload (PNG accepted, SVG rejected, a fake-PNG-containing-a-
+script rejected on sniffed content, not claimed MIME type), settings, and the
+entire W9–W12 user-management lifecycle end to end using two genuinely
+independent sessions (same browser, different origins — `localhost` vs.
+`127.0.0.1` — to get real parallel cookies): invite → accept-invite → editor
+logs in → permission ceiling enforced at the API (403) and the publish
+boundary enforced at the schema (422) → promoted to admin with the _same
+already-open session_ going from 403 to 200 with no re-login → suspended with
+that same session going 200 to 401 on its very next request → self-guards and
+owner-guards confirmed via direct API calls → ownership transfer confirmed
+atomic, and confirmed instant on the demoted former owner's still-open
+session. Bearer tokens: issued, used with zero cookie/CSRF, refreshed,
+rotated, and reuse-detection confirmed to revoke the entire token family
+including a still-valid newer token. All of this passed. **Correction to the
+"W14 (tests) not started" line below:** most of W14 is actually covered by
+the unit tests W9–W13 already added — see W14's own section for the
+one real gap.
+
+**What deploying today actually found, in order:**
+
+1. **`main` was 15 commits ahead of `origin/main`.** Everything from W7
+   onward — including the Cloudflare Access removal (W8) — existed only
+   locally. `deploy.yml` hadn't run since 2026-08-29 not because CI was
+   broken, but because nothing had been pushed.
+2. **Production was already broken because of that gap**, not despite it:
+   the deployed `.env` still had `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` set
+   from before Access was torn down at the Cloudflare dashboard level.
+   `proxy.ts`'s old layer-1 check requires a `Cf-Access-Jwt-Assertion` header
+   that no longer arrives, and fails _closed_ — so `/admin` redirected to `/`
+   and `/api/admin/*` 403'd unconditionally, for everyone, including the
+   real owner. Confirmed live with `curl` before touching anything. Pushing
+   W8 (which deletes the whole check and stops writing those two vars into
+   `.env`) fixed this outright — verified after deploy: `/admin` now
+   redirects to `/admin/login`, `/api/admin/*` now 401s instead of 403ing.
+3. **Two of four new GitHub Actions secrets landed in the wrong namespace.**
+   `GMAIL_USER` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` were added as
+   _secrets_; `deploy.yml` reads them as `vars.*`. `${{ vars.X }}` and a
+   secret named `X` don't fall back to each other — both would have
+   rendered empty in production's `.env`, silently disabling Turnstile
+   verification and lead-notification email in production while `.env.example`
+   confidently claims both are wired up. Fixed by moving both to repo
+   variables (neither is sensitive — one's a public site key, the other's
+   an email address already visible in this file's own comments).
+4. **Sign-out redirected to `http://0.0.0.0:<port>/admin/login`** — the
+   container's own bind address, not the real domain. Root-caused by
+   actually building and running the standalone production server locally
+   (`node server.js`, `HOSTNAME=0.0.0.0`, identical to
+   `docker-compose.prod.yml`) rather than trusting that a dev-mode check was
+   representative: Auth.js v5's `createActionURL()` falls back to the
+   request's `Host` header when `AUTH_URL`/`NEXTAUTH_URL` is unset, and that
+   resolution leaks the bind address instead under this app's required
+   `HOSTNAME=0.0.0.0`. The session was destroyed correctly either way — this
+   was a broken redirect, not an auth hole. Fixed by setting `AUTH_URL` from
+   the existing `NEXT_PUBLIC_SITE_URL` value in `deploy.yml`, rather than a
+   second variable that could drift from it.
+5. **`/docs` rendered as a completely blank page in production** — every
+   script blocked by CSP, including Next.js's own hydration bundle. Found
+   _after_ the first deploy, checking the live site in a real browser rather
+   than trusting the W13 section's own "verified live in a real browser"
+   claim below, which was true only against the dev server. Root cause:
+   `next build` classified `/docs` as static (`○`) because its page is a
+   Client Component with no data dependency, so it prerenders once at build
+   time — but `proxy.ts`'s nonce-based CSP is generated fresh on every
+   request, and a nonce baked into build-time HTML can never match a
+   per-request header. The dev server never surfaces this because it always
+   renders per request, static or not. Fixed with a new `src/app/docs/
+layout.tsx` exporting `dynamic = 'force-dynamic'` — has to live in a
+   layout rather than `page.tsx` itself, since Next only reads route-segment
+   config from a Server Component and the page is a Client Component.
+   Verified by rebuilding, confirming `next build` now lists `/docs` as `ƒ`
+   (dynamic), and loading it against the standalone production server with
+   zero console errors before shipping the fix.
+
+**Deployed and verified live against `wasikahmed.me`** after both pushes:
+health check green, `/admin` → `/admin/login`, `/api/admin/*` → 401,
+`/docs` and `/api/openapi.json` serving correctly with no console errors,
+public pages and the SEO surface (`/sitemap.xml`, `/robots.txt`,
+`/writing/feed.xml`) all 200, security headers present.
+
+**Still outstanding, not blocking anything:** production's admin user is
+still `role: 'admin'` from before this phase, not `owner` — run
+`pnpm seed:admin` against production once to migrate it (PLAN.md W9's own
+migration note). That script also resets the password as a side effect and
+prints the new one once; save it when it does. `admin` already has every
+functional permission `owner` has, so this is a consistency fix, not an
+access problem.
+
+---
+
 ## Progress — 2026-09-06
 
 **W7 (truth-up), W8 (Cloudflare Access removed), W9 (permissions core), W10
@@ -164,6 +263,19 @@ console errors, the full three-column reference layout rendering correctly,
 every collection's request/response schema expanding with real generated
 `curl` examples, and `GET /api/openapi.json` returning valid JSON with no
 authentication of any kind.
+
+**Correction, 2026-09-20 — this verification was against the dev server
+only, and it missed a real production-only bug.** "Live" here meant
+`docker compose watch`, which always server-renders per request. In an
+actual production build, `next build` prerenders `/docs` statically (its
+page has no data dependency), which bakes in whatever CSP nonce existed at
+build time — permanently mismatched against the fresh nonce `proxy.ts`
+generates on every real request. The result was a completely blank `/docs`
+in production, every script rejected by CSP, found only by loading the live
+site in a browser after deploying. See the 2026-09-20 progress note above
+and W14's own note: "verified live" from here on should mean the actual
+production runtime, not just the dev stack — the two diverge exactly where
+static-vs-dynamic rendering matters, which is invisible from source alone.
 
 ---
 
@@ -616,27 +728,41 @@ Decide explicitly; don't drift into one.
 Not an afterthought: this phase changes who can do what, and every bug in it
 is a security bug.
 
-1. **The permission matrix, exhaustively.** `can()` is a pure function — assert
-   every role against every permission. Roughly 4 × 25 assertions, generated
-   from the tuples, and the cheapest security test in the repo.
-2. **Enforcement, per route.** Extend `admin-crud.test.ts`: for each handler,
-   a role that may and a role that may not. The existing file already proves
-   session/CSRF/Zod/audit; permission becomes the fifth thing it proves.
-3. **The publish boundary.** An `editor` without `content:publish` submitting
-   `status: 'published'` must be rejected — through the API, not just in the
-   UI. This is the one that protects the public site.
-4. **Revocation is immediate.** Suspend a user mid-session; their next request
-   must 401. This is the whole justification for W10's design, and it is
-   worthless unproven.
-5. **The owner guards.** Owner cannot be demoted, suspended, deleted, or
-   self-role-changed. One test each.
-6. **E2E: the invitation round trip.** Invite → accept → log in → hit a
-   permission ceiling → get refused. `e2e/admin.spec.ts` already establishes
-   the pattern (deterministic no-TOTP account via `seed:e2e-admin`); extend it
-   with a second seeded account at a lower role.
-7. **Bearer parity.** The same permission checks hold whether the caller
-   presents a cookie or a token. Two auth paths into one permission layer is
-   precisely where a gap hides.
+**Correction, 2026-09-20 — most of this was already done.** The "Progress"
+note above this section (written 2026-09-06, same day as W9–W13) claimed
+"the remaining items of W14 (tests) are not started" in the same breath as
+listing `permissions.test.ts`, `session.test.ts`, `users-routes.test.ts`,
+and the publish-boundary case in `admin-crud.test.ts` as shipped — a direct
+contradiction that stood uncorrected for two weeks. Verified against the
+actual suite: items 1–5 and 7 below are done. Only item 6 is a real gap.
+
+1. ~~**The permission matrix, exhaustively.**~~ **Done** —
+   `permissions.test.ts`, 80 assertions.
+2. ~~**Enforcement, per route.**~~ **Done** — `admin-crud.test.ts` and
+   `users-routes.test.ts` cover this per handler.
+3. ~~**The publish boundary.**~~ **Done** — asserted in `admin-crud.test.ts`,
+   and re-verified live today: an `editor` submitting `status: 'published'`
+   gets a 422 from `withPublishGuard`, through the real API.
+4. ~~**Revocation is immediate.**~~ **Done** — `session.test.ts` (the
+   "stale-role problem"), and re-verified live today: a suspended user's
+   already-open session went from 200 to 401 on its very next request, no
+   re-login.
+5. ~~**The owner guards.**~~ **Done** — covered in `users-routes.test.ts`,
+   and re-verified live today via direct API calls: self-role-change,
+   self-suspend, self-delete, and every guard against acting on the owner
+   all correctly refused.
+6. **E2E: the invitation round trip.** Still open. Invite → accept → log in
+   → hit a permission ceiling → get refused. `e2e/admin.spec.ts` already
+   establishes the pattern (deterministic no-TOTP account via
+   `seed:e2e-admin`) but only covers the project CRUD pipeline; extend it
+   with a second seeded account at a lower role. The manual pass today
+   covered this exact path by hand (invite → accept → permission ceiling →
+   promote → suspend → ownership transfer) but that isn't a substitute for
+   a repeatable e2e test.
+7. ~~**Bearer parity.**~~ **Done** — `bearer-token.test.ts`, and re-verified
+   live today: issue, use with zero cookie/CSRF, refresh, rotate, and reuse
+   detection revoking the whole token family, all exercised with real
+   `curl` calls against the running app.
 
 Sabotage-test the important ones — break the check, confirm the test goes red,
 restore. The archived plan set that standard and it caught real bugs.
