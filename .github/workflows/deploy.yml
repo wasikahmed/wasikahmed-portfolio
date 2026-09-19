@@ -194,6 +194,15 @@ jobs:
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
             ADMIN_EMAIL=${{ vars.ADMIN_EMAIL }}
             AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            # Auth.js v5 needs this explicitly in production: with `trustHost:
+            # true` and no AUTH_URL, it falls back to deriving the origin from
+            # the request's Host header, and under this app's HOSTNAME=0.0.0.0
+            # binding (required for Docker) that resolution leaks the
+            # container's own bind address instead — verified live, e.g. a
+            # sign-out redirect landing on http://0.0.0.0:<port>/admin/login.
+            # Reuses NEXT_PUBLIC_SITE_URL rather than a second variable that
+            # could drift from it.
+            AUTH_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
             DOCKERHUB_USERNAME=${{ vars.DOCKERHUB_USERNAME }}
             MONGO_ROOT_USER=${{ vars.MONGO_ROOT_USER }}
             MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
