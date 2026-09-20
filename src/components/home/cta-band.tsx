@@ -20,11 +20,11 @@ export async function CtaBand() {
           ) : null}
 
           <h2 className="font-display mx-auto max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-            Got something that should run itself?
+            Hiring, or just curious?
           </h2>
           <p className="text-fg-muted mx-auto mt-5 max-w-md text-pretty">
-            Tell me what breaks today. If I am not the right person for it, I will say so and point
-            you somewhere better.
+            I am open to software engineering roles, remote preferred, and to automation work
+            alongside them. Tell me what you are building.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

@@ -4,7 +4,7 @@ import { SelectedWork } from '@/components/home/selected-work';
 import { Impact } from '@/components/home/impact';
 import { Experience } from '@/components/home/experience';
 import { Process } from '@/components/home/process';
-import { Voices } from '@/components/home/voices';
+import { Shipped } from '@/components/home/shipped';
 import { CtaBand } from '@/components/home/cta-band';
 import { SectionRail } from '@/components/layout/section-rail';
 import { getSettings, getRoles } from '@/server/queries';
@@ -25,8 +25,8 @@ const RAIL = [
   { id: 'work', label: 'Work' },
   { id: 'impact', label: 'Impact' },
   { id: 'experience', label: 'Experience' },
-  { id: 'process', label: 'Process' },
-  { id: 'voices', label: 'Clients' },
+  { id: 'process', label: 'Approach' },
+  { id: 'shipped', label: 'Shipped' },
   { id: 'contact', label: 'Contact' },
 ];
 
@@ -47,7 +47,7 @@ export default async function HomePage() {
       <Impact />
       <Experience roles={roles} />
       <Process />
-      <Voices />
+      <Shipped />
       <CtaBand />
     </>
   );

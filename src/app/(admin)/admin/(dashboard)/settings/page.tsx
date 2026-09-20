@@ -5,6 +5,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { ObjectArrayEditor } from '@/components/admin/object-array-editor';
+import { StringList } from '@/components/admin/string-list';
 import { adminFetchJson } from '@/lib/admin-fetch';
 import type { Settings } from '@/lib/types';
 
@@ -184,6 +185,35 @@ export default function SettingsPage() {
               }
             />
           </div>
+        </Field>
+
+        <Field
+          label="About story"
+          htmlFor="story"
+          hint="One entry per paragraph, shown on /about in this order."
+        >
+          <StringList
+            value={draft.story ?? []}
+            onChange={(story) => set('story', story)}
+            placeholder="A paragraph of the about page…"
+          />
+        </Field>
+
+        <Field
+          label="Approach"
+          htmlFor="approach"
+          hint="Home's numbered “How I actually work” list. Numbering follows this order."
+        >
+          <ObjectArrayEditor
+            value={draft.approach ?? []}
+            onChange={(approach) => set('approach', approach)}
+            fields={[
+              { key: 'title', label: 'Title', required: true },
+              { key: 'body', label: 'Body', required: true, multiline: true },
+            ]}
+            empty={{ title: '', body: '' }}
+            addLabel="Add step"
+          />
         </Field>
 
         <Field label="Social links" htmlFor="socials">

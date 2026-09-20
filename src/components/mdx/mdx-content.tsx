@@ -38,6 +38,9 @@ export async function MdxContent({ source, className }: { source: string; classN
         '[&_ul]:flex [&_ul]:list-none [&_ul]:flex-col [&_ul]:gap-2 [&_ul>li]:relative [&_ul>li]:pl-5',
         "[&_ul>li]:before:bg-accent [&_ul>li]:before:absolute [&_ul>li]:before:top-[0.6em] [&_ul>li]:before:left-0 [&_ul>li]:before:h-1 [&_ul>li]:before:w-1 [&_ul>li]:before:rounded-full [&_ul>li]:before:content-['']",
         '[&_ol]:marker:text-2xs [&_ol]:marker:text-accent [&_ol]:flex [&_ol]:list-decimal [&_ol]:flex-col [&_ol]:gap-2 [&_ol]:pl-5 [&_ol]:marker:font-mono',
+        // Diagrams in post bodies: same card treatment as the rest of the
+        // site, and width-bound so a wide SVG scales instead of overflowing.
+        '[&_img]:border-border-subtle [&_img]:bg-surface-1 [&_img]:h-auto [&_img]:w-full [&_img]:rounded-md [&_img]:border',
         '[&_blockquote]:border-border-strong [&_blockquote]:text-fg [&_blockquote]:border-l-2 [&_blockquote]:pl-5',
         className,
       )}

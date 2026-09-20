@@ -1,55 +1,77 @@
 import type { Role } from '@/lib/types';
 
+/**
+ * The real timeline, newest first. Home's Experience section shows the first
+ * three and links to /about#experience for the rest, so order matters: the
+ * degree sits last deliberately, where it reads as context rather than as
+ * the headline.
+ */
 export const roles: Omit<Role, 'id'>[] = [
   {
-    title: 'Senior Software Engineer',
-    company: 'Meridian AI',
-    period: '2022 — Present',
-    type: 'Full-time',
+    title: 'Freelance Software Engineer',
+    company: 'Advergo Sports & Fashion Wear Ltd.',
+    period: 'Jul 2026 — Present',
+    type: 'Freelance · Remote',
     shipped: [
-      'Built a document intelligence pipeline processing 12,000+ contracts a month',
-      'Cut infrastructure cost 40% by moving batch jobs to async workers',
-      'Led a monolith-to-services migration without a single outage',
-      'Replaced a 3,000-line rules engine with an LLM classification layer',
+      'Sole backend engineer on a live B2B custom-order and B2C retail system (advergo.org), built with Django, Next.js and PostgreSQL',
+      'Designed a modular Django backend of 65 REST endpoints and a quote-to-invoice flow with automated PDF generation',
+      'Added role-based access control, admin 2FA and audit trails across every mutation',
+      'Built the CI/CD pipeline that runs 244 automated tests on every push',
+      'Retained for phase two',
     ],
     order: 0,
   },
   {
-    title: 'Software Engineer',
-    company: 'Fieldworks SaaS',
-    period: '2020 — 2022',
-    type: 'Full-time',
+    title: 'Software Engineer Intern',
+    company: 'Factoryze Technologies Limited',
+    period: 'May 2026 — Present',
+    type: 'Internship · Hybrid',
     shipped: [
-      'Built the scheduling engine behind 10,000+ weekly shift assignments',
-      'Designed the real-time event system for the field operations dashboard',
-      'Shipped a public REST API used by eight third-party integrations',
-      'Mentored two junior engineers, both promoted within a year',
+      'Automated short-term-rental guest onboarding in n8n across Jurny, Autohost, Monday.com and QuickBooks',
+      'Built LLM-based email triage for Gmail and Outlook, sorting a property manager’s inbox into 8 categories',
+      'Developed LLM reply drafting with human approval in Telegram, supporting revision rounds and full logging',
     ],
     order: 1,
   },
   {
-    title: 'Backend Engineer',
-    company: 'Pulse Agency',
-    period: '2019 — 2020',
-    type: 'Full-time',
+    title: 'Junior Backend Developer',
+    company: 'Join Venture AI',
+    period: 'Dec 2025 — Feb 2026',
+    type: 'Full-time · On-site',
     shipped: [
-      'Delivered six client projects across fintech, retail, and logistics',
-      'Built a shared API gateway used by every agency product',
-      'Introduced automated testing — coverage went from 0% to 74%',
+      'Sole backend engineer for ScoreLivePro, a live football app on Google Play (10K+ downloads) and the App Store',
+      'Implemented live updates that sync match data every 15 seconds via Celery, pushed over WebSockets and Firebase',
+      'Reduced paid sports-API spend through targeted fetching rather than blanket polling',
+      'Shipped CI/CD with GitHub Actions and Docker',
+      'Built and maintained Django backends for multiple international client products, coordinating across time zones',
     ],
     order: 2,
   },
   {
-    title: 'Independent',
-    company: 'Consulting',
-    period: '2023 — Present',
-    type: 'Ongoing',
+    title: 'Junior Software Engineer',
+    company: 'MADD Technology',
+    /* Joined as an intern in May and converted in August; one entry rather
+       than two, because the work is continuous and splitting it reads as
+       padding. */
+    period: 'May 2025 — Nov 2025',
+    type: 'Intern → Junior Engineer · On-site',
     shipped: [
-      'AI document processing for a legal tech firm',
-      'Constraint-solving scheduler for a staffing agency',
-      'Inventory platform for a twelve-store retail chain',
-      'Deployment automation for a growing SaaS team',
+      'Co-built Neeramoy, an Angular + Electron desktop app that lets doctors run a clinic fully offline',
+      'Designed its SQLite data layer and sync engine, reconciling offline records with the cloud on reconnect',
+      'Published neeramoy-sdk on npm — a typed TypeScript API client with AWS Cognito OTP auth, 14 releases to date',
+      'Developed features and fixed API, database and scheduling issues across multiple company products',
     ],
     order: 3,
+  },
+  {
+    title: 'B.Sc. in Computer Science & Engineering',
+    company: 'American International University-Bangladesh (AIUB)',
+    period: 'May 2022 — Present',
+    type: 'Education · Major in Information Systems',
+    shipped: [
+      'Major in Information Systems',
+      'Worked professionally as a software engineer throughout the final two years of the degree',
+    ],
+    order: 4,
   },
 ];

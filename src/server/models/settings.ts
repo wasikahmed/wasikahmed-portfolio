@@ -5,6 +5,11 @@ const linkSchema = new Schema(
   { _id: false },
 );
 
+const approachStepSchema = new Schema(
+  { title: { type: String, required: true }, body: { type: String, required: true } },
+  { _id: false },
+);
+
 const mediaRefSchema = new Schema(
   { url: { type: String, required: true }, alt: { type: String, required: true } },
   { _id: false },
@@ -34,6 +39,8 @@ const settingsSchema = new Schema(
     responseTime: { type: String, required: true },
     socials: { type: [linkSchema], default: [] },
     portrait: { type: mediaRefSchema, default: undefined },
+    story: { type: [String], default: [] },
+    approach: { type: [approachStepSchema], default: [] },
   },
   { timestamps: true },
 );

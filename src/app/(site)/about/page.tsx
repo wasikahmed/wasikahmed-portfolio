@@ -14,17 +14,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: pageTitle('About', settings.name),
     description:
-      'Software engineer working on AI, automation, and systems that remove manual work.',
+      'Backend engineer in Dhaka building Django and TypeScript systems — live apps, offline-first desktop software, and automation.',
     alternates: canonical('/about'),
   };
 }
-
-const STORY = [
-  'I started writing code at university because it was the fastest way to make things that actually worked. Computer science gave me the theory; agencies, startups, and product teams gave me everything else.',
-  'Most of my career has been spent in the gap between "we have a problem" and "we have software that fixes it". The hardest part is rarely the code — it is understanding the problem precisely enough to know what to build.',
-  'For the last few years that has increasingly meant AI and automation. Not because they are fashionable, but because they are usually the right tool when the goal is to remove manual work at scale.',
-  'I work as a senior engineer on product teams and take on consulting projects for people who need one specific system built well. Each keeps the other honest.',
-];
 
 export default async function AboutPage() {
   const [skillGroups, roles, settings] = await Promise.all([
@@ -44,7 +37,7 @@ export default async function AboutPage() {
                 I build software that removes a problem.
               </h1>
               <div className="mt-8 flex max-w-xl flex-col gap-5">
-                {STORY.map((paragraph, i) => (
+                {settings.story.map((paragraph, i) => (
                   <p key={i} className="text-fg-muted text-base leading-relaxed text-pretty">
                     {paragraph}
                   </p>
@@ -52,7 +45,7 @@ export default async function AboutPage() {
               </div>
               <div className="mt-10 flex flex-wrap gap-3">
                 <Button href="/contact" className="group">
-                  Work with me
+                  Get in touch
                   <ArrowRight />
                 </Button>
                 <Button href="/work" variant="ghost">

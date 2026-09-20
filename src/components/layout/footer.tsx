@@ -86,7 +86,12 @@ export function Footer({ settings }: { settings: Settings }) {
           <nav aria-label="Footer">
             <ColumnLabel>Navigate</ColumnLabel>
             <ul className="flex flex-col gap-2.5">
-              {[...NAV_LINKS, { label: 'Design system', href: '/design-system' }].map((link) => (
+              {[
+                ...NAV_LINKS,
+                { label: 'Résumé', href: '/resume' },
+                { label: 'API reference', href: '/docs' },
+                { label: 'Design system', href: '/design-system' },
+              ].map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className={LINK}>
                     {link.label}

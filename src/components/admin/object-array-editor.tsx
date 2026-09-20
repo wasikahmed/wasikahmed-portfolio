@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@/components/ui/field';
+import { Input, Textarea } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -9,6 +9,12 @@ interface FieldSpec<T> {
   label: string;
   required?: boolean;
   placeholder?: string;
+  /**
+   * Render a Textarea and give the field the full row width. For prose —
+   * Settings' `approach` bodies are paragraphs, and a single-line Input
+   * makes them effectively uneditable.
+   */
+  multiline?: boolean;
 }
 
 /**
@@ -41,19 +47,24 @@ export function ObjectArrayEditor<T>({
       {value.map((row, i) => (
         <Card key={i} variant="flat" padding="sm" className="flex items-start gap-3">
           <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
-            {fields.map((f) => (
-              <Input
-                key={f.key}
-                value={(row[f.key] as string | undefined) ?? ''}
-                placeholder={f.placeholder ?? f.label}
-                required={f.required}
-                onChange={(e) => {
-                  const next = [...value];
-                  next[i] = { ...next[i], [f.key]: e.target.value };
-                  onChange(next);
-                }}
-              />
-            ))}
+            {fields.map((f) => {
+              const Control = f.multiline ? Textarea : Input;
+              return (
+                <Control
+                  key={f.key}
+                  value={(row[f.key] as string | undefined) ?? ''}
+                  placeholder={f.placeholder ?? f.label}
+                  required={f.required}
+                  rows={f.multiline ? 3 : undefined}
+                  className={f.multiline ? 'sm:col-span-2' : undefined}
+                  onChange={(e) => {
+                    const next = [...value];
+                    next[i] = { ...next[i], [f.key]: e.target.value };
+                    onChange(next);
+                  }}
+                />
+              );
+            })}
           </div>
           <button
             type="button"

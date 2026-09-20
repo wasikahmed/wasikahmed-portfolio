@@ -6,20 +6,24 @@ import { getProjects } from '@/server/queries';
 /**
  * Full-bleed statement moment — the second deliberate break from the card
  * grid (PLAN.md §2.7). No cards at all: just the numbers, large, on the
- * page ground, with the baseline that makes each one evidence.
+ * page ground, with the baseline that makes each one checkable.
+ *
+ * Capped at four: the grid is four columns at its widest, so a fifth metric
+ * strands itself alone on a second row.
  */
 export async function Impact() {
-  const projects = await getProjects();
+  const projects = (await getProjects()).slice(0, 4);
 
   return (
     <Section id="impact" density="spacious" bordered ambient={['noise']}>
       <Container>
         <Reveal>
           <h2 className="font-display max-w-3xl text-3xl font-bold tracking-tight text-balance">
-            The numbers, with the baselines that make them mean something.
+            The numbers, and where you can go and check them.
           </h2>
           <p className="text-fg-muted mt-4 max-w-xl text-sm">
-            A percentage on its own is marketing. Paired with what it replaced, it is evidence.
+            A figure on its own is marketing. Each of these points at something public — a store
+            listing, a published package, a test suite that runs on every push.
           </p>
         </Reveal>
 

@@ -175,7 +175,12 @@ export const getSettings = cache(async (): Promise<SettingsType> => {
   // the seed script's literal-narrowing benefit, which is incompatible with
   // the mutable Settings shape components expect.
   if (!doc) {
-    return { ...settingsSeed, socials: settingsSeed.socials.map((s) => ({ ...s })) };
+    return {
+      ...settingsSeed,
+      socials: settingsSeed.socials.map((s) => ({ ...s })),
+      story: [...settingsSeed.story],
+      approach: settingsSeed.approach.map((s) => ({ ...s })),
+    };
   }
   // Settings' `_id` is the fixed singleton key, not a per-record identity
   // like every other collection's — dropped rather than exposed as `id`.

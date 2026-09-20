@@ -25,15 +25,15 @@ export default async function WorkPage() {
       <Container>
         <Eyebrow rule>Work</Eyebrow>
         <h1 className="font-display mt-6 max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-          Systems that removed a problem.
+          Systems that are still running.
         </h1>
         <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">
           {/* Was hardcoded "Four" — the same drift PLAN.md W5 fixed on the
               home page, still live here. Wrong the moment a project ships
               or is unpublished from the CMS. */}
           {count.charAt(0).toUpperCase() + count.slice(1)} project
-          {projects.length === 1 ? '' : 's'}, each still running. Every number below is paired with
-          what it replaced.
+          {projects.length === 1 ? '' : 's'} in production, one of which you are reading. Every
+          number below points at something you can go and check.
         </p>
 
         <div className="mt-14">

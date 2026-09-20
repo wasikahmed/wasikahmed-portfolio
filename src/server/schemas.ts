@@ -58,8 +58,25 @@ export const seoSchema = z.object({
  * the underlying upload doesn't cascade here, same trade-off `ogImage`
  * already made.
  */
+/**
+ * A picked image. Media-library uploads are absolute Cloudinary URLs, but a
+ * root-relative path is equally valid: the portrait is a fixed brand asset
+ * served from public/ rather than user-managed content, so it must never
+ * depend on a third-party host being reachable (see seed-data/settings.ts).
+ * The Mongoose side is a plain String, so this is the only gate to widen.
+ */
+export const approachStepSchema = z.object({
+  title: z.string().min(1),
+  body: z.string().min(1),
+});
+
 export const mediaRefSchema = z.object({
-  url: z.string().url(),
+  url: z
+    .string()
+    .min(1)
+    .refine((v) => v.startsWith('/') || z.string().url().safeParse(v).success, {
+      message: 'Must be an absolute URL or a root-relative path',
+    }),
   alt: z.string().min(1),
 });
 
@@ -195,6 +212,10 @@ export const settingsSchema = z.object({
   responseTime: z.string().min(1),
   socials: z.array(linkSchema),
   portrait: mediaRefSchema.optional(),
+  // Defaulted, not required: settings documents written before these
+  // existed must keep validating rather than locking the admin out.
+  story: z.array(z.string().min(1)).default([]),
+  approach: z.array(approachStepSchema).default([]),
 });
 
 /** The public submission contract for POST /api/contact. */

@@ -127,6 +127,12 @@ export interface SkillGroup {
   order: number;
 }
 
+/** One numbered step in home's "How I actually work" section. */
+export interface ApproachStep {
+  title: string;
+  body: string;
+}
+
 /** The settings singleton — site-wide facts editable from the admin. */
 export interface Settings {
   name: string;
@@ -144,6 +150,14 @@ export interface Settings {
   socials: { label: string; href: string }[];
   /** /about's portrait (PLAN.md W15 item 1). Absent renders exactly as before. */
   portrait?: MediaRef;
+  /**
+   * /about's narrative, one entry per paragraph, and home's Approach
+   * section. Both were hardcoded consts in their components, which made the
+   * most personal copy on the site the only copy needing a deploy to change
+   * — squarely against the premise that content lives in the database.
+   */
+  story: string[];
+  approach: ApproachStep[];
 }
 
 export interface Media {
