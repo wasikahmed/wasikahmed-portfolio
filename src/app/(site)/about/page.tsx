@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
+import { RoleAccordion } from '@/components/experience/role-accordion';
 import { getSkillGroups, getRoles, getSettings } from '@/server/queries';
 import { pageTitle, canonical } from '@/lib/seo';
 
@@ -60,12 +62,28 @@ export default async function AboutPage() {
             </Reveal>
 
             {/*
-             * Facts panel instead of a stock portrait. The prototype used an
-             * Unsplash headshot of someone else, which is the single biggest
-             * credibility leak a portfolio can have. A real photo goes here
-             * once one exists — see PLAN.md W15 open item 1.
+             * A real photo replaces the facts-only panel once one exists
+             * (PLAN.md W15 item 1) — the prototype's stock Unsplash headshot
+             * of someone else was the single biggest credibility leak a
+             * portfolio can have, so this stayed facts-only until a real
+             * one was uploaded. It also gives this column enough height to
+             * stop reading as an afterthought next to the story column
+             * (PLAN.md W15 item 5) — without one, the facts panel alone is
+             * a legitimately shorter, self-contained block, not a gap.
              */}
-            <Reveal delay={0.1}>
+            <Reveal delay={0.1} className="flex flex-col gap-6">
+              {settings.portrait ? (
+                <div className="border-border-subtle bg-surface-1 relative aspect-[4/5] overflow-hidden rounded-lg border">
+                  <Image
+                    src={settings.portrait.url}
+                    alt={settings.portrait.alt}
+                    fill
+                    sizes="(min-width: 1024px) 26rem, 100vw"
+                    priority
+                    className="object-cover"
+                  />
+                </div>
+              ) : null}
               <dl className="divide-border-subtle border-border-subtle bg-surface-1 flex flex-col divide-y rounded-lg border">
                 {[
                   ['Based in', settings.location],
@@ -119,24 +137,16 @@ export default async function AboutPage() {
         </Container>
       </Section>
 
-      <Section bordered>
+      {/*
+       * The full role history, shipped-work detail included — home's
+       * Experience section used to duplicate this in full (PLAN.md W15
+       * item 6); it now shows a three-role summary and links to this
+       * section's id.
+       */}
+      <Section id="experience" bordered>
         <Container>
           <Eyebrow rule>Timeline</Eyebrow>
-          <ul className="mt-10 flex flex-col">
-            {roles.map((role, i) => (
-              <Reveal as="li" key={`${role.company}-${role.title}`} delay={i * 0.05}>
-                <div className="border-border-subtle flex flex-col gap-1 border-b py-5 sm:flex-row sm:items-baseline sm:gap-8">
-                  <span className="text-2xs text-fg-subtle shrink-0 font-mono sm:w-40">
-                    {role.period}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="text-fg block text-base">{role.title}</span>
-                    <span className="text-fg-muted block text-sm">{role.company}</span>
-                  </span>
-                </div>
-              </Reveal>
-            ))}
-          </ul>
+          <RoleAccordion roles={roles} />
         </Container>
       </Section>
     </>

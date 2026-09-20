@@ -134,7 +134,7 @@ export function Footer({ settings }: { settings: Settings }) {
               <p className="text-fg-muted text-sm">Not taking on new work right now.</p>
             )}
 
-            <dl className="text-2xs mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 font-mono">
+            <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 font-mono text-xs">
               {meta.map(([term, value]) => (
                 <div key={term} className="contents">
                   <dt className="text-fg-subtle">{term}</dt>

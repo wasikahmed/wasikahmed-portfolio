@@ -70,6 +70,7 @@ export function ProjectForm({ project }: { project?: Project }) {
         ...draft,
         metrics: draft.metrics.length ? draft.metrics : [draft.headline],
         links: draft.links?.length ? draft.links : undefined,
+        cover: draft.cover?.url ? draft.cover : undefined,
       };
       if (project) {
         await adminFetchJson(`/api/admin/projects/${project.id}`, {
@@ -141,6 +142,26 @@ export function ProjectForm({ project }: { project?: Project }) {
           value={draft.tagline}
           onChange={(e) => set('tagline', e.target.value)}
         />
+      </Field>
+
+      <Field
+        label="Cover image"
+        htmlFor="cover-url"
+        hint="Optional. Paste a URL copied from the media library — shown on the card and the case study hero."
+      >
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Input
+            id="cover-url"
+            placeholder="https://…"
+            value={draft.cover?.url ?? ''}
+            onChange={(e) => set('cover', { url: e.target.value, alt: draft.cover?.alt ?? '' })}
+          />
+          <Input
+            placeholder="Alt text"
+            value={draft.cover?.alt ?? ''}
+            onChange={(e) => set('cover', { url: draft.cover?.url ?? '', alt: e.target.value })}
+          />
+        </div>
       </Field>
 
       <Field

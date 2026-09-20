@@ -39,7 +39,7 @@ export async function CtaBand() {
             </Button>
           </div>
 
-          <p className="text-2xs text-fg-subtle mt-6 font-mono">
+          <p className="text-fg-subtle mt-6 font-mono text-xs">
             Replies in {settings.responseTime} · {settings.location} · {settings.timezone}
           </p>
         </Reveal>

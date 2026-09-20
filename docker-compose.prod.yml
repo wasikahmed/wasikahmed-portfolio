@@ -28,8 +28,6 @@ services:
       # same MONGO_ROOT_USER/PASSWORD the mongo service below authenticates
       # with, so there is exactly one place to rotate the password.
       MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/portfolio?authSource=admin
-    volumes:
-      - media-uploads:/app/public/uploads
     depends_on:
       mongo:
         condition: service_healthy
@@ -71,4 +69,3 @@ services:
 
 volumes:
   mongo-data:
-  media-uploads:

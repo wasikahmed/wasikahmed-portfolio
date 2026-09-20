@@ -29,9 +29,10 @@ export default function SettingsPage() {
     setError(null);
     setSaved(false);
     try {
+      const payload = { ...draft, portrait: draft.portrait?.url ? draft.portrait : undefined };
       const res = await adminFetchJson<{ item: Settings }>('/api/admin/settings', {
         method: 'PATCH',
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
       setDraft(res.item);
       setSaved(true);
@@ -160,6 +161,30 @@ export default function SettingsPage() {
             />
           </Field>
         </div>
+
+        <Field
+          label="Portrait"
+          htmlFor="portrait-url"
+          hint="Optional. Paste a URL copied from the media library — shown on /about."
+        >
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input
+              id="portrait-url"
+              placeholder="https://…"
+              value={draft.portrait?.url ?? ''}
+              onChange={(e) =>
+                set('portrait', { url: e.target.value, alt: draft.portrait?.alt ?? '' })
+              }
+            />
+            <Input
+              placeholder="Alt text"
+              value={draft.portrait?.alt ?? ''}
+              onChange={(e) =>
+                set('portrait', { url: draft.portrait?.url ?? '', alt: e.target.value })
+              }
+            />
+          </div>
+        </Field>
 
         <Field label="Social links" htmlFor="socials">
           <ObjectArrayEditor

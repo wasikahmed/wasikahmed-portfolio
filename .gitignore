@@ -43,13 +43,11 @@ next-env.d.ts
 # docker
 docker-data/
 
-# media library uploads — local disk in dev; Phase 7 swaps this for S3/R2
-# without changing the Media model, which already only stores a URL.
-# Ignore the contents but not .gitkeep — that placeholder is what keeps
-# public/uploads/ (and therefore public/ itself) present after a fresh
-# checkout. Without it, a clean `git clone` has no public/ directory at
-# all, which is exactly what broke the first CI Docker build: the
-# Dockerfile's `COPY --from=builder /app/public ./public` had nothing to
-# copy.
+# media library uploads — no longer written to (PLAN.md W15 item 1 moved
+# the media library to Cloudinary; see src/server/cloudinary.ts). This
+# directory is otherwise vestigial now, kept only because .gitkeep is what
+# keeps public/uploads/ (and therefore public/ itself, which has nothing
+# else in it) present after a fresh checkout — the Dockerfile's
+# `COPY --from=builder /app/public ./public` needs public/ to exist.
 /public/uploads/*
 !/public/uploads/.gitkeep

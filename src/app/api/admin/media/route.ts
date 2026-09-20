@@ -1,28 +1,18 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { NextResponse, type NextRequest } from 'next/server';
 import probe from 'probe-image-size';
 import { connectToDatabase } from '@/server/db';
 import { requirePermission } from '@/server/resolve-auth';
 import { writeAuditLog } from '@/server/audit';
+import { uploadImage } from '@/server/cloudinary';
 import { Media } from '@/server/models/media';
 import { mediaSchema } from '@/server/schemas';
 import { normalizeDoc } from '@/server/mongo-utils';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 const MAX_SIZE = 8 * 1024 * 1024; // 8MB
-// SVG is deliberately excluded — it's an XHTML document, not a raster format,
-// and uploads are served from the site's own origin (public/uploads), so an
-// SVG with an embedded <script> would execute under an admin session. See
-// PLAN.md W2 item 3.
+// SVG is deliberately excluded — it's an XHTML document, not a raster
+// format, and an SVG with an embedded <script> would execute under
+// whatever origin serves it back. See PLAN.md W2 item 3.
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const EXT_BY_MIME: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-};
 
 export async function GET(request: NextRequest) {
   const { response } = await requirePermission(request, 'media:read');
@@ -61,8 +51,7 @@ export async function POST(request: NextRequest) {
   // extension are both attacker-controlled claims, not facts. probe reads
   // the actual magic bytes, so a mismatch (or an unrecognizable payload
   // wearing an allowed content-type) is rejected outright rather than
-  // stored — the extension used on disk is derived from what probe found,
-  // never from the client-supplied filename.
+  // uploaded anywhere.
   const dimensions = probe.sync(bytes);
   if (!dimensions || !ALLOWED_TYPES.has(dimensions.mime)) {
     return NextResponse.json(
@@ -71,19 +60,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const key = `${randomBytes(12).toString('hex')}${EXT_BY_MIME[dimensions.mime]}`;
-
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, key), bytes);
+  let uploaded;
+  try {
+    uploaded = await uploadImage(bytes, file.name);
+  } catch (err) {
+    console.error('Cloudinary upload failed:', err);
+    return NextResponse.json({ error: 'Upload failed. Try again.' }, { status: 502 });
+  }
 
   await connectToDatabase();
   const created = await Media.create({
-    key,
-    url: `/uploads/${key}`,
+    publicId: uploaded.publicId,
+    url: uploaded.url,
     alt: altResult.data.alt,
-    width: dimensions.width,
-    height: dimensions.height,
-    size: file.size,
+    width: uploaded.width ?? dimensions.width,
+    height: uploaded.height ?? dimensions.height,
+    size: uploaded.bytes,
     contentType: dimensions.mime,
   });
 

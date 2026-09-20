@@ -364,7 +364,7 @@ export function Constellation({ tech }: { tech: Tech[] }) {
 
       <p
         className={cn(
-          'text-2xs text-fg-subtle mt-4 font-mono',
+          'text-fg-subtle mt-4 font-mono text-xs',
           prefersReduced ? '' : 'hidden sm:block',
         )}
       >

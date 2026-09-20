@@ -41,6 +41,10 @@ jobs:
       # scripts/seed-e2e-admin.ts. Also throwaway; never reused anywhere else.
       E2E_ADMIN_EMAIL: e2e-admin@example.com
       E2E_ADMIN_PASSWORD: e2e-admin-password-not-a-secret
+      # Deterministic, pre-accepted-state invite for e2e/invite.spec.ts —
+      # see scripts/seed-e2e-invite.ts. Also throwaway.
+      E2E_INVITE_EMAIL: e2e-invite@example.com
+      E2E_INVITE_TOKEN: e2e-invite-token-not-a-secret
     steps:
       - uses: actions/checkout@v4
 
@@ -67,10 +71,13 @@ jobs:
           ADMIN_EMAIL=${{ env.ADMIN_EMAIL }}
           E2E_ADMIN_EMAIL=${{ env.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD=${{ env.E2E_ADMIN_PASSWORD }}
+          E2E_INVITE_EMAIL=${{ env.E2E_INVITE_EMAIL }}
+          E2E_INVITE_TOKEN=${{ env.E2E_INVITE_TOKEN }}
           EOF
 
       - run: pnpm seed
       - run: pnpm seed:e2e-admin
+      - run: pnpm seed:e2e-invite
 
       - run: pnpm e2e
 

@@ -35,7 +35,14 @@ export default async function ContactPage() {
             </div>
           </div>
 
-          <aside className="flex flex-col gap-8">
+          {/*
+           * Sticky (PLAN.md W15 item 5) — the same `lg:sticky lg:top-28
+           * lg:self-start` pattern Process's left column already uses.
+           * The form to its left grew a field taller once intent stopped
+           * gating the rest of it (item 3); without this the aside ended
+           * well before the form did.
+           */}
+          <aside className="flex flex-col gap-8 lg:sticky lg:top-28 lg:self-start">
             <div>
               <p className="text-2xs text-fg-subtle mb-3 font-mono tracking-widest uppercase">
                 Direct
@@ -75,7 +82,7 @@ export default async function ContactPage() {
                 {settings.available ? 'Available' : 'Booked up'}
               </p>
               <p className="text-fg-muted mt-3 text-sm leading-relaxed">{settings.availableFor}</p>
-              <p className="text-2xs text-fg-subtle mt-4 font-mono">
+              <p className="text-fg-subtle mt-4 font-mono text-xs">
                 Replies in {settings.responseTime} · {settings.timezone}
               </p>
             </div>

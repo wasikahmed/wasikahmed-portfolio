@@ -23,6 +23,18 @@ const nextConfig: NextConfig = {
    * Dev-only setting; it has no effect on production builds.
    */
   allowedDevOrigins: ['127.0.0.1'],
+
+  /*
+   * Media (PLAN.md W15 item 1) is uploaded to Cloudinary, not this app's
+   * own disk — every URL `next/image` is asked to optimize comes back from
+   * `res.cloudinary.com`. Without `remotePatterns`, Next refuses to
+   * optimize any remote image regardless of what CSP allows; proxy.ts's
+   * `img-src` directive is the separate, browser-side half of this same
+   * allowance.
+   */
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com', pathname: '/**' }],
+  },
 };
 
 export default nextConfig;

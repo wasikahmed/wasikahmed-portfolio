@@ -141,17 +141,21 @@ test.describe('Case study', () => {
 });
 
 test.describe('Contact form', () => {
-  test('reveals the rest of the form only after intent is chosen', async ({ page }) => {
+  // PLAN.md W15 item 3 — the form is visible on arrival, intent as its
+  // first field rather than a gate. This still exercises the qualifying
+  // signal (intent) and the project/role-specific fields that follow it.
+  test('renders immediately, with intent switching the project-only fields', async ({ page }) => {
     await page.goto('/contact');
 
-    await expect(page.getByLabel('Email')).toBeHidden();
-    await page.getByRole('button', { name: /A project/ }).click();
-
+    // 'project' is the default — no click needed for the form to be complete.
     await expect(page.getByLabel('Email')).toBeVisible();
-    // Budget is project-specific.
     await expect(page.getByLabel('Rough budget')).toBeVisible();
 
     await page.getByRole('button', { name: /A role/ }).click();
     await expect(page.getByLabel('Rough budget')).toBeHidden();
+    await expect(page.getByLabel('Email')).toBeVisible();
+
+    await page.getByRole('button', { name: /A project/ }).click();
+    await expect(page.getByLabel('Rough budget')).toBeVisible();
   });
 });

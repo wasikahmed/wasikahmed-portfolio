@@ -35,7 +35,7 @@ export async function Voices() {
                     >
                       {t.initials}
                     </span>
-                    <span className="text-2xs text-fg-muted min-w-0">
+                    <span className="text-fg-muted min-w-0 text-xs">
                       <span className="text-fg block truncate">{t.name}</span>
                       <span className="block truncate">
                         {t.title}, {t.company}
@@ -45,7 +45,7 @@ export async function Voices() {
                   {project ? (
                     <Link
                       href={`/work/${project.slug}`}
-                      className="text-2xs text-fg-subtle duration-fast hover:text-accent mt-3 font-mono transition-colors"
+                      className="text-fg-subtle duration-fast hover:text-accent mt-3 font-mono text-xs transition-colors"
                     >
                       → {project.title}
                     </Link>

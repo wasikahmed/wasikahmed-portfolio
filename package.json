@@ -21,7 +21,8 @@
     "seed": "tsx --env-file=.env scripts/seed.ts",
     "seed:dry": "tsx --env-file=.env scripts/seed.ts --dry-run",
     "seed:admin": "tsx --env-file=.env scripts/seed-admin.ts",
-    "seed:e2e-admin": "tsx --env-file=.env scripts/seed-e2e-admin.ts"
+    "seed:e2e-admin": "tsx --env-file=.env scripts/seed-e2e-admin.ts",
+    "seed:e2e-invite": "tsx --env-file=.env scripts/seed-e2e-invite.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -30,6 +31,7 @@
     "@node-rs/argon2": "^2.1.0",
     "@scalar/api-reference-react": "^0.9.66",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "jose": "^6.2.10",
     "mongoose": "^9.9.4",

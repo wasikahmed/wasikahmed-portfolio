@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Project } from '@/lib/types';
 import { ViewTransition } from '@/components/motion/view-transition';
@@ -67,6 +68,25 @@ export function ProjectCard({
         }}
       />
 
+      {/* Cover image, bled to the card's edges — absent means the card
+          reads exactly as it did before this existed (PLAN.md W15 item 1). */}
+      {project.cover ? (
+        <div
+          className={cn(
+            'bg-surface-2 relative -mx-6 -mt-6 mb-5 aspect-video overflow-hidden',
+            feature ? 'sm:-mx-8 sm:-mt-8' : '',
+          )}
+        >
+          <Image
+            src={project.cover.url}
+            alt={project.cover.alt}
+            fill
+            sizes="(min-width: 640px) 50vw, 100vw"
+            className="duration-base object-cover transition-transform group-hover:scale-[1.03]"
+          />
+        </div>
+      ) : null}
+
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <ViewTransition name={`project-title-${project.slug}`}>
@@ -88,6 +108,15 @@ export function ProjectCard({
         </div>
 
         <p className="text-fg-muted mt-2 text-sm">{project.tagline}</p>
+
+        {/*
+         * Role/timeline/categories (PLAN.md W15 item 2) — previously known
+         * only from the case study. One quiet meta line is enough; the
+         * numbers below already carry the card's visual weight.
+         */}
+        <p className="text-2xs text-fg-subtle mt-2 font-mono tracking-wide uppercase">
+          {project.categories.join(' · ')} — {project.role}, {project.timeline}
+        </p>
 
         {/*
          * Progressive disclosure is for the small tiles, where hiding the
@@ -133,7 +162,7 @@ export function ProjectCard({
                   {metric.value}
                 </dd>
                 {metric.baseline ? (
-                  <dd className="text-2xs text-fg-subtle mt-0.5 font-mono">{metric.baseline}</dd>
+                  <dd className="text-fg-subtle mt-0.5 font-mono text-xs">{metric.baseline}</dd>
                 ) : null}
               </div>
             ))}

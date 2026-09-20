@@ -23,6 +23,7 @@ a Cloudflare Tunnel.
 | Validation  | Zod 4                                                         |
 | Motion      | `motion` v13 (Framer Motion's successor)                      |
 | Content     | MDX via `next-mdx-remote-client`, Shiki highlighting          |
+| Media       | Cloudinary (`src/server/cloudinary.ts`), one folder per app   |
 | Package mgr | pnpm 11.8.0 (pinned via `packageManager`)                     |
 | Runtime     | Node 22 in Docker                                             |
 
@@ -62,6 +63,24 @@ no-TOTP admin account for exercising the real login → create → publish →
 delete pipeline. It `test.skip`s itself cleanly if that account was never
 seeded, so skipping this step just means that one file no-ops rather than
 failing the whole suite.
+
+`e2e/invite.spec.ts` (PLAN.md W14 item 6) needs `pnpm seed:e2e-invite` run
+first (with `E2E_INVITE_EMAIL`/`E2E_INVITE_TOKEN` set in `.env`) — same
+`test.skip`-if-unseeded convention. It seeds a `status: 'invited'` viewer
+directly rather than driving `/admin/users` (the real invite token only
+ever leaves the server inside an emailed link — see
+`scripts/seed-e2e-invite.ts`'s own comment), then exercises the real
+accept-invite → login → permission-ceiling round trip.
+
+If your `.env` has real Cloudflare Turnstile keys configured (rather than
+the always-pass test keys `.env.example` recommends for local dev),
+`e2e/invite.spec.ts` will fail locally on the accept-invite step with
+"Verification failed" — Turnstile is only skipped server-side when
+`TURNSTILE_SECRET_KEY` is unset (`src/server/turnstile.ts`), and a
+headless Playwright run can't solve a real challenge. `e2e.yml`'s CI job
+doesn't set that var, so this is a local-only wrinkle, not a real failure —
+swap in the test keys, or run `TURNSTILE_SECRET_KEY= pnpm e2e` for that one
+file.
 
 **Docker dev stack** (Mongo + mongo-express + hot reload):
 
@@ -329,12 +348,17 @@ means production is safe, not that the push was good. To roll back to some
 _other_ tag manually: SSH in, set `IMAGE_TAG` in `.env`, re-run pull + up.
 
 **Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
-backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump` plus a
-tarball of the `media-uploads` volume, both dated and rotated locally under
-`$DEPLOY_PATH/backups` (default 7-day retention). Local retention only,
-deliberately, decided 2026-08-30 (PLAN.md W4) — it protects against a bad
-migration or an admin-CMS mistake, not against losing the VPS itself. Revisit
-shipping these off-box as its own task if that risk becomes worth carrying.
+backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump`,
+dated and rotated locally under `$DEPLOY_PATH/backups` (default 7-day
+retention). Local retention only, deliberately, decided 2026-08-30
+(PLAN.md W4) — it protects against a bad migration or an admin-CMS
+mistake, not against losing the VPS itself. Media no longer needs a
+local-volume backup of its own (PLAN.md W15 item 1 moved it to
+Cloudinary — off-box and versioned on its own, on an account this app
+never has write access outside its own folder in). Mongo is the one
+thing left with only a local copy; revisit shipping that off-box (e.g.
+rclone to an S3-compatible bucket) as its own task if that risk becomes
+worth carrying.
 
 ---
 
@@ -382,3 +406,21 @@ live" only means what it says if it was checked against the actual
 production runtime, not the dev server — the two diverge exactly on static
 vs. dynamic rendering and on `HOSTNAME=0.0.0.0` binding behavior, neither of
 which is visible from reading source.
+
+**Everything PLAN.md's 2026-09-20 forward plan listed is now implemented**
+(same day) — the one remaining test (PLAN.md W14 item 6, the invitation
+round trip), the whole W15 design pass, and the media library's move to
+Cloudinary. Full gate (`typecheck`/`lint`/`format:check`/`test`/`build`)
+and the entire `pnpm e2e` suite pass locally. Cloudinary is configured and
+verified in dev — a real image was uploaded and deleted through
+`/admin/media` against the live account, confirmed both in Cloudinary's own
+Admin API and in the browser, not just assumed from the code (see PLAN.md's
+Cloudinary section for the one permission hiccup that surfaced and how it
+was fixed). **None of it is deployed yet** — per the lesson two paragraphs
+up, that only gets claimed once it's been checked against the running
+production container, not before. Two things still need a person, not
+code, before that can happen: the same Cloudinary credentials added to
+GitHub Actions (dev has them, production doesn't yet) and the production
+owner-role migration (needs an interactive Cloudflare Access SSH session
+and a password only the person running it should see — see PLAN.md's
+housekeeping section).

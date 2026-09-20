@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Section, Container } from '@/components/ui/section';
@@ -85,6 +86,21 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           </ViewTransition>
 
           <p className="text-fg-muted mt-4 max-w-xl text-lg text-pretty">{project.tagline}</p>
+
+          {/* Absent means the hero reads exactly as it did before cover
+              images existed (PLAN.md W15 item 1). */}
+          {project.cover ? (
+            <div className="border-border-subtle bg-surface-1 relative mt-8 aspect-video overflow-hidden rounded-lg border">
+              <Image
+                src={project.cover.url}
+                alt={project.cover.alt}
+                fill
+                sizes="(min-width: 1024px) 46rem, 100vw"
+                priority
+                className="object-cover"
+              />
+            </div>
+          ) : null}
         </Container>
       </Section>
 

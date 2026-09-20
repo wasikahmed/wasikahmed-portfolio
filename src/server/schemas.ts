@@ -50,6 +50,19 @@ export const seoSchema = z.object({
   ogImage: z.string().optional(),
 });
 
+/**
+ * A picked image, pasted in from the media library's "Copy URL" action
+ * (PLAN.md W15 item 1) — the same shallow reference pattern `seoSchema`'s
+ * `ogImage` already used, just paired with the alt text every image on the
+ * public site needs. Not a live reference to a `Media` document: deleting
+ * the underlying upload doesn't cascade here, same trade-off `ogImage`
+ * already made.
+ */
+export const mediaRefSchema = z.object({
+  url: z.string().url(),
+  alt: z.string().min(1),
+});
+
 const publishFields = {
   status: statusSchema.default('draft'),
   publishedAt: z.string().datetime().optional(),
@@ -72,6 +85,7 @@ export const projectSchema = z.object({
   timeline: z.string().min(1),
   year: z.number().int().min(2000).max(2100),
   accent: z.string().min(1),
+  cover: mediaRefSchema.optional(),
   architecture: z.array(architectureNodeSchema).min(1),
   sections: z.array(caseStudySectionSchema).min(1),
   links: z.array(linkSchema).optional(),
@@ -180,6 +194,7 @@ export const settingsSchema = z.object({
   availableFor: z.string().min(1),
   responseTime: z.string().min(1),
   socials: z.array(linkSchema),
+  portrait: mediaRefSchema.optional(),
 });
 
 /** The public submission contract for POST /api/contact. */

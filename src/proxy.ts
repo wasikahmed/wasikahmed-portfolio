@@ -86,7 +86,11 @@ function buildCsp(nonce: string): string {
     `default-src 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data:`,
+    // https://res.cloudinary.com — every uploaded image (PLAN.md W15 item
+    // 1) is served from there now, not this origin. next.config.ts's
+    // `images.remotePatterns` is the separate, build-time half of this
+    // same allowance.
+    `img-src 'self' data: https://res.cloudinary.com`,
     `font-src 'self'`,
     `connect-src ${connectSrc}`,
     `frame-src https://challenges.cloudflare.com`,

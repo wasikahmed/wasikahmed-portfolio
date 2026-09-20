@@ -92,7 +92,7 @@ export function Metric({ value, label, baseline, className }: MetricProps) {
 
       {baseline ? (
         <motion.span
-          className="text-2xs text-accent mt-1 font-mono"
+          className="text-accent mt-1 font-mono text-xs"
           initial={{ opacity: 0, y: 4 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.5 }}

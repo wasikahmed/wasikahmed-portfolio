@@ -3,13 +3,15 @@
 # "Install the backup cron job" step (see .github/workflows/deploy.yml) — it
 # is not part of the Docker image and is never invoked from CI directly.
 #
-# Local retention only (PLAN.md W4, decided 2026-08-30): dumps mongo and
-# tars the uploads volume into dated files under $DEPLOY_PATH/backups,
-# rotating anything older than $RETENTION_DAYS. This protects against a bad
-# migration, a fat-fingered admin-CMS delete, or database corruption — NOT
-# against losing the VPS itself, since nothing here leaves the box. Revisit
-# shipping these off-box (e.g. via rclone to an S3-compatible bucket) as its
-# own task if that risk becomes worth carrying.
+# Local retention only (PLAN.md W4, decided 2026-08-30): dumps mongo into a
+# dated file under $DEPLOY_PATH/backups, rotating anything older than
+# $RETENTION_DAYS. This protects against a bad migration, a fat-fingered
+# admin-CMS delete, or database corruption — NOT against losing the VPS
+# itself, since nothing here leaves the box. Revisit shipping this off-box
+# (e.g. via rclone to an S3-compatible bucket) as its own task if that risk
+# becomes worth carrying (PLAN.md housekeeping item 4 — media no longer
+# needs this: it moved to Cloudinary, PLAN.md W15 item 1, which is already
+# off-box and versioned on its own).
 #
 # Requires the same .env this compose project already runs with — reads
 # MONGO_ROOT_USER/MONGO_ROOT_PASSWORD from it rather than duplicating them.
@@ -38,14 +40,7 @@ docker compose -p portfolio -f docker-compose.prod.yml exec -T mongo \
   --archive --gzip \
   > "$BACKUP_DIR/mongo-$STAMP.archive.gz"
 
-# --- Uploads: tar the named volume's contents via a disposable container -----
-docker run --rm \
-  -v portfolio_media-uploads:/uploads:ro \
-  -v "$BACKUP_DIR":/backups \
-  alpine \
-  tar czf "/backups/uploads-$STAMP.tar.gz" -C /uploads .
-
 # --- Rotate --------------------------------------------------------------
 find "$BACKUP_DIR" -type f -mtime "+$RETENTION_DAYS" -delete
 
-echo "Backup complete: $BACKUP_DIR/{mongo,uploads}-$STAMP.*"
+echo "Backup complete: $BACKUP_DIR/mongo-$STAMP.archive.gz"

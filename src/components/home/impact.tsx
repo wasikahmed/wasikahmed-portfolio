@@ -31,7 +31,7 @@ export async function Impact() {
                 label={project.headline.label}
                 baseline={project.headline.baseline}
               />
-              <p className="border-border-subtle text-2xs text-fg-subtle mt-3 border-t pt-3 font-mono">
+              <p className="border-border-subtle text-fg-subtle mt-3 border-t pt-3 font-mono text-xs">
                 {project.title}
               </p>
             </Reveal>

@@ -43,6 +43,11 @@ const seoSchema = new Schema(
   { _id: false },
 );
 
+const mediaRefSchema = new Schema(
+  { url: { type: String, required: true }, alt: { type: String, required: true } },
+  { _id: false },
+);
+
 const projectSchema = new Schema(
   {
     slug: { type: String, required: true, unique: true, index: true },
@@ -61,6 +66,7 @@ const projectSchema = new Schema(
     timeline: { type: String, required: true },
     year: { type: Number, required: true },
     accent: { type: String, required: true },
+    cover: { type: mediaRefSchema, default: undefined },
     architecture: { type: [architectureNodeSchema], required: true },
     sections: { type: [caseStudySectionSchema], required: true },
     links: { type: [linkSchema], default: undefined },

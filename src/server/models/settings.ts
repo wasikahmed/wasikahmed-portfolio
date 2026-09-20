@@ -5,6 +5,11 @@ const linkSchema = new Schema(
   { _id: false },
 );
 
+const mediaRefSchema = new Schema(
+  { url: { type: String, required: true }, alt: { type: String, required: true } },
+  { _id: false },
+);
+
 /**
  * Singleton — always exactly one document, found/updated by this fixed id
  * rather than a query. `findSettings()` / `upsertSettings()` in queries.ts
@@ -28,6 +33,7 @@ const settingsSchema = new Schema(
     availableFor: { type: String, required: true },
     responseTime: { type: String, required: true },
     socials: { type: [linkSchema], default: [] },
+    portrait: { type: mediaRefSchema, default: undefined },
   },
   { timestamps: true },
 );

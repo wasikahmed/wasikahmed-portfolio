@@ -35,6 +35,12 @@ export interface Seo {
   ogImage?: string;
 }
 
+/** A picked image — a URL from the media library plus the alt text it needs. */
+export interface MediaRef {
+  url: string;
+  alt: string;
+}
+
 export interface Project {
   /** Mongo's `_id`, as a string — the stable key admin CRUD targets. */
   id: string;
@@ -53,6 +59,8 @@ export interface Project {
   timeline: string;
   year: number;
   accent: string;
+  /** Hero/card image (PLAN.md W15 item 1). Absent renders exactly as before. */
+  cover?: MediaRef;
   architecture: ArchitectureNode[];
   sections: CaseStudySection[];
   /** Optional external links. Absent means "not public", not "missing". */
@@ -134,11 +142,13 @@ export interface Settings {
   availableFor: string;
   responseTime: string;
   socials: { label: string; href: string }[];
+  /** /about's portrait (PLAN.md W15 item 1). Absent renders exactly as before. */
+  portrait?: MediaRef;
 }
 
 export interface Media {
   id: string;
-  key: string;
+  publicId: string;
   url: string;
   alt: string;
   width?: number;
