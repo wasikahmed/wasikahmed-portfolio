@@ -6,6 +6,7 @@ const roleSchema = new Schema(
     company: { type: String, required: true },
     period: { type: String, required: true },
     type: { type: String, required: true },
+    summary: { type: String },
     shipped: { type: [String], required: true },
     order: { type: Number, default: 0 },
   },

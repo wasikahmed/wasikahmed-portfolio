@@ -12,6 +12,8 @@ export const roles: Omit<Role, 'id'>[] = [
     company: 'Advergo Sports & Fashion Wear Ltd.',
     period: 'Jul 2026 — Present',
     type: 'Freelance · Remote',
+    summary:
+      'Sixty-five endpoints carrying both bespoke B2B orders and off-the-shelf retail, with 244 tests guarding every push.',
     shipped: [
       'Sole backend engineer on a live B2B custom-order and B2C retail system (advergo.org), built with Django, Next.js and PostgreSQL',
       'Designed a modular Django backend of 65 REST endpoints and a quote-to-invoice flow with automated PDF generation',
@@ -26,6 +28,8 @@ export const roles: Omit<Role, 'id'>[] = [
     company: 'Factoryze Technologies Limited',
     period: 'May 2026 — Present',
     type: 'Internship · Hybrid',
+    summary:
+      'An LLM pipeline that sorts a property manager’s inbox into eight categories and drafts the replies — a person still sends them.',
     shipped: [
       'Automated short-term-rental guest onboarding in n8n across Jurny, Autohost, Monday.com and QuickBooks',
       'Built LLM-based email triage for Gmail and Outlook, sorting a property manager’s inbox into 8 categories',
@@ -38,6 +42,8 @@ export const roles: Omit<Role, 'id'>[] = [
     company: 'Join Venture AI',
     period: 'Dec 2025 — Feb 2026',
     type: 'Full-time · On-site',
+    summary:
+      'The backend behind a live football app with 10,000+ installs, pushing match data to every open client every fifteen seconds.',
     shipped: [
       'Sole backend engineer for ScoreLivePro, a live football app on Google Play (10K+ downloads) and the App Store',
       'Implemented live updates that sync match data every 15 seconds via Celery, pushed over WebSockets and Firebase',
@@ -55,6 +61,8 @@ export const roles: Omit<Role, 'id'>[] = [
        padding. */
     period: 'May 2025 — Nov 2025',
     type: 'Intern → Junior Engineer · On-site',
+    summary:
+      'A clinic desktop app that runs entirely offline, and the sync engine that reconciles it with the cloud on reconnect.',
     shipped: [
       'Co-built Neeramoy, an Angular + Electron desktop app that lets doctors run a clinic fully offline',
       'Designed its SQLite data layer and sync engine, reconciling offline records with the cloud on reconnect',
@@ -68,6 +76,8 @@ export const roles: Omit<Role, 'id'>[] = [
     company: 'American International University-Bangladesh (AIUB)',
     period: 'May 2022 — Present',
     type: 'Education · Major in Information Systems',
+    summary:
+      'Computer Science with a major in Information Systems, read alongside two years of full-time engineering work.',
     shipped: [
       'Major in Information Systems',
       'Worked professionally as a software engineer throughout the final two years of the degree',

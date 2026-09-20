@@ -178,6 +178,7 @@ export const roleSchema = z.object({
   company: z.string().min(1),
   period: z.string().min(1),
   type: z.string().min(1),
+  summary: z.string().optional(),
   shipped: z.array(z.string().min(1)).min(1),
   order: z.number().int().default(0),
 });

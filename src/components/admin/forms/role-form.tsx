@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Field, Input } from '@/components/ui/field';
+import { Field, Input, Textarea } from '@/components/ui/field';
 import { StringList } from '@/components/admin/string-list';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { FormShell } from '@/components/admin/form-shell';
@@ -99,6 +99,18 @@ export function RoleForm({ role }: { role?: Role }) {
           />
         </Field>
       </div>
+      <Field
+        label="Summary"
+        htmlFor="summary"
+        hint="One sentence for the home page. Do not restate the job title — it is printed directly above this."
+      >
+        <Textarea
+          id="summary"
+          rows={2}
+          value={draft.summary ?? ''}
+          onChange={(e) => set('summary', e.target.value)}
+        />
+      </Field>
       <Field label="What I shipped" htmlFor="shipped">
         <StringList value={draft.shipped} onChange={(v) => set('shipped', v)} />
       </Field>

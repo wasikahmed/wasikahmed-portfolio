@@ -63,9 +63,13 @@ export function Experience({ roles }: { roles: Role[] }) {
                   {role.title}
                 </h3>
                 <p className="text-fg-muted mt-1 text-sm">{role.company}</p>
-                {role.shipped[0] ? (
+                {/* Falls back to the first CV bullet so a role added
+                    through the admin without a summary still renders —
+                    that is exactly how this read before the field
+                    existed, not a broken state. */}
+                {(role.summary ?? role.shipped[0]) ? (
                   <p className="text-fg-subtle mt-3 max-w-xl text-sm leading-relaxed text-pretty">
-                    {role.shipped[0]}
+                    {role.summary ?? role.shipped[0]}
                   </p>
                 ) : null}
               </div>
