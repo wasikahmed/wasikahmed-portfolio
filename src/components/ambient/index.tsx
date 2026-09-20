@@ -11,7 +11,7 @@ import { cn } from '@/lib/cn';
  * All of these are static. None loop. `blob` is the single exception and it
  * drifts on a 20s cycle that the reduced-motion kill switch stops dead.
  */
-export type AmbientKind = 'grid' | 'noise' | 'blob' | 'dots';
+export type AmbientKind = 'grid' | 'noise' | 'blob' | 'dots' | 'scanlines' | 'hatch' | 'guides';
 
 /** 48px emerald grid. A spatial anchor — use where the page needs structure. */
 export function GridTexture({ className }: { className?: string }) {
@@ -83,11 +83,102 @@ export function DotMatrix({ className }: { className?: string }) {
   );
 }
 
+/**
+ * Horizontal hairlines, 5px apart, masked to fade at the top and bottom
+ * edges so the band has no hard seam against the section above it.
+ *
+ * The quietest of the textures: at 3% accent it reads as a tone rather
+ * than as lines, which is the point — it gives a section a surface
+ * without competing with type set on top of it.
+ */
+export function Scanlines({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn('pointer-events-none absolute inset-0', className)}
+      style={{
+        backgroundImage: `repeating-linear-gradient(
+          to bottom,
+          color-mix(in oklab, var(--color-accent) 3%, transparent) 0px,
+          color-mix(in oklab, var(--color-accent) 3%, transparent) 1px,
+          transparent 1px,
+          transparent 5px
+        )`,
+        maskImage: 'linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent)',
+      }}
+    />
+  );
+}
+
+/**
+ * 45° hatch, weighted to the right edge.
+ *
+ * Deliberately not centred and not full-bleed: a full-width diagonal
+ * fights the reading direction of everything on top of it. Held to one
+ * edge it behaves like a margin mark on a technical drawing.
+ */
+export function Hatch({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn('pointer-events-none absolute inset-0', className)}
+      style={{
+        backgroundImage: `repeating-linear-gradient(
+          45deg,
+          color-mix(in oklab, var(--color-accent) 7%, transparent) 0px,
+          color-mix(in oklab, var(--color-accent) 7%, transparent) 1px,
+          transparent 1px,
+          transparent 11px
+        )`,
+        maskImage: 'linear-gradient(to left, #000, transparent 42%)',
+      }}
+    />
+  );
+}
+
+/**
+ * Vertical rules on the container's own edges — the layout grid, made
+ * faintly visible.
+ *
+ * Positioned with the same max-width and padding `Container` uses, so the
+ * lines land exactly where the content column starts and ends rather than
+ * near it. That alignment is the whole effect; a rule a few pixels off
+ * reads as a mistake instead of as structure.
+ */
+export function Guides({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={cn('pointer-events-none absolute inset-0 px-6 lg:px-10', className)}
+    >
+      <div className="relative mx-auto h-full w-full max-w-[1280px]">
+        <span
+          className="absolute inset-y-0 left-0 w-px"
+          style={{
+            background:
+              'linear-gradient(to bottom, transparent, color-mix(in oklab, var(--color-accent) 12%, transparent) 20%, color-mix(in oklab, var(--color-accent) 12%, transparent) 80%, transparent)',
+          }}
+        />
+        <span
+          className="absolute inset-y-0 right-0 w-px"
+          style={{
+            background:
+              'linear-gradient(to bottom, transparent, color-mix(in oklab, var(--color-accent) 12%, transparent) 20%, color-mix(in oklab, var(--color-accent) 12%, transparent) 80%, transparent)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 const REGISTRY: Record<AmbientKind, (props: { className?: string }) => React.ReactElement> = {
   grid: GridTexture,
   noise: NoiseTexture,
   blob: Blob,
   dots: DotMatrix,
+  scanlines: Scanlines,
+  hatch: Hatch,
+  guides: Guides,
 };
 
 export function AmbientLayer({ kind }: { kind: AmbientKind }) {
