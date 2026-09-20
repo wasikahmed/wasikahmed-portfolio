@@ -5,22 +5,27 @@ import { Reveal } from '@/components/motion/reveal';
 import type { Role } from '@/lib/types';
 
 /**
- * Three-role summary (PLAN.md W15 item 6).
+ * The whole timeline, one line each.
  *
- * This page and /about used to render the same full role history —
- * home's version even the richer of the two, with an expand-for-detail
- * accordion /about didn't have. Redundant, and a large share of why the
- * home page ran to a ~7,500px mobile scroll. /about now owns the full
- * timeline (`RoleAccordion`, with the shipped-work detail this section
- * used to show); this keeps only the headline of it, plus a way there.
+ * This used to show only the first three (PLAN.md W15 item 6). That cap
+ * was introduced when home rendered the full role history as an
+ * expand-for-detail accordion — richer than /about's own copy of it, and
+ * a large share of why the page ran to a ~7,500px mobile scroll. Cutting
+ * to three fixed a real problem with the format of the time.
  *
- * `roles` arrives already sorted by `order` ascending (queries.ts's
- * `getRoles()`) — the first three are the current/most recent ones, not
- * an arbitrary slice.
+ * The format is now one compact line per role, so a row costs ~153px and
+ * the whole list costs less than the accordion did at three. Keeping the
+ * cap would hide two of five entries — including the offline sync engine
+ * and the published npm SDK — behind a click, to save about 3% of page
+ * height. Not a trade worth making on the one section a recruiter
+ * actually scans.
+ *
+ * /about still owns the detail: `RoleAccordion` there carries the full
+ * shipped-work bullets, which is what "Full experience" links to.
+ *
+ * `roles` arrives sorted by `order` ascending (queries.ts's `getRoles()`).
  */
 export function Experience({ roles }: { roles: Role[] }) {
-  const featured = roles.slice(0, 3);
-
   return (
     <Section id="experience" bordered band ambient={['dots']}>
       <Container>
@@ -31,8 +36,10 @@ export function Experience({ roles }: { roles: Role[] }) {
               Where I&apos;ve built.
             </h2>
           </div>
+          {/* Not "Full experience" any more — the full list is right here.
+              What /about adds is the shipped-work detail behind each row. */}
           <Button href="/about#experience" variant="ghost" className="group">
-            Full experience
+            Full detail
             <ArrowRight />
           </Button>
         </div>
@@ -47,7 +54,7 @@ export function Experience({ roles }: { roles: Role[] }) {
          * has one list idiom rather than two.
          */}
         <ol className="mt-12 flex flex-col">
-          {featured.map((role, i) => (
+          {roles.map((role, i) => (
             <Reveal
               as="li"
               key={`${role.company}-${role.title}`}
