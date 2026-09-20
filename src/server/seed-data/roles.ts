@@ -70,6 +70,7 @@ export const roles: Omit<Role, 'id'>[] = [
   {
     title: 'B.Sc. in Computer Science & Engineering',
     company: 'American International University-Bangladesh (AIUB)',
+    kind: 'education',
     period: 'May 2022 — Present',
     type: 'Education · Major in Information Systems',
     summary: 'Information Systems major · alongside full-time engineering work',

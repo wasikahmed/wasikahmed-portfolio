@@ -26,6 +26,8 @@ import type { Role } from '@/lib/types';
  * `roles` arrives sorted by `order` ascending (queries.ts's `getRoles()`).
  */
 export function Experience({ roles }: { roles: Role[] }) {
+  const work = roles.filter((role) => role.kind !== 'education');
+
   return (
     <Section id="experience" bordered band ambient={['dots']}>
       <Container>
@@ -54,7 +56,7 @@ export function Experience({ roles }: { roles: Role[] }) {
          * has one list idiom rather than two.
          */}
         <ol className="mt-12 flex flex-col">
-          {roles.map((role, i) => (
+          {work.map((role, i) => (
             <Reveal
               as="li"
               key={`${role.company}-${role.title}`}

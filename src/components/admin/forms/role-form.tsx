@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Field, Input, Textarea } from '@/components/ui/field';
+import { Field, Input, Textarea, Select } from '@/components/ui/field';
 import { StringList } from '@/components/admin/string-list';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { FormShell } from '@/components/admin/form-shell';
@@ -11,7 +11,14 @@ import type { Role } from '@/lib/types';
 
 type Draft = Omit<Role, 'id' | 'order'>;
 
-const EMPTY: Draft = { title: '', company: '', period: '', type: 'Full-time', shipped: [''] };
+const EMPTY: Draft = {
+  title: '',
+  company: '',
+  period: '',
+  type: 'Full-time',
+  kind: 'work',
+  shipped: [''],
+};
 
 export function RoleForm({ role }: { role?: Role }) {
   const router = useRouter();
@@ -99,6 +106,20 @@ export function RoleForm({ role }: { role?: Role }) {
           />
         </Field>
       </div>
+      <Field
+        label="Kind"
+        htmlFor="kind"
+        hint="Education is kept off the home page's Experience list and shown only in /about's timeline."
+      >
+        <Select
+          id="kind"
+          value={draft.kind ?? 'work'}
+          onChange={(e) => set('kind', e.target.value as Role['kind'])}
+        >
+          <option value="work">Work</option>
+          <option value="education">Education</option>
+        </Select>
+      </Field>
       <Field
         label="Summary"
         htmlFor="summary"

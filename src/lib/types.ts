@@ -108,6 +108,20 @@ export interface Role {
   period: string;
   type: string;
   /**
+   * What this entry is, which decides where it appears.
+   *
+   * /about's timeline shows everything interleaved by date; home's
+   * "Where I've built." section shows only work, because a university is
+   * not somewhere you built anything. Discriminating on this rather than
+   * on the free-text `type` field matters: `type` is edited in the admin,
+   * so renaming "Education · …" to "Degree · …" would silently put the
+   * degree back on the home page with nothing to catch it.
+   *
+   * Optional, defaulting to 'work', so every role written before this
+   * existed keeps rendering exactly where it did.
+   */
+  kind?: 'work' | 'education';
+  /**
    * The one line home's Experience list shows for this role.
    *
    * Separate from `shipped` on purpose. A CV bullet is scanned inside a
