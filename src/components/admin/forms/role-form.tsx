@@ -102,7 +102,7 @@ export function RoleForm({ role }: { role?: Role }) {
       <Field
         label="Summary"
         htmlFor="summary"
-        hint="One sentence for the home page. Do not restate the job title — it is printed directly above this."
+        hint="The home page line. Short fragments separated by · — keep it to one line, lead with a number, and do not restate the job title printed above it."
       >
         <Textarea
           id="summary"

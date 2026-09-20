@@ -108,12 +108,16 @@ export interface Role {
   period: string;
   type: string;
   /**
-   * One sentence for home's Experience list, written to stand alone.
+   * The one line home's Experience list shows for this role.
    *
    * Separate from `shipped` on purpose. A CV bullet is scanned inside a
-   * list under a heading, so it can restate the role and list tools; the
-   * single line representing a job on the home page cannot — it sits
-   * directly under the title it would otherwise repeat. Optional: absent
+   * list under a heading, so it can restate the role and name its tools;
+   * the single line representing a job on the home page cannot — it sits
+   * directly under the title it would otherwise repeat.
+   *
+   * Written as middot-separated fragments rather than prose: at this size
+   * a full sentence wraps to two lines and the section reads heavy, while
+   * the fragments keep the numbers and stay on one. Optional — absent
    * falls back to the first `shipped` entry, which is how this rendered
    * before the field existed.
    */
