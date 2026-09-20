@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // esbuild's bundled seed scripts (pnpm build:scripts) — generated
+    // output, not source, and gitignored. Linting them reported 152
+    // warnings from inside bundled dependencies.
+    'dist-scripts/**',
   ]),
 ]);
 

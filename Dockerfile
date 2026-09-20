@@ -31,6 +31,16 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
+# The seed scripts, bundled to single-file ESM so they can run in the
+# runner image. That image has no pnpm, no tsx and no src/ — it is
+# `next build`'s standalone output plus static assets — so `pnpm seed`
+# cannot work there, which matters because a fresh deploy against an
+# empty database has no content and, more importantly, no way to create
+# the owner account and log in. mongoose and @node-rs/argon2 stay
+# external: both are traced into the standalone node_modules already, and
+# argon2 is a native binary that must not be bundled.
+RUN pnpm build:scripts
+
 # ---- runner: the actual production image ------------------------------------
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -49,6 +59,7 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/dist-scripts ./dist-scripts
 
 USER nextjs
 EXPOSE 3000

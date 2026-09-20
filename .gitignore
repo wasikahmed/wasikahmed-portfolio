@@ -51,3 +51,4 @@ docker-data/
 # `COPY --from=builder /app/public ./public` needs public/ to exist.
 /public/uploads/*
 !/public/uploads/.gitkeep
+dist-scripts/

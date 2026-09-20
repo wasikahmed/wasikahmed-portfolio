@@ -44,6 +44,7 @@ pnpm format:check       # prettier --check .
 pnpm seed               # Upsert seed content into Mongo (idempotent)
 pnpm seed:dry           # Validate seed data against Zod, write nothing
 pnpm seed:admin         # Create/reset the single admin account, prints password once
+pnpm build:scripts      # Bundle the seed scripts to dist-scripts/*.mjs (see §10)
 ```
 
 **Before every push to `main`** run the full gate — CI does **not** run it:
@@ -346,6 +347,37 @@ the outgoing `IMAGE_TAG` before overwriting `.env` and restores it if the new
 image never goes healthy) — the job still fails either way, since a rollback
 means production is safe, not that the push was good. To roll back to some
 _other_ tag manually: SSH in, set `IMAGE_TAG` in `.env`, re-run pull + up.
+
+**Seeding production.** The runner image cannot run `pnpm seed`. It is
+`next build`'s standalone output plus static assets — there is no pnpm on
+PATH (the runner stage is `FROM node:22-alpine`, not the `base` stage that
+enables corepack), no `tsx` (a devDependency), and no `scripts/` or `src/`.
+`pnpm build:scripts` therefore bundles `seed.ts` and `seed-admin.ts` into
+single-file ESM with esbuild, and the Dockerfile copies the result to
+`/app/dist-scripts`. `mongoose` and `@node-rs/argon2` stay external —
+both are already traced into the standalone `node_modules`, and argon2 is
+a native binary that must not be bundled.
+
+On a database that starts empty — a fresh volume — nothing else will
+populate it, and without the second command there is no account to log in
+with:
+
+```bash
+cd $DEPLOY_PATH
+docker compose -p portfolio -f docker-compose.prod.yml exec web node dist-scripts/seed.mjs
+docker compose -p portfolio -f docker-compose.prod.yml exec web node dist-scripts/seed-admin.mjs
+```
+
+`MONGODB_URI` comes from the compose environment and `ADMIN_EMAIL` from
+`.env`, so neither needs arguments; pass an email to `seed-admin.mjs` to
+override it. Both are idempotent, so re-running converges rather than
+duplicating — but `seed-admin.mjs` resets the password and prints the new
+one once, so only run it when you intend that.
+
+Note `pnpm seed` **upserts and never deletes** (scripts/seed.ts). Against
+a database that already holds superseded content, it adds the new
+documents alongside the old ones rather than replacing them; the only
+clean states are an empty volume or deleting the stale records yourself.
 
 **Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
 backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump`,

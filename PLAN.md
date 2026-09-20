@@ -38,8 +38,17 @@ what's left.
    Once connected:
 
    ```bash
-   cd <DEPLOY_PATH> && docker compose -p portfolio -f docker-compose.prod.yml exec web pnpm seed:admin
+   cd <DEPLOY_PATH> && docker compose -p portfolio -f docker-compose.prod.yml \
+     exec web node dist-scripts/seed-admin.mjs
    ```
+
+   **This command used to read `pnpm seed:admin` and could never have
+   worked.** The runner image is `next build`'s standalone output plus
+   static assets — no pnpm on PATH, no `tsx`, no `scripts/`, no `src/`.
+   The seed scripts are now bundled to single-file ESM at build time and
+   copied into the image, which is what `dist-scripts/*.mjs` is. It reads
+   `MONGODB_URI` from the compose environment and `ADMIN_EMAIL` from
+   `.env`; pass an email as an argument to override.
 
    Idempotent by email, doubles as the migration PLAN.md W9 always said it
    would be. **Side effect:** resets the password and prints the new one
