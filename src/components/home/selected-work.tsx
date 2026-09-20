@@ -22,7 +22,7 @@ export async function SelectedWork() {
   const countCapitalized = count.charAt(0).toUpperCase() + count.slice(1);
 
   return (
-    <Section id="work" bordered ambient={['grid']}>
+    <Section id="work" bordered band ambient={['grid']}>
       <Container>
         <Reveal>
           <div className="flex flex-wrap items-end justify-between gap-6">

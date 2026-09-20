@@ -31,6 +31,15 @@ export interface SectionProps extends React.HTMLAttributes<HTMLElement> {
   ambient?: AmbientBudget;
   /** Hairline rule along the top edge. */
   bordered?: boolean;
+  /**
+   * Raise the section onto `surface-1` instead of the page ground.
+   *
+   * Not an ambient layer and deliberately outside the budget: this is a
+   * surface, not a decoration drawn on top of one, and the effect only
+   * works if adjacent sections alternate — which is a page-level rhythm
+   * decision rather than a per-section one.
+   */
+  band?: boolean;
   children: React.ReactNode;
 }
 
@@ -38,6 +47,7 @@ export function Section({
   density = 'default',
   ambient = [],
   bordered = false,
+  band = false,
   className,
   children,
   ...props
@@ -48,6 +58,7 @@ export function Section({
         'relative isolate px-6 lg:px-10',
         DENSITY[density],
         bordered && 'border-border-subtle border-t',
+        band && 'bg-surface-1',
         className,
       )}
       {...props}

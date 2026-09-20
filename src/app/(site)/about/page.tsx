@@ -103,7 +103,7 @@ export default async function AboutPage() {
         </Container>
       </Section>
 
-      <Section bordered ambient={['dots']}>
+      <Section bordered band ambient={['dots']}>
         <Container>
           <Eyebrow rule>Skills</Eyebrow>
           <h2 className="font-display mt-5 max-w-xl text-3xl font-bold tracking-tight text-balance">
@@ -136,7 +136,7 @@ export default async function AboutPage() {
        * item 6); it now shows a three-role summary and links to this
        * section's id.
        */}
-      <Section id="experience" bordered>
+      <Section id="experience" bordered ambient={['scanlines']}>
         <Container>
           <Eyebrow rule>Timeline</Eyebrow>
           <RoleAccordion roles={roles} />

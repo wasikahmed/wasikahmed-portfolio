@@ -1,28 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Field, Input, Textarea, Select } from '@/components/ui/field';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { TurnstileWidget } from '@/components/contact/turnstile-widget';
-import { cn } from '@/lib/cn';
 
 type Intent = 'project' | 'role';
 type Status = 'idle' | 'pending' | 'sent' | 'error';
 
 /**
- * Immediate form, intent as its first field (PLAN.md W15 item 3).
+ * One short form, no branching.
  *
- * The prototype gated every other field behind a click on one of these two
- * cards — same qualifying signal, but rendering the form outright removes
- * the one extra step, on the one page whose entire job is receiving a
- * message. `intent` defaults rather than starting unset so the form is
- * complete and submittable on arrival.
+ * Earlier versions made "a role or a project?" the first thing a visitor
+ * had to answer — first as two cards gating every other field, then as
+ * two cards that stayed but swapped fields in and out beneath them. Both
+ * put a qualifying question ahead of the message, on the one page whose
+ * entire job is receiving a message, and the animated show/hide moved
+ * fields under the cursor while someone was reading.
  *
- * That default is `'role'`, and role is listed first: the site is written
- * for people hiring, so the common case should be the one already
- * selected. `company` is asked for on both paths — it matters at least as
- * much for a role as for a project — and only `budget` is project-only.
+ * It is now a single compact select sitting in the same row as everything
+ * else. The triage signal is still captured — /admin/leads filters on it
+ * — but it costs a glance rather than a decision, and every field is
+ * present and stable from the moment the page loads.
+ *
+ * `budget` is gone. It was the most transactional thing on the page, it
+ * only ever applied to one of the two paths, and the ranges were
+ * guesswork. It stays optional in the schema, so leads that already carry
+ * one still render.
  */
 export function ContactForm({ email }: { email: string }) {
   const [intent, setIntent] = useState<Intent>('role');
@@ -39,7 +43,6 @@ export function ContactForm({ email }: { email: string }) {
       name: String(form.get('name') ?? ''),
       email: String(form.get('email') ?? ''),
       company: form.get('company') ? String(form.get('company')) : undefined,
-      budget: form.get('budget') ? String(form.get('budget')) : undefined,
       message: String(form.get('message') ?? ''),
       turnstileToken,
     };
@@ -74,7 +77,7 @@ export function ContactForm({ email }: { email: string }) {
             variant="ghost"
             onClick={() => {
               setStatus('idle');
-              setIntent('project');
+              setIntent('role');
             }}
           >
             Send another
@@ -86,49 +89,6 @@ export function ContactForm({ email }: { email: string }) {
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
-      <fieldset>
-        <legend className="text-2xs text-fg-muted mb-3 font-mono tracking-wide uppercase">
-          What is this about?
-        </legend>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(
-            [
-              {
-                id: 'role',
-                title: 'A role',
-                body: 'You are hiring, or sourcing for a team.',
-              },
-              {
-                id: 'project',
-                title: 'A project',
-                body: 'You have something that needs building.',
-              },
-            ] as const
-          ).map((option) => {
-            const active = intent === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setIntent(option.id)}
-                aria-pressed={active}
-                className={cn(
-                  'duration-fast rounded-md border p-4 text-left transition-all',
-                  active
-                    ? 'border-border-strong bg-accent-whisper'
-                    : 'border-border-subtle hover:border-border',
-                )}
-              >
-                <span className={cn('block text-sm', active ? 'text-accent' : 'text-fg')}>
-                  {option.title}
-                </span>
-                <span className="text-2xs text-fg-subtle mt-1 block">{option.body}</span>
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
-
       <div className="flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Name" htmlFor="name">
@@ -139,52 +99,36 @@ export function ContactForm({ email }: { email: string }) {
           </Field>
         </div>
 
-        <Field label="Company" htmlFor="company">
-          <Input id="company" name="company" autoComplete="organization" />
-        </Field>
-
-        <AnimatePresence initial={false}>
-          {intent === 'project' ? (
-            <motion.div
-              key="project-fields"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden"
+        <div className="grid gap-5 sm:grid-cols-2">
+          {/* "Optional" lives in the label, not the hint slot: a hint
+              renders below the input and would make this column taller
+              than the select beside it. */}
+          <Field label="Company (optional)" htmlFor="company">
+            <Input id="company" name="company" autoComplete="organization" />
+          </Field>
+          <Field label="What is this about?" htmlFor="intent">
+            <Select
+              id="intent"
+              name="intent"
+              value={intent}
+              onChange={(e) => setIntent(e.target.value as Intent)}
             >
-              <div className="pt-1">
-                <Field
-                  label="Rough budget"
-                  htmlFor="budget"
-                  hint="Helps me be straight with you about fit."
-                >
-                  <Select id="budget" name="budget" defaultValue="">
-                    <option value="" disabled>
-                      Select a range
-                    </option>
-                    <option>Under $1k</option>
-                    <option>$1k — $5k</option>
-                    <option>$5k — $15k</option>
-                    <option>$15k+</option>
-                    <option>Not sure yet</option>
-                  </Select>
-                </Field>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+              <option value="role">A role</option>
+              <option value="project">A project</option>
+            </Select>
+          </Field>
+        </div>
 
         <Field
-          label={intent === 'project' ? 'What needs building?' : 'About the role'}
+          label="Message"
           htmlFor="message"
           hint={
-            intent === 'project'
-              ? 'The problem, not the solution — I will get to that part.'
-              : 'Team, stack, and what you need someone to own.'
+            intent === 'role'
+              ? 'Team, stack, and what you need someone to own.'
+              : 'The problem, not the solution — I will get to that part.'
           }
         >
-          <Textarea id="message" name="message" required rows={6} />
+          <Textarea id="message" name="message" required rows={7} />
         </Field>
 
         <TurnstileWidget onVerify={setTurnstileToken} />

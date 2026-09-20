@@ -22,7 +22,7 @@ export function Experience({ roles }: { roles: Role[] }) {
   const featured = roles.slice(0, 3);
 
   return (
-    <Section id="experience" bordered>
+    <Section id="experience" bordered band ambient={['dots']}>
       <Container>
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
