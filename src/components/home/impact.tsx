@@ -15,7 +15,7 @@ export async function Impact() {
   const projects = (await getProjects()).slice(0, 4);
 
   return (
-    <Section id="impact" density="spacious" bordered ambient={['noise']}>
+    <Section id="impact" density="spacious" bordered ambient={['scanlines', 'guides']}>
       <Container>
         <Reveal>
           <h2 className="font-display max-w-3xl text-3xl font-bold tracking-tight text-balance">

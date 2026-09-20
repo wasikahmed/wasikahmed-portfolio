@@ -21,7 +21,7 @@ export async function Shipped() {
   if (!shipped.length) return null;
 
   return (
-    <Section id="shipped" bordered density="compact" ambient={['noise']}>
+    <Section id="shipped" bordered band density="compact" ambient={['scanlines']}>
       <Container>
         <Eyebrow rule>Shipped &amp; public</Eyebrow>
         <h2 className="font-display mt-5 max-w-2xl text-3xl font-bold tracking-tight text-balance">

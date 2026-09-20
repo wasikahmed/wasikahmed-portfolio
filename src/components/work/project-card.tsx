@@ -73,8 +73,11 @@ export function ProjectCard({
       {project.cover ? (
         <div
           className={cn(
-            'bg-surface-2 relative -mx-6 -mt-6 mb-5 aspect-video overflow-hidden',
-            feature ? 'sm:-mx-8 sm:-mt-8' : '',
+            'bg-surface-2 relative -mx-6 -mt-6 mb-5 overflow-hidden',
+            // The feature card spans the full grid row, so 16:9 becomes a
+            // ~720px-tall image that leaves the card mostly picture. A
+            // wider ratio keeps the same crop reading as a banner.
+            feature ? 'aspect-[21/9] sm:-mx-8 sm:-mt-8' : 'aspect-video',
           )}
         >
           <Image
