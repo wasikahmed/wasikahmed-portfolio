@@ -7,10 +7,13 @@ import { getProjects } from '@/server/queries';
 import { spelledOutCount } from '@/lib/format';
 
 /**
- * Asymmetric offset grid — one of the three sections that deliberately
- * breaks the uniform card grid (PLAN.md §2.7). The first project gets a
- * larger tile and the second column is nudged down, so the eye moves
- * diagonally instead of scanning identical rows.
+ * The first project gets a full-width feature tile and the rest fall into
+ * an even two-column grid — one of the three sections that deliberately
+ * breaks the uniform card grid (PLAN.md §2.7).
+ *
+ * The hierarchy break is the point; the earlier asymmetric-offset version
+ * achieved it by row-spanning the lead against a stack of siblings, which
+ * only held while there were exactly four projects and no cover images.
  */
 export async function SelectedWork() {
   const projects = await getProjects();
@@ -40,18 +43,22 @@ export async function SelectedWork() {
 
         {lead ? (
           <Stagger className="mt-12 grid gap-5 lg:grid-cols-2" gap={0.08}>
-            <StaggerItem className="lg:row-span-2">
-              <ProjectCard project={lead} size="feature" className="h-full" />
+            {/* Full width, not a row-spanning column. The previous layout
+                gave the lead `lg:row-span-2 h-full` against an unbounded
+                right column, so the card stretched to whatever the stack
+                beside it happened to total — 2168px against a 256px cover
+                once a fifth project and cover images landed. Spanning the
+                row instead keeps the hierarchy break without tying one
+                card's height to the number of others. */}
+            <StaggerItem className="lg:col-span-2">
+              <ProjectCard project={lead} size="feature" />
             </StaggerItem>
 
-            {/* Offset pushes the right column out of lockstep with the left. */}
-            <div className="flex flex-col gap-5 lg:mt-12">
-              {rest.map((project) => (
-                <StaggerItem key={project.slug}>
-                  <ProjectCard project={project} />
-                </StaggerItem>
-              ))}
-            </div>
+            {rest.map((project) => (
+              <StaggerItem key={project.slug}>
+                <ProjectCard project={project} className="h-full" />
+              </StaggerItem>
+            ))}
           </Stagger>
         ) : (
           // No published projects yet — a real, reachable state (a fresh

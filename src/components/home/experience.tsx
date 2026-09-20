@@ -37,17 +37,41 @@ export function Experience({ roles }: { roles: Role[] }) {
           </Button>
         </div>
 
-        <ul className="mt-12 grid gap-x-8 gap-y-8 sm:grid-cols-3">
+        {/*
+         * A ruled two-column list rather than three free-floating text
+         * blocks: period and engagement type on the left, role, employer
+         * and the headline thing shipped on the right. The previous
+         * version showed only period/title/company, which read as a
+         * placeholder — the role means nothing without what came out of
+         * it. Mirrors the Approach section's ruled-row rhythm so the page
+         * has one list idiom rather than two.
+         */}
+        <ol className="mt-12 flex flex-col">
           {featured.map((role, i) => (
-            <Reveal as="li" key={`${role.company}-${role.title}`} delay={i * 0.06}>
-              <p className="text-fg-subtle font-mono text-xs">{role.period}</p>
-              <p className="font-display text-fg mt-2 text-lg font-semibold tracking-tight">
-                {role.title}
-              </p>
-              <p className="text-fg-muted mt-1 text-sm">{role.company}</p>
+            <Reveal
+              as="li"
+              key={`${role.company}-${role.title}`}
+              delay={i * 0.07}
+              className="border-border-subtle grid gap-x-10 gap-y-3 border-b py-7 first:border-t sm:grid-cols-[11rem_1fr]"
+            >
+              <div>
+                <p className="text-2xs text-accent font-mono tracking-wide">{role.period}</p>
+                <p className="text-2xs text-fg-subtle mt-2 font-mono">{role.type}</p>
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-display text-fg text-xl font-semibold tracking-tight">
+                  {role.title}
+                </h3>
+                <p className="text-fg-muted mt-1 text-sm">{role.company}</p>
+                {role.shipped[0] ? (
+                  <p className="text-fg-subtle mt-3 max-w-xl text-sm leading-relaxed text-pretty">
+                    {role.shipped[0]}
+                  </p>
+                ) : null}
+              </div>
             </Reveal>
           ))}
-        </ul>
+        </ol>
       </Container>
     </Section>
   );

@@ -86,11 +86,15 @@ export function Footer({ settings }: { settings: Settings }) {
           <nav aria-label="Footer">
             <ColumnLabel>Navigate</ColumnLabel>
             <ul className="flex flex-col gap-2.5">
+              {/* /design-system is intentionally absent: it is a developer
+                  reference, not something a visitor should be offered. The
+                  page already sets robots.index=false and is excluded from
+                  the sitemap, so dropping this link is the last public
+                  surface it had. Still reachable by URL for development. */}
               {[
                 ...NAV_LINKS,
                 { label: 'Résumé', href: '/resume' },
                 { label: 'API reference', href: '/docs' },
-                { label: 'Design system', href: '/design-system' },
               ].map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className={LINK}>

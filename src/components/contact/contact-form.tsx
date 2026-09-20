@@ -14,15 +14,18 @@ type Status = 'idle' | 'pending' | 'sent' | 'error';
  * Immediate form, intent as its first field (PLAN.md W15 item 3).
  *
  * The prototype gated every other field behind a click on one of these two
- * cards — same qualifying signal (still choose project vs. role before the
- * rest renders differently), but rendering the form outright removes the
- * one extra step, on the one page whose entire job is receiving a message.
- * `intent` defaults to `'project'` rather than starting unset so the form
- * is complete and submittable on arrival; switching it still animates the
- * project-only fields (company/budget) in and out.
+ * cards — same qualifying signal, but rendering the form outright removes
+ * the one extra step, on the one page whose entire job is receiving a
+ * message. `intent` defaults rather than starting unset so the form is
+ * complete and submittable on arrival.
+ *
+ * That default is `'role'`, and role is listed first: the site is written
+ * for people hiring, so the common case should be the one already
+ * selected. `company` is asked for on both paths — it matters at least as
+ * much for a role as for a project — and only `budget` is project-only.
  */
 export function ContactForm({ email }: { email: string }) {
-  const [intent, setIntent] = useState<Intent>('project');
+  const [intent, setIntent] = useState<Intent>('role');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
@@ -91,11 +94,15 @@ export function ContactForm({ email }: { email: string }) {
           {(
             [
               {
+                id: 'role',
+                title: 'A role',
+                body: 'You are hiring, or sourcing for a team.',
+              },
+              {
                 id: 'project',
                 title: 'A project',
                 body: 'You have something that needs building.',
               },
-              { id: 'role', title: 'A role', body: 'You are hiring and want to talk.' },
             ] as const
           ).map((option) => {
             const active = intent === option.id;
@@ -132,6 +139,10 @@ export function ContactForm({ email }: { email: string }) {
           </Field>
         </div>
 
+        <Field label="Company" htmlFor="company">
+          <Input id="company" name="company" autoComplete="organization" />
+        </Field>
+
         <AnimatePresence initial={false}>
           {intent === 'project' ? (
             <motion.div
@@ -142,10 +153,7 @@ export function ContactForm({ email }: { email: string }) {
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               className="overflow-hidden"
             >
-              <div className="grid gap-5 pt-1 sm:grid-cols-2">
-                <Field label="Company" htmlFor="company">
-                  <Input id="company" name="company" autoComplete="organization" />
-                </Field>
+              <div className="pt-1">
                 <Field
                   label="Rough budget"
                   htmlFor="budget"
@@ -155,10 +163,10 @@ export function ContactForm({ email }: { email: string }) {
                     <option value="" disabled>
                       Select a range
                     </option>
-                    <option>Under $10k</option>
-                    <option>$10k — $30k</option>
-                    <option>$30k — $75k</option>
-                    <option>$75k+</option>
+                    <option>Under $1k</option>
+                    <option>$1k — $5k</option>
+                    <option>$5k — $15k</option>
+                    <option>$15k+</option>
                     <option>Not sure yet</option>
                   </Select>
                 </Field>
@@ -168,7 +176,7 @@ export function ContactForm({ email }: { email: string }) {
         </AnimatePresence>
 
         <Field
-          label={intent === 'project' ? 'What breaks today?' : 'About the role'}
+          label={intent === 'project' ? 'What needs building?' : 'About the role'}
           htmlFor="message"
           hint={
             intent === 'project'

@@ -9,7 +9,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
   return {
     title: pageTitle('Contact', settings.name),
-    description: 'Start a conversation about a project or a role.',
+    description:
+      'Get in touch about a software engineering role, or a project that needs building. Based in Dhaka, open to remote.',
     alternates: canonical('/contact'),
   };
 }
@@ -24,10 +25,11 @@ export default async function ContactPage() {
           <div className="min-w-0">
             <Eyebrow rule>Contact</Eyebrow>
             <h1 className="font-display mt-6 max-w-xl text-4xl font-bold tracking-tighter text-balance">
-              Tell me what breaks.
+              Tell me what you are building.
             </h1>
             <p className="text-fg-muted mt-5 max-w-lg text-lg text-pretty">
-              If I am not the right person for it, I will say so and point you somewhere better.
+              Hiring, or have something that needs building? Either way, a couple of sentences is
+              enough to start. If I am not the right fit I will say so plainly.
             </p>
 
             <div className="mt-12">
@@ -52,6 +54,18 @@ export default async function ContactPage() {
                 className="text-fg duration-fast hover:text-accent text-sm transition-colors"
               >
                 {settings.email}
+              </a>
+            </div>
+
+            <div>
+              <p className="text-2xs text-fg-subtle mb-3 font-mono tracking-widest uppercase">
+                Résumé
+              </p>
+              <a
+                href="/resume"
+                className="text-fg duration-fast hover:text-accent text-sm transition-colors"
+              >
+                Download PDF
               </a>
             </div>
 
