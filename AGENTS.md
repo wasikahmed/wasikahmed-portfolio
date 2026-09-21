@@ -380,17 +380,43 @@ documents alongside the old ones rather than replacing them; the only
 clean states are an empty volume or deleting the stale records yourself.
 
 **Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
-backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump`,
-dated and rotated locally under `$DEPLOY_PATH/backups` (default 7-day
-retention). Local retention only, deliberately, decided 2026-08-30
-(PLAN.md W4) — it protects against a bad migration or an admin-CMS
-mistake, not against losing the VPS itself. Media no longer needs a
-local-volume backup of its own (PLAN.md W15 item 1 moved it to
-Cloudinary — off-box and versioned on its own, on an account this app
-never has write access outside its own folder in). Mongo is the one
-thing left with only a local copy; revisit shipping that off-box (e.g.
-rclone to an S3-compatible bucket) as its own task if that risk becomes
-worth carrying.
+backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump`
+and `pg_dump` (Umami's database, see below), dated and rotated locally
+under `$DEPLOY_PATH/backups` (default 7-day retention). Local retention
+only, deliberately, decided 2026-08-30 (PLAN.md W4) — it protects against
+a bad migration or an admin-CMS mistake, not against losing the VPS
+itself. Media no longer needs a local-volume backup of its own (PLAN.md
+W15 item 1 moved it to Cloudinary — off-box and versioned on its own, on
+an account this app never has write access outside its own folder in).
+Mongo and Umami's Postgres are the two things left with only a local
+copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
+bucket) as its own task if that risk becomes worth carrying.
+
+**Self-hosted Umami analytics.** `docker-compose.prod.yml` runs Umami
+(privacy-first, no cookies) as two extra services: `umami` (the app
+itself) and `umami-db` (Postgres — Umami's own requirement, unrelated to
+this app's Mongo). Both are bound to `127.0.0.1` like `web`, on
+`UMAMI_PORT_HOST` (default 5010 — picked to clear every other tenant's
+published port on the shared VPS at the time this was set up; re-check
+`docker ps` before reusing this default if the box's port map has since
+moved on); the Cloudflare Tunnel needs its own
+public-hostname rule pointing a subdomain (e.g. `analytics.<domain>`) at
+that port — that rule lives in Cloudflare's dashboard, not this repo, so
+it has to be added by hand once. The Next app itself only ever reads
+`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID` (§7's
+sibling env vars, read by `src/app/(site)/layout.tsx` — unset either one
+and no tracking script renders at all); those two values come from
+Umami's own dashboard after you add the website there, post-deploy —
+don't hand-construct the script URL, copy the exact tracking code Umami
+gives you, since the script's served path isn't a fixed convention across
+versions. Self-hosting is free under Umami's MIT license with no feature
+gate in the code — the only things its own Cloud service adds that the
+self-hosted app doesn't have are scheduled email reports and the
+streaming API; everything else (funnels, retention, goals, heatmaps,
+session replays, the REST/MCP API) ships in the open-source app itself.
+First login after deploy is `admin`/`umami` — a publicly known default,
+so change it immediately from Umami's own settings, the same way
+`pnpm seed:admin`'s printed password is meant to be rotated once used.
 
 ---
 

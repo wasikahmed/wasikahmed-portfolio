@@ -34,6 +34,16 @@ name: Build and deploy
 #                                  Unset = no analytics script at all (see
 #                                  src/app/(site)/layout.tsx) — optional.
 #   NEXT_PUBLIC_UMAMI_WEBSITE_ID   The Umami site's website ID.
+#   UMAMI_DB_USER           Postgres user for the self-hosted `umami-db`
+#                            service (docker-compose.prod.yml) — a second
+#                            database engine, since Umami requires Postgres
+#                            and this app otherwise only runs Mongo.
+#   UMAMI_PORT_HOST         Host port `umami` publishes to 127.0.0.1, for
+#                            the Cloudflare Tunnel's analytics.<domain> rule.
+#                            Optional — defaults to 5010 (chosen to avoid
+#                            this VPS's other tenants' ports; re-check
+#                            `docker ps` before reusing this default
+#                            elsewhere).
 #   CLOUDINARY_CLOUD_NAME   Cloudinary account identifier (media library,
 #                            PLAN.md W15 item 1) — not secret on its own.
 #   CLOUDINARY_FOLDER       Optional — scopes every asset this app writes
@@ -51,6 +61,11 @@ name: Build and deploy
 #   CLOUDINARY_API_SECRET  Cloudinary API secret — write access to the whole
 #                          account, not just this app's folder, so it's
 #                          masked even though the key/cloud name aren't.
+#   UMAMI_DB_PASSWORD      Postgres password for the self-hosted `umami-db`
+#                          service.
+#   UMAMI_APP_SECRET       Signs Umami's own session cookies — unrelated to
+#                          this app's AUTH_SECRET. Generate with:
+#                          openssl rand -hex 32
 # --------------------------------------------------------------------------
 
 on:
@@ -225,6 +240,10 @@ jobs:
             TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
             NEXT_PUBLIC_UMAMI_SCRIPT_URL=${{ vars.NEXT_PUBLIC_UMAMI_SCRIPT_URL }}
             NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
+            UMAMI_DB_USER=${{ vars.UMAMI_DB_USER || 'umami' }}
+            UMAMI_DB_PASSWORD=${{ secrets.UMAMI_DB_PASSWORD }}
+            UMAMI_APP_SECRET=${{ secrets.UMAMI_APP_SECRET }}
+            UMAMI_PORT_HOST=${{ vars.UMAMI_PORT_HOST || '5010' }}
             CLOUDINARY_CLOUD_NAME=${{ vars.CLOUDINARY_CLOUD_NAME }}
             CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
             CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}

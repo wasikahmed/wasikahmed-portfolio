@@ -3,8 +3,9 @@
 # "Install the backup cron job" step (see .github/workflows/deploy.yml) — it
 # is not part of the Docker image and is never invoked from CI directly.
 #
-# Local retention only (PLAN.md W4, decided 2026-08-30): dumps mongo into a
-# dated file under $DEPLOY_PATH/backups, rotating anything older than
+# Local retention only (PLAN.md W4, decided 2026-08-30): dumps mongo (and,
+# since the self-hosted Umami stack was added, umami-db's Postgres too) into
+# dated files under $DEPLOY_PATH/backups, rotating anything older than
 # $RETENTION_DAYS. This protects against a bad migration, a fat-fingered
 # admin-CMS delete, or database corruption — NOT against losing the VPS
 # itself, since nothing here leaves the box. Revisit shipping this off-box
@@ -14,7 +15,8 @@
 # off-box and versioned on its own).
 #
 # Requires the same .env this compose project already runs with — reads
-# MONGO_ROOT_USER/MONGO_ROOT_PASSWORD from it rather than duplicating them.
+# MONGO_ROOT_USER/MONGO_ROOT_PASSWORD and UMAMI_DB_USER/UMAMI_DB_PASSWORD
+# from it rather than duplicating them.
 set -euo pipefail
 
 # Deployed at $DEPLOY_PATH/scripts/vps-backup.sh (scp preserves the
@@ -40,7 +42,19 @@ docker compose -p portfolio -f docker-compose.prod.yml exec -T mongo \
   --archive --gzip \
   > "$BACKUP_DIR/mongo-$STAMP.archive.gz"
 
+# --- Umami's Postgres: same idea — pg_dump's custom format is compressed
+# by default, so no separate --gzip flag needed the way mongodump has one.
+# PGPASSWORD (rather than a --password flag, which pg_dump doesn't have) is
+# how libpq takes a password non-interactively.
+docker compose -p portfolio -f docker-compose.prod.yml exec -T \
+  -e PGPASSWORD="$UMAMI_DB_PASSWORD" umami-db \
+  pg_dump \
+  --username "$UMAMI_DB_USER" \
+  --dbname umami \
+  --format=custom \
+  > "$BACKUP_DIR/umami-$STAMP.dump"
+
 # --- Rotate --------------------------------------------------------------
 find "$BACKUP_DIR" -type f -mtime "+$RETENTION_DAYS" -delete
 
-echo "Backup complete: $BACKUP_DIR/mongo-$STAMP.archive.gz"
+echo "Backup complete: $BACKUP_DIR/mongo-$STAMP.archive.gz and $BACKUP_DIR/umami-$STAMP.dump"
