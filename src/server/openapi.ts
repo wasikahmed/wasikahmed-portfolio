@@ -10,6 +10,8 @@ import {
   techItemSchema,
   skillGroupSchema,
   settingsSchema,
+  siteCopySchema,
+  resumeUpdateSchema,
   leadSchema,
   leadUpdateSchema,
   inviteSchema,
@@ -497,6 +499,209 @@ const auditLogPaths: ZodOpenApiPathsObject = {
   },
 };
 
+const resumeVersionSchema = z
+  .object({
+    id: idField,
+    label: z.string(),
+    notes: z.string().optional(),
+    fileName: z.string(),
+    size: z.number().meta({ description: 'Bytes.' }),
+    sha256: z.string(),
+    isCurrent: z.boolean().meta({ description: 'The one version GET /resume serves.' }),
+    uploadedBy: z.string(),
+    createdAt: timestampField,
+    updatedAt: timestampField,
+  })
+  .meta({ id: 'ResumeVersion' });
+
+const revisionSchema = z
+  .object({
+    id: idField,
+    entityType: z.enum([
+      'project',
+      'post',
+      'testimonial',
+      'role',
+      'tech',
+      'skillGroup',
+      'settings',
+      'siteCopy',
+    ]),
+    entityId: z.string(),
+    label: z.string(),
+    action: z.enum(['update', 'delete', 'restore']),
+    userEmail: z.string(),
+    snapshot: z
+      .record(z.string(), z.unknown())
+      .meta({ description: 'The full record as it was before the change.' }),
+    createdAt: timestampField,
+  })
+  .meta({ id: 'Revision' });
+
+const siteCopyPaths: ZodOpenApiPathsObject = {
+  '/api/admin/site-copy': {
+    get: {
+      tags: ['Settings'],
+      summary: 'Get the page copy singleton',
+      description:
+        '**Permission:** `settings:read`. Stored values merged over the built-in defaults — always complete, even before the first save.',
+      responses: {
+        '200': jsonResponse('200 OK', z.object({ item: siteCopySchema })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+      },
+    },
+    patch: {
+      tags: ['Settings'],
+      summary: 'Replace the page copy singleton',
+      description:
+        '**Permission:** `settings:write`. The whole document, every field non-empty. The replaced version is kept in content history.',
+      requestBody: { content: { 'application/json': { schema: siteCopySchema } } },
+      responses: {
+        '200': jsonResponse('200 OK', z.object({ item: siteCopySchema })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '422': VALIDATION_FAILED,
+      },
+    },
+  },
+};
+
+const resumePaths: ZodOpenApiPathsObject = {
+  '/api/admin/resumes': {
+    get: {
+      tags: ['Résumé'],
+      summary: 'List every résumé version, newest first',
+      description: '**Permission:** `content:read`. Metadata only — never the file bytes.',
+      responses: {
+        '200': jsonResponse('200 OK', z.object({ items: z.array(resumeVersionSchema) })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+      },
+    },
+    post: {
+      tags: ['Résumé'],
+      summary: 'Upload a résumé version',
+      description:
+        '**Permission:** `content:write`; `makeCurrent: "true"` additionally needs `content:publish`. PDF only (checked against the file bytes), max 5MB.',
+      requestBody: {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: {
+                file: { type: 'string', format: 'binary' },
+                label: { type: 'string', description: '1–120 characters.' },
+                notes: { type: 'string', description: 'Optional, up to 2000 characters.' },
+                makeCurrent: { type: 'string', enum: ['true', 'false'] },
+              },
+              required: ['file', 'label'],
+            },
+          },
+        },
+      },
+      responses: {
+        '201': jsonResponse('201 Created', z.object({ item: resumeVersionSchema })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '422': VALIDATION_FAILED,
+      },
+    },
+  },
+  '/api/admin/resumes/{id}': {
+    patch: {
+      tags: ['Résumé'],
+      summary: 'Rename, re-note, or make a version live',
+      description:
+        '**Permission:** `content:write`; `isCurrent: true` additionally needs `content:publish`.',
+      requestParams: { path: z.object({ id: idField }) },
+      requestBody: { content: { 'application/json': { schema: resumeUpdateSchema } } },
+      responses: {
+        '200': jsonResponse('200 OK', z.object({ item: resumeVersionSchema })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '404': NOT_FOUND,
+        '422': VALIDATION_FAILED,
+      },
+    },
+    delete: {
+      tags: ['Résumé'],
+      summary: 'Delete a version',
+      description: '**Permission:** `content:delete`. The live version cannot be deleted (409).',
+      requestParams: { path: z.object({ id: idField }) },
+      responses: {
+        '204': { description: '204 — deleted.' },
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '404': NOT_FOUND,
+        '409': jsonResponse('409 — this is the live version.', errorSchema),
+      },
+    },
+  },
+  '/api/admin/resumes/{id}/file': {
+    get: {
+      tags: ['Résumé'],
+      summary: "Download one version's PDF",
+      description:
+        '**Permission:** `content:read`. Any version, live or not — old versions are only reachable here, never publicly.',
+      requestParams: { path: z.object({ id: idField }) },
+      responses: {
+        '200': {
+          description: '200 — the PDF.',
+          content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } },
+        },
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '404': NOT_FOUND,
+      },
+    },
+  },
+};
+
+const revisionPaths: ZodOpenApiPathsObject = {
+  '/api/admin/revisions': {
+    get: {
+      tags: ['History'],
+      summary: 'List content history, newest first',
+      description:
+        "**Permission:** that type's read permission when `entityType` is given (`content:read`, or `settings:read` for settings/siteCopy); `audit:read` for the unscoped list across every type. 20 per page.",
+      requestParams: {
+        query: z.object({
+          entityType: z.string().optional(),
+          entityId: z.string().optional(),
+          page: z.string().optional(),
+        }),
+      },
+      responses: {
+        '200': jsonResponse(
+          '200 OK',
+          z.object({ items: z.array(revisionSchema), page: z.number(), totalPages: z.number() }),
+        ),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '422': VALIDATION_FAILED,
+      },
+    },
+  },
+  '/api/admin/revisions/{id}/restore': {
+    post: {
+      tags: ['History'],
+      summary: 'Restore a version',
+      description:
+        "**Permission:** the record type's write permission, plus `content:publish` when the version being restored is published or scheduled. Re-validated against the current schema; the state it replaces is kept as a new revision.",
+      requestParams: { path: z.object({ id: idField }) },
+      responses: {
+        '200': jsonResponse('200 OK', z.object({ ok: z.literal(true), entityId: z.string() })),
+        '401': NOT_AUTHENTICATED,
+        '403': NOT_PERMITTED,
+        '404': NOT_FOUND,
+        '409': jsonResponse('409 — another record now uses the same slug.', errorSchema),
+        '422': VALIDATION_FAILED,
+      },
+    },
+  },
+};
+
 const mdxPreviewPaths: ZodOpenApiPathsObject = {
   '/api/admin/mdx-preview': {
     post: {
@@ -867,6 +1072,8 @@ export function buildOpenApiDocument() {
       { name: 'Leads' },
       { name: 'Media' },
       { name: 'Settings' },
+      { name: 'Résumé' },
+      { name: 'History', description: 'Earlier versions of content records, and restoring them.' },
       { name: 'Users' },
       { name: 'Audit log' },
       { name: 'Auth', description: 'Bearer token issuance, rotation, and session management.' },
@@ -903,6 +1110,9 @@ export function buildOpenApiDocument() {
       ...leadPaths,
       ...mediaPaths,
       ...settingsPaths,
+      ...siteCopyPaths,
+      ...resumePaths,
+      ...revisionPaths,
       ...auditLogPaths,
       ...mdxPreviewPaths,
       ...usersPaths,

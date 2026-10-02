@@ -30,15 +30,21 @@ const jetbrainsMono = JetBrains_Mono({
  * URL — social crawlers reject relative ones. Falls back to localhost so `next
  * build` (which runs with no env in Docker) does not warn on every route.
  */
+/*
+ * Only the fallback now: every public page gets its description and social
+ * card from the CMS via `(site)/layout.tsx` and `pageMetadata`. What is left
+ * here is seen by /docs and the admin, so it is kept deliberately generic —
+ * a static string that can't go stale the way the old pitch line did.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000'),
   title: 'Wasik Ahmed',
-  description: 'Software engineer building AI and automation systems.',
+  description: 'Software engineering portfolio.',
   openGraph: {
     type: 'website',
     siteName: 'Wasik Ahmed',
     title: 'Wasik Ahmed',
-    description: 'Software engineer building AI and automation systems.',
+    description: 'Software engineering portfolio.',
   },
   twitter: {
     card: 'summary_large_image',

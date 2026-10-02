@@ -1,7 +1,8 @@
+import type { Metadata } from 'next';
 import Script from 'next/script';
 import { SiteShell } from '@/components/layout/site-shell';
 import { Footer } from '@/components/layout/footer';
-import { getSettings, getProjects, getPosts } from '@/server/queries';
+import { getSettings, getProjects, getPosts, getSiteCopy } from '@/server/queries';
 
 /*
  * Umami analytics. Both env vars unset = no script at all, same
@@ -31,12 +32,36 @@ const UMAMI_WEBSITE_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
  */
 export const dynamic = 'force-dynamic';
 
+/*
+ * The site-wide description and social-card defaults, from the CMS rather
+ * than the root layout's static fallback (which only admin and /docs still
+ * see). Pages override both through `pageMetadata` (lib/seo.ts); this is
+ * what anything without its own description falls back to.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  return {
+    description: copy.seo.siteDescription,
+    openGraph: {
+      type: 'website',
+      siteName: settings.name,
+      title: settings.name,
+      description: copy.seo.siteDescription,
+    },
+  };
+}
+
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   // Fetched once at the layout — Nav, the command palette, and Footer all
   // need settings/projects/posts, and React's cache() (see queries.ts)
   // means this and any call the same data further down the tree resolve
   // to a single Mongo round trip per request either way.
-  const [settings, projects, posts] = await Promise.all([getSettings(), getProjects(), getPosts()]);
+  const [settings, projects, posts, copy] = await Promise.all([
+    getSettings(),
+    getProjects(),
+    getPosts(),
+    getSiteCopy(),
+  ]);
 
   return (
     <SiteShell settings={settings} projects={projects} posts={posts}>
@@ -44,7 +69,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main id="main" className="flex-1 pt-16">
         {children}
       </main>
-      <Footer settings={settings} />
+      <Footer settings={settings} unavailableText={copy.footer.unavailableText} />
       {UMAMI_SCRIPT_URL && UMAMI_WEBSITE_ID ? (
         <Script
           src={UMAMI_SCRIPT_URL}

@@ -6,17 +6,25 @@ import { Field, Input, Textarea } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { ObjectArrayEditor } from '@/components/admin/object-array-editor';
 import { StringList } from '@/components/admin/string-list';
+import { RevisionHistory } from '@/components/admin/revision-history';
 import { adminFetchJson } from '@/lib/admin-fetch';
 import type { Settings } from '@/lib/types';
 
 export default function SettingsPage() {
   const [draft, setDraft] = useState<Settings | null>(null);
+  // The last state the server confirmed — what History compares against.
+  // Kept apart from `draft`, which holds unsaved edits.
+  const [stored, setStored] = useState<Settings | null>(null);
+  const [saveCount, setSaveCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    adminFetchJson<{ item: Settings }>('/api/admin/settings').then((res) => setDraft(res.item));
+    adminFetchJson<{ item: Settings }>('/api/admin/settings').then((res) => {
+      setDraft(res.item);
+      setStored(res.item);
+    });
   }, []);
 
   if (!draft) return <p className="text-fg-muted text-sm">Loading…</p>;
@@ -36,6 +44,8 @@ export default function SettingsPage() {
         body: JSON.stringify(payload),
       });
       setDraft(res.item);
+      setStored(res.item);
+      setSaveCount((n) => n + 1);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save.');
@@ -238,6 +248,15 @@ export default function SettingsPage() {
           {saved ? <span className="text-2xs text-accent">Saved.</span> : null}
         </div>
       </form>
+
+      {/* Remounted on every save (`key`) so the version that save just
+          replaced shows up in the list without a reload. */}
+      <RevisionHistory
+        key={saveCount}
+        entityType="settings"
+        entityId="settings"
+        current={(stored ?? undefined) as Record<string, unknown> | undefined}
+      />
     </div>
   );
 }

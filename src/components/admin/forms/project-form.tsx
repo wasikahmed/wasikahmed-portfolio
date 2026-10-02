@@ -125,7 +125,7 @@ export function ProjectForm({ project }: { project?: Project }) {
           <Input
             id="slug"
             required
-            pattern="[a-z0-9-]+"
+            pattern="[a-z0-9\-]+"
             value={draft.slug}
             onChange={(e) => {
               setSlugTouched(true);

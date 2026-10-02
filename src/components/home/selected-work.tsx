@@ -3,8 +3,8 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { ProjectCard } from '@/components/work/project-card';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
-import { getProjects } from '@/server/queries';
-import { spelledOutCount } from '@/lib/format';
+import { getProjects, getSiteCopy } from '@/server/queries';
+import { fillCount } from '@/lib/format';
 
 /**
  * The first project gets a full-width feature tile and the rest fall into
@@ -16,10 +16,8 @@ import { spelledOutCount } from '@/lib/format';
  * only held while there were exactly four projects and no cover images.
  */
 export async function SelectedWork() {
-  const projects = await getProjects();
+  const [projects, copy] = await Promise.all([getProjects(), getSiteCopy()]);
   const [lead, ...rest] = projects;
-  const count = spelledOutCount(projects.length);
-  const countCapitalized = count.charAt(0).toUpperCase() + count.slice(1);
 
   return (
     <Section id="work" bordered band ambient={['grid']}>
@@ -30,8 +28,10 @@ export async function SelectedWork() {
               <Eyebrow rule>Selected work</Eyebrow>
               <h2 className="font-display mt-5 max-w-xl text-3xl font-bold tracking-tight text-balance">
                 {/* Was hardcoded "Four" (PLAN.md W5) — silently wrong the
-                    moment a project shipped or was unpublished. */}
-                {countCapitalized} system{projects.length === 1 ? '' : 's'}, still in production.
+                    moment a project shipped or was unpublished. The count
+                    still comes from the data; the sentence around it is
+                    site copy. */}
+                {fillCount(copy.home.workHeading, projects.length)}
               </h2>
             </div>
             <Button href="/work" variant="ghost" className="group">

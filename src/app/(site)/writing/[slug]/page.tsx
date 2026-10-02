@@ -8,7 +8,7 @@ import { ReadingProgress } from '@/components/layout/reading-progress';
 import { MdxContent } from '@/components/mdx/mdx-content';
 import { formatDate } from '@/lib/format';
 import { getPostSlugs, getPost, getAdjacentPosts, getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
+import { pageTitle, pageMetadata } from '@/lib/seo';
 import { articleJsonLd } from '@/lib/json-ld';
 
 export async function generateStaticParams() {
@@ -34,11 +34,12 @@ export async function generateMetadata({
   const { slug } = await params;
   const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
   if (!post) return {};
-  return {
+  return pageMetadata({
     title: pageTitle(post.seo?.title ?? post.title, settings.name),
     description: post.seo?.description ?? post.excerpt,
-    alternates: canonical(`/writing/${slug}`),
-  };
+    path: `/writing/${slug}`,
+    siteName: settings.name,
+  });
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {

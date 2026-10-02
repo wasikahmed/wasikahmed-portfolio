@@ -14,6 +14,7 @@ const BASE_GROUPS: { label: string; links: { label: string; href: string }[] }[]
       { label: 'Testimonials', href: '/admin/testimonials' },
       { label: 'Experience', href: '/admin/experience' },
       { label: 'Skills', href: '/admin/skills' },
+      { label: 'Résumé', href: '/admin/resume' },
     ],
   },
   {
@@ -21,6 +22,7 @@ const BASE_GROUPS: { label: string; links: { label: string; href: string }[] }[]
     links: [
       { label: 'Media', href: '/admin/media' },
       { label: 'Leads', href: '/admin/leads' },
+      { label: 'Site copy', href: '/admin/site-copy' },
       { label: 'Settings', href: '/admin/settings' },
     ],
   },
@@ -28,6 +30,7 @@ const BASE_GROUPS: { label: string; links: { label: string; href: string }[] }[]
     label: 'Account',
     links: [
       { label: 'Security', href: '/admin/security' },
+      { label: 'History', href: '/admin/history' },
       { label: 'Audit log', href: '/admin/audit-log' },
     ],
   },

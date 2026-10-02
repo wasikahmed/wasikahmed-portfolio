@@ -12,6 +12,7 @@ import { writeAuditLog } from './audit';
 import { normalizeDoc } from './mongo-utils';
 import type { Permission } from './permissions';
 import { withPublishGuard, reorderSchema } from './schemas';
+import { isRevisionType, recordRevision } from './revisions';
 
 /**
  * Generic CRUD route factory for the admin API.
@@ -43,6 +44,11 @@ import { withPublishGuard, reorderSchema } from './schemas';
  * break every legitimate API client for no security benefit. That helper
  * moved out of this file into resolve-auth.ts once every other permission-
  * gated hand-written route needed the exact same thing.
+ *
+ * Update and delete also save the record's previous state as a revision
+ * (src/server/revisions.ts) for every collection registered there — every
+ * `content:` collection, not leads. Recorded only after the write succeeds,
+ * so a rejected or failed save never leaves a phantom history entry.
  */
 
 type Resource = 'content' | 'lead';
@@ -170,6 +176,8 @@ export function updateHandler<T>(model: Model<Record<string, unknown>>, config: 
     }
 
     await connectToDatabase();
+    const versioned = isRevisionType(config.entityType) ? config.entityType : null;
+    const before = versioned ? await model.findById(id).lean() : null;
     try {
       const updated = await model
         .findByIdAndUpdate(id, result.data as Record<string, unknown>, {
@@ -178,6 +186,16 @@ export function updateHandler<T>(model: Model<Record<string, unknown>>, config: 
         })
         .lean();
       if (!updated) return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+
+      if (versioned && before) {
+        await recordRevision({
+          entityType: versioned,
+          entityId: id,
+          before: before as Record<string, unknown>,
+          action: 'update',
+          userEmail: session.email,
+        });
+      }
 
       await writeAuditLog({
         userEmail: session.email,
@@ -212,6 +230,18 @@ export function deleteHandler(model: Model<Record<string, unknown>>, entityType:
     await connectToDatabase();
     const deleted = await model.findByIdAndDelete(id).lean();
     if (!deleted) return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+
+    // The only copy of a deleted record from here on — /admin/history is
+    // where it can be brought back from.
+    if (isRevisionType(entityType)) {
+      await recordRevision({
+        entityType,
+        entityId: id,
+        before: deleted as Record<string, unknown>,
+        action: 'delete',
+        userEmail: session.email,
+      });
+    }
 
     await writeAuditLog({
       userEmail: session.email,

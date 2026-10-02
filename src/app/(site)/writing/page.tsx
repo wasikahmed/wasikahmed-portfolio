@@ -5,18 +5,20 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
 import { Reveal } from '@/components/motion/reveal';
 import { formatDate } from '@/lib/format';
-import { getPosts, getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
+import { getPosts, getSettings, getSiteCopy } from '@/server/queries';
+import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  return {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  const metadata = pageMetadata({
     title: pageTitle('Writing', settings.name),
-    description: 'Notes on AI systems, constraint solving, and shipping software that lasts.',
-    alternates: {
-      ...canonical('/writing'),
-      types: { 'application/rss+xml': '/writing/feed.xml' },
-    },
+    description: copy.writing.metaDescription,
+    path: '/writing',
+    siteName: settings.name,
+  });
+  return {
+    ...metadata,
+    alternates: { ...metadata.alternates, types: { 'application/rss+xml': '/writing/feed.xml' } },
   };
 }
 
@@ -26,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * column because they are shorter and scanned differently.
  */
 export default async function WritingPage() {
-  const posts = await getPosts();
+  const [posts, copy] = await Promise.all([getPosts(), getSiteCopy()]);
   const articles = posts.filter((p) => p.kind === 'article');
   const tils = posts.filter((p) => p.kind === 'til');
 
@@ -35,11 +37,9 @@ export default async function WritingPage() {
       <Container>
         <Eyebrow rule>Writing</Eyebrow>
         <h1 className="font-display mt-6 max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-          Things worth writing down.
+          {copy.writing.heading}
         </h1>
-        <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">
-          Mostly about the gap between a problem and the software that fixes it.
-        </p>
+        <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">{copy.writing.intro}</p>
 
         <div className="mt-16 grid gap-16 lg:grid-cols-[1fr_minmax(0,20rem)] lg:gap-20">
           <div>

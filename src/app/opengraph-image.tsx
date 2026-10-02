@@ -14,7 +14,10 @@ import { getSettings } from '@/server/queries';
  */
 
 export const dynamic = 'force-dynamic';
-export const alt = 'Wasik Ahmed — Software engineer building AI and automation systems.';
+// Describes the card itself rather than restating its text: the alt has to
+// be a build-time constant, and anything copied from the CMS here would go
+// stale the first time the tagline changed.
+export const alt = 'Social card with name, role and tagline.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

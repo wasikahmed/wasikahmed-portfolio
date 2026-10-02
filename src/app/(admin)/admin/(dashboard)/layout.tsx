@@ -61,11 +61,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
               { label: 'Testimonials', href: '/admin/testimonials' },
               { label: 'Experience', href: '/admin/experience' },
               { label: 'Skills', href: '/admin/skills' },
+              { label: 'Résumé', href: '/admin/resume' },
               { label: 'Media', href: '/admin/media' },
               { label: 'Leads', href: '/admin/leads' },
+              { label: 'Site copy', href: '/admin/site-copy' },
               { label: 'Settings', href: '/admin/settings' },
               ...(canManageUsers ? [{ label: 'Users', href: '/admin/users' }] : []),
               { label: 'Security', href: '/admin/security' },
+              { label: 'History', href: '/admin/history' },
               { label: 'Audit log', href: '/admin/audit-log' },
             ].map((l) => (
               <a
