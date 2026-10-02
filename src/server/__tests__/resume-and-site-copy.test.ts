@@ -63,6 +63,7 @@ let SiteCopyModel: (typeof import('../models/site-copy'))['SiteCopyModel'];
 let resumesRoute: typeof import('@/app/api/admin/resumes/route');
 let resumeRoute: typeof import('@/app/api/admin/resumes/[id]/route');
 let publicResume: typeof import('@/app/resume/route');
+let legacyResume: typeof import('@/app/wasik-ahmed-resume.pdf/route');
 let siteCopyRoute: typeof import('@/app/api/admin/site-copy/route');
 let queries: typeof import('../queries');
 let defaults: (typeof import('../seed-data/site-copy'))['siteCopyDefaults'];
@@ -78,6 +79,7 @@ beforeAll(async () => {
   resumesRoute = await import('@/app/api/admin/resumes/route');
   resumeRoute = await import('@/app/api/admin/resumes/[id]/route');
   publicResume = await import('@/app/resume/route');
+  legacyResume = await import('@/app/wasik-ahmed-resume.pdf/route');
   siteCopyRoute = await import('@/app/api/admin/site-copy/route');
   queries = await import('../queries');
   ({ siteCopyDefaults: defaults } = await import('../seed-data/site-copy'));
@@ -163,8 +165,10 @@ describe('résumé uploads', () => {
 describe('/resume', () => {
   it('falls back to the bundled file until a version is live', async () => {
     const res = await publicResume.GET(new Request('http://localhost/resume'));
+    // Temporary, never permanent — a cached 308 is what once pinned
+    // visitors to an old CV (see resume-response.ts).
     expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toBe('/wasik-ahmed-resume.pdf');
+    expect(res.headers.get('location')).toBe('/resume-fallback.pdf');
   });
 
   it('serves the live version, and 304s a repeat request for the same file', async () => {
@@ -181,6 +185,14 @@ describe('/resume', () => {
       new Request('http://localhost/resume', { headers: { 'if-none-match': etag } }),
     );
     expect(again.status).toBe(304);
+  });
+
+  it('serves the live version at the old bundled filename too', async () => {
+    authedAs('admin');
+    await resumesRoute.POST(uploadReq({ label: 'Live', makeCurrent: 'true' }));
+    const res = await legacyResume.GET(new Request('http://localhost/wasik-ahmed-resume.pdf'));
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).equals(PDF)).toBe(true);
   });
 });
 
