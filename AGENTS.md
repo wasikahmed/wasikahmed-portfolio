@@ -214,8 +214,10 @@ Fonts: Inter (`font-sans`), Space Grotesk (`font-display`), JetBrains Mono
   Deleted records are restored under their original `_id` from `/admin/history`.
 - **Résumé** (`models/resume.ts`): every uploaded PDF is kept in Mongo, bytes in
   a `select: false` Buffer, at most one `isCurrent` (partial unique index).
-  `/resume` streams the current one with an ETag and falls back to
-  `public/wasik-ahmed-resume.pdf` until a version is live. Old versions are only
+  `/resume` streams the current one with an ETag and falls back (307, never a
+  permanent redirect) to `public/resume-fallback.pdf` until a version is live.
+  `/wasik-ahmed-resume.pdf` serves the same live version: the old `/resume`
+  sent a cached-forever 308 there (`src/server/resume-response.ts`). Old versions are only
   reachable through `/api/admin/resumes/[id]/file`. A `.lean()` read returns the
   Buffer as a BSON `Binary` — go through `storedBytes()`, never `new
 Uint8Array(doc.data)`.
