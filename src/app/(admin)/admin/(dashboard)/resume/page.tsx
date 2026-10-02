@@ -15,22 +15,47 @@ function formatSize(bytes: number) {
 }
 
 /**
- * Opens one stored version in a new tab. Fetched rather than linked: every
- * /api/admin route checks the CSRF header, which a plain link can't send,
- * so the PDF comes back as a blob and opens from a local object URL.
+ * A stored version's PDF as a local object URL. Fetched rather than linked:
+ * every /api/admin route checks the CSRF header, which a plain link can't
+ * send, so the file comes back as a blob instead.
  */
-async function openVersion(id: string) {
-  const tab = window.open('', '_blank');
+async function versionUrl(id: string): Promise<string | null> {
   const res = await adminFetch(`/api/admin/resumes/${id}/file`);
-  if (!res.ok) {
+  if (!res.ok) return null;
+  const url = URL.createObjectURL(await res.blob());
+  // Long enough for a tab or download to pick it up; useless after that.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return url;
+}
+
+function saveAs(url: string, fileName: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+}
+
+/**
+ * Opens a version in a new tab. The tab is opened synchronously, inside
+ * the click, because popup blockers only allow that — opening it after the
+ * fetch resolves gets blocked. Where a popup is refused anyway (some
+ * embedded browsers refuse all of them), the file downloads instead of the
+ * click doing nothing.
+ */
+async function openVersion(version: ResumeVersion) {
+  const tab = window.open('', '_blank');
+  const url = await versionUrl(version.id);
+  if (!url) {
     tab?.close();
     return;
   }
-  const url = URL.createObjectURL(await res.blob());
   if (tab) tab.location.href = url;
-  else window.location.href = url;
-  // Long enough for the tab to load it; the URL is useless after that.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  else saveAs(url, version.fileName);
+}
+
+async function downloadVersion(version: ResumeVersion) {
+  const url = await versionUrl(version.id);
+  if (url) saveAs(url, version.fileName);
 }
 
 function VersionRow({ version, onChange }: { version: ResumeVersion; onChange: () => void }) {
@@ -79,10 +104,17 @@ function VersionRow({ version, onChange }: { version: ResumeVersion; onChange: (
         <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"
-            onClick={() => void openVersion(version.id)}
+            onClick={() => void openVersion(version)}
             className="text-2xs text-accent hover:underline"
           >
             Open
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadVersion(version)}
+            className="text-2xs text-fg-subtle hover:text-fg"
+          >
+            Download
           </button>
           <button
             type="button"
@@ -119,8 +151,15 @@ function VersionRow({ version, onChange }: { version: ResumeVersion; onChange: (
             void patch({ label, notes });
           }}
         >
-          <Input required value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input
+            aria-label="Label"
+            required
+            maxLength={120}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
           <Textarea
+            aria-label="What changed"
             rows={3}
             className="min-h-0"
             placeholder="What changed in this version"

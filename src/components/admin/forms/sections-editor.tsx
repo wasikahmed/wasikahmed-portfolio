@@ -78,7 +78,7 @@ export function SectionsEditor({
               <Input
                 id={`section-id-${i}`}
                 required
-                pattern="[a-z0-9-]+"
+                pattern="[a-z0-9\-]+"
                 value={section.id}
                 onChange={(e) => update(i, { id: e.target.value })}
               />

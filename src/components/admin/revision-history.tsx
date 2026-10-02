@@ -16,6 +16,18 @@ const ACTION_LABEL: Record<Revision['action'], string> = {
   restore: 'Before restore',
 };
 
+/** The registry's `entityType` keys (src/server/revisions.ts), as a person would say them. */
+export const REVISION_TYPE_LABEL: Record<string, string> = {
+  project: 'Project',
+  post: 'Post',
+  testimonial: 'Testimonial',
+  role: 'Experience',
+  tech: 'Tech',
+  skillGroup: 'Skill group',
+  settings: 'Settings',
+  siteCopy: 'Site copy',
+};
+
 const ACTION_COLOR: Record<Revision['action'], string> = {
   update: 'text-signal-amber',
   delete: 'text-signal-rose',
@@ -32,21 +44,47 @@ function display(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Spreads one level of nested objects into `parent.child` keys. Site copy
+ * is entirely groups (`home.ctaHeading`…) and projects have `headline`/
+ * `seo` objects; without this, changing one heading shows the whole group
+ * as changed. Arrays stay whole — a changed metric or section shows as its
+ * list, which reads fine at CMS scale and keeps this dependency-free.
+ */
+function flatten(record: Record<string, unknown>): Record<string, unknown> {
+  const flat: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (IGNORED_KEYS.has(key)) continue;
+    if (isPlainObject(value)) {
+      for (const [child, childValue] of Object.entries(value)) {
+        flat[`${key}.${child}`] = childValue;
+      }
+    } else {
+      flat[key] = value;
+    }
+  }
+  return flat;
+}
+
 /**
  * The fields where a revision differs from `current`, or — with nothing to
  * compare against (the global history page, a deleted record) — every
- * field it has. Top-level only: a changed metric or section shows as its
- * whole array, which reads fine at CMS scale and keeps this dependency-free.
+ * field it has.
  */
 export function revisionChanges(
   snapshot: Record<string, unknown>,
   current?: Record<string, unknown>,
 ): { key: string; before: unknown; now?: unknown }[] {
-  const keys = new Set([...Object.keys(snapshot), ...Object.keys(current ?? {})]);
+  const before = flatten(snapshot);
+  const now = current ? flatten(current) : undefined;
+  const keys = new Set([...Object.keys(before), ...Object.keys(now ?? {})]);
   return [...keys]
-    .filter((key) => !IGNORED_KEYS.has(key))
-    .filter((key) => !current || stable(snapshot[key]) !== stable(current[key]))
-    .map((key) => ({ key, before: snapshot[key], now: current?.[key] }));
+    .filter((key) => !now || stable(before[key]) !== stable(now[key]))
+    .map((key) => ({ key, before: before[key], now: now?.[key] }));
 }
 
 function ValueBlock({ label, value }: { label: string; value: unknown }) {
@@ -103,7 +141,10 @@ export function RevisionRow({
         {showLabel ? (
           <span className="text-fg min-w-0 flex-1 truncate text-sm">
             {revision.label}
-            <span className="text-fg-subtle"> · {revision.entityType}</span>
+            <span className="text-fg-subtle">
+              {' '}
+              · {REVISION_TYPE_LABEL[revision.entityType] ?? revision.entityType}
+            </span>
           </span>
         ) : (
           <span className="flex-1" />
