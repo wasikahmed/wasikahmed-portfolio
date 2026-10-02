@@ -3,37 +3,36 @@ import { Suspense } from 'react';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { WorkIndex } from '@/components/work/work-index';
-import { getProjects, getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
-import { spelledOutCount } from '@/lib/format';
+import { getProjects, getSettings, getSiteCopy } from '@/server/queries';
+import { pageTitle, pageMetadata } from '@/lib/seo';
+import { fillCount } from '@/lib/format';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  return {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  return pageMetadata({
     title: pageTitle('Work', settings.name),
-    description: 'Case studies: AI pipelines, schedulers, and internal systems in production.',
-    alternates: canonical('/work'),
-  };
+    description: copy.work.metaDescription,
+    path: '/work',
+    siteName: settings.name,
+  });
 }
 
 export default async function WorkPage() {
-  const projects = await getProjects();
-  const count = spelledOutCount(projects.length);
+  const [projects, copy] = await Promise.all([getProjects(), getSiteCopy()]);
 
   return (
     <Section density="spacious" ambient={['grid']} className="pt-10 sm:pt-16">
       <Container>
         <Eyebrow rule>Work</Eyebrow>
         <h1 className="font-display mt-6 max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-          Systems that are still running.
+          {copy.work.heading}
         </h1>
         <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">
           {/* Was hardcoded "Four" — the same drift PLAN.md W5 fixed on the
               home page, still live here. Wrong the moment a project ships
-              or is unpublished from the CMS. */}
-          {count.charAt(0).toUpperCase() + count.slice(1)} project
-          {projects.length === 1 ? '' : 's'} in production, one of which you are reading. Every
-          number below points at something you can go and check.
+              or is unpublished from the CMS. The sentence is site copy now;
+              the number in it still comes from the data. */}
+          {fillCount(copy.work.intro, projects.length)}
         </p>
 
         <div className="mt-14">

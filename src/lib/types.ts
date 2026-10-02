@@ -260,3 +260,71 @@ export interface ApiToken {
   lastUsedAt?: string;
   createdAt: string;
 }
+
+/**
+ * Page copy that used to be hardcoded in components — headings, intros,
+ * calls to action and meta descriptions — now edited from /admin/site-copy.
+ * A singleton like Settings, kept separate from it so Settings stays "facts
+ * about the person" and this stays "words on the pages".
+ *
+ * Grouped by the page each string appears on, which is also how the admin
+ * form is laid out. Headings that mention how many projects are live take
+ * `{count}`/`{Count}`/`{s}` tokens (see `fillCount` in format.ts).
+ */
+export interface SiteCopy {
+  seo: { siteDescription: string };
+  home: {
+    workHeading: string;
+    impactHeading: string;
+    impactIntro: string;
+    experienceHeading: string;
+    approachHeading: string;
+    approachIntro: string;
+    shippedHeading: string;
+    shippedMoreTitle: string;
+    shippedMoreBody: string;
+    ctaHeading: string;
+    ctaBody: string;
+  };
+  about: { metaDescription: string; heading: string; skillsHeading: string };
+  work: { metaDescription: string; heading: string; intro: string };
+  writing: { metaDescription: string; heading: string; intro: string };
+  contact: { metaDescription: string; heading: string; intro: string };
+  caseStudy: { ctaText: string };
+  footer: { unavailableText: string };
+}
+
+/**
+ * One uploaded résumé PDF (admin view — never carries the file bytes; those
+ * are only read by the two routes that stream them). Exactly one version is
+ * `isCurrent`, and that is what /resume serves.
+ */
+export interface ResumeVersion {
+  id: string;
+  label: string;
+  notes?: string;
+  fileName: string;
+  size: number;
+  sha256: string;
+  isCurrent: boolean;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+/**
+ * A saved copy of a CMS record as it was *before* a change — the content
+ * the audit log only describes in one line. Restoring one writes the
+ * snapshot back (and records the state it replaced, so a restore is itself
+ * undoable).
+ */
+export interface Revision {
+  id: string;
+  entityType: string;
+  entityId: string;
+  /** Human-readable name of the record, captured at snapshot time. */
+  label: string;
+  action: 'update' | 'delete' | 'restore';
+  userEmail: string;
+  snapshot: Record<string, unknown>;
+  createdAt: string;
+}

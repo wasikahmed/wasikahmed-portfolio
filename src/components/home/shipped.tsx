@@ -1,7 +1,7 @@
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Reveal } from '@/components/motion/reveal';
-import { getProjects, getSettings } from '@/server/queries';
+import { getProjects, getSettings, getSiteCopy } from '@/server/queries';
 
 /**
  * Public artefacts, derived from each project's `links` rather than from a
@@ -14,7 +14,11 @@ import { getProjects, getSettings } from '@/server/queries';
  * a project and it appears here, so the two can never disagree.
  */
 export async function Shipped() {
-  const [projects, settings] = await Promise.all([getProjects(), getSettings()]);
+  const [projects, settings, copy] = await Promise.all([
+    getProjects(),
+    getSettings(),
+    getSiteCopy(),
+  ]);
   const shipped = projects.filter((p) => p.links?.length);
   const github = settings.socials.find((s) => s.label === 'GitHub');
 
@@ -25,7 +29,7 @@ export async function Shipped() {
       <Container>
         <Eyebrow rule>Shipped &amp; public</Eyebrow>
         <h2 className="font-display mt-5 max-w-2xl text-3xl font-bold tracking-tight text-balance">
-          Things you can open yourself.
+          {copy.home.shippedHeading}
         </h2>
 
         <ul className="divide-border-subtle border-border-subtle mt-10 flex flex-col divide-y border-t">
@@ -60,11 +64,9 @@ export async function Shipped() {
               <div className="flex flex-col gap-3 py-5 sm:flex-row sm:items-baseline sm:gap-8">
                 <div className="min-w-0 sm:w-64 sm:shrink-0">
                   <p className="font-display text-fg text-lg font-semibold tracking-tight">
-                    Everything else
+                    {copy.home.shippedMoreTitle}
                   </p>
-                  <p className="text-fg-subtle mt-1 text-xs">
-                    Smaller projects and experiments, in public.
-                  </p>
+                  <p className="text-fg-subtle mt-1 text-xs">{copy.home.shippedMoreBody}</p>
                 </div>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
                   <a

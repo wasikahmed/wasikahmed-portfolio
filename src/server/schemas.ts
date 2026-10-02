@@ -220,6 +220,64 @@ export const settingsSchema = z.object({
   approach: z.array(approachStepSchema).default([]),
 });
 
+const copyText = z.string().trim().min(1);
+// Meta descriptions get the same 200-character ceiling `seoSchema` applies
+// to per-project/per-post descriptions — search engines truncate long
+// before that anyway.
+const metaDescription = z.string().trim().min(1).max(200);
+
+/**
+ * PATCH /api/admin/site-copy — the whole document every time, every field
+ * required. Partial saves would make "what is on the page right now" depend
+ * on which fields happened to be stored versus defaulted; requiring the
+ * full shape means a saved document is always complete.
+ */
+export const siteCopySchema = z.object({
+  seo: z.object({ siteDescription: metaDescription }),
+  home: z.object({
+    workHeading: copyText,
+    impactHeading: copyText,
+    impactIntro: copyText,
+    experienceHeading: copyText,
+    approachHeading: copyText,
+    approachIntro: copyText,
+    shippedHeading: copyText,
+    shippedMoreTitle: copyText,
+    shippedMoreBody: copyText,
+    ctaHeading: copyText,
+    ctaBody: copyText,
+  }),
+  about: z.object({ metaDescription, heading: copyText, skillsHeading: copyText }),
+  work: z.object({ metaDescription, heading: copyText, intro: copyText }),
+  writing: z.object({ metaDescription, heading: copyText, intro: copyText }),
+  contact: z.object({ metaDescription, heading: copyText, intro: copyText }),
+  caseStudy: z.object({ ctaText: copyText }),
+  footer: z.object({ unavailableText: copyText }),
+});
+
+/**
+ * Résumé upload metadata — the PDF itself arrives as multipart form data,
+ * same split as `mediaSchema`. `makeCurrent` is a form checkbox, so it
+ * arrives as the string "true" or not at all.
+ */
+export const resumeUploadSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  notes: z.string().trim().max(2000).optional(),
+  makeCurrent: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+});
+
+/** PATCH /api/admin/resumes/[id] — rename, re-note, or make this the live version. */
+export const resumeUpdateSchema = z
+  .object({
+    label: z.string().trim().min(1).max(120).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    isCurrent: z.literal(true).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });
+
 /** The public submission contract for POST /api/contact. */
 export const leadSchema = z.object({
   intent: z.enum(['project', 'role']),

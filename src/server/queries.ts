@@ -12,6 +12,9 @@ import { TechItem } from './models/tech-item';
 import { SkillGroup } from './models/skill-group';
 import { Settings, SETTINGS_SINGLETON_ID } from './models/settings';
 import { settingsSeed } from './seed-data/settings';
+import { SiteCopyModel, SITE_COPY_SINGLETON_ID } from './models/site-copy';
+import { siteCopyDefaults } from './seed-data/site-copy';
+import { ResumeVersionModel } from './models/resume';
 import { normalizeDoc } from './mongo-utils';
 import type {
   Project as ProjectType,
@@ -21,6 +24,7 @@ import type {
   Tech as TechType,
   SkillGroup as SkillGroupType,
   Settings as SettingsType,
+  SiteCopy as SiteCopyType,
 } from '@/lib/types';
 
 /**
@@ -188,3 +192,48 @@ export const getSettings = cache(async (): Promise<SettingsType> => {
   delete (normalized as Record<string, unknown>).id;
   return normalized as SettingsType;
 });
+
+// ── Site copy (singleton) ──────────────────────────────────────────────
+
+/**
+ * Stored copy merged over `siteCopyDefaults`, group by group and field by
+ * field. A missing document, a missing group, or a field added to the
+ * defaults after the document was saved all resolve to the default text —
+ * never to an empty heading on the live page. Empty strings count as
+ * missing for the same reason (the write path rejects them, but a hand-
+ * edited document shouldn't be able to blank a page either).
+ */
+export function mergeSiteCopy(stored: Partial<Record<string, unknown>> | null): SiteCopyType {
+  const merged = structuredClone(siteCopyDefaults) as unknown as Record<
+    string,
+    Record<string, string>
+  >;
+  if (!stored) return merged as unknown as SiteCopyType;
+  for (const [groupKey, defaults] of Object.entries(merged)) {
+    const storedGroup = stored[groupKey];
+    if (!storedGroup || typeof storedGroup !== 'object') continue;
+    for (const field of Object.keys(defaults)) {
+      const value = (storedGroup as Record<string, unknown>)[field];
+      if (typeof value === 'string' && value.trim()) defaults[field] = value;
+    }
+  }
+  return merged as unknown as SiteCopyType;
+}
+
+export const getSiteCopy = cache(async (): Promise<SiteCopyType> => {
+  await connectToDatabase();
+  const doc = await SiteCopyModel.findById(SITE_COPY_SINGLETON_ID).lean();
+  return mergeSiteCopy(doc as Partial<Record<string, unknown>> | null);
+});
+
+// ── Résumé ──────────────────────────────────────────────────────────────
+
+/**
+ * The live résumé, bytes included — only /resume calls this. Not wrapped
+ * in `cache()`: it runs from a Route Handler, outside any React render, so
+ * there is no request-scoped memo to share.
+ */
+export async function getCurrentResumeFile() {
+  await connectToDatabase();
+  return ResumeVersionModel.findOne({ isCurrent: true }).select('+data').lean();
+}

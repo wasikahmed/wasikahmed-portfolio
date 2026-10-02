@@ -105,7 +105,8 @@ src/
   proxy.ts           Next 16's middleware (renamed from middleware.ts).
   server/            server-only. Never importable from a Client Component.
     models/          Mongoose schemas.
-    seed-data/       Initial content for `pnpm seed`.
+    seed-data/       Initial content for `pnpm seed`, plus site-copy defaults.
+    revisions.ts     Content history registry: record + restore. See §6.
     queries.ts       The read layer. get*/getAll* split — see §6.
     admin-crud.ts    Generic CRUD route factory. Six collections share it.
     schemas.ts       Zod schemas. The write-side validation boundary.
@@ -150,6 +151,17 @@ scripts/             seed.ts, seed-admin.ts
    CSRF header.
 7. **Draft content must never reach the public site.** `get*` functions filter to
    published/scheduled-and-due; `getAll*` do not. Public pages use `get*`. Only.
+8. **No page copy in components.** Headings, intros, calls to action and meta
+   descriptions come from the site-copy singleton (`getSiteCopy()`), edited at
+   `/admin/site-copy`. A new one is a field in `SiteCopy` (`lib/types.ts`), its
+   default in `seed-data/site-copy.ts`, the Mongoose group and Zod schema, and
+   an entry in `lib/site-copy-fields.ts` — never a string literal in JSX.
+   Structural labels (eyebrows, button text, empty states) may stay in code.
+9. **Versioned writes keep the old state.** Every update/delete of a type
+   registered in `src/server/revisions.ts` calls `recordRevision()` with the
+   record as it was _before_ the change — `admin-crud.ts` does this for you;
+   a hand-written route for a registered type must do it itself (see the
+   settings and site-copy routes).
 
 ---
 
@@ -189,6 +201,24 @@ Fonts: Inter (`font-sans`), Space Grotesk (`font-display`), JetBrains Mono
   places (see PLAN.md W5) — check both when editing a shape.
 - `Settings` is a singleton keyed by the fixed `_id` `'settings'`. `getSettings()`
   falls back to the seed shape rather than throwing when unseeded.
+- `SiteCopy` is a singleton keyed by `'site-copy'`, never seeded. `getSiteCopy()`
+  merges the stored document over `siteCopyDefaults` field by field, so a field
+  added later shows its default on a database that predates it. Headings that
+  state how many projects are live use `{count}`/`{Count}`/`{s}` tokens filled
+  by `fillCount()` — the number always comes from the data.
+- **Content history** (`models/revision.ts`, `src/server/revisions.ts`): up to
+  50 previous states per record, for projects, posts, testimonials, roles, tech,
+  skill groups, settings and site copy. Restores are re-validated against the
+  current Zod schema (publish guard included), keep the record's current
+  `order`, and record the state they replace, so a restore is itself undoable.
+  Deleted records are restored under their original `_id` from `/admin/history`.
+- **Résumé** (`models/resume.ts`): every uploaded PDF is kept in Mongo, bytes in
+  a `select: false` Buffer, at most one `isCurrent` (partial unique index).
+  `/resume` streams the current one with an ETag and falls back to
+  `public/wasik-ahmed-resume.pdf` until a version is live. Old versions are only
+  reachable through `/api/admin/resumes/[id]/file`. A `.lean()` read returns the
+  Buffer as a BSON `Binary` — go through `storedBytes()`, never `new
+Uint8Array(doc.data)`.
 
 ---
 

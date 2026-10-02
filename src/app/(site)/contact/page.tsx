@@ -2,21 +2,21 @@ import type { Metadata } from 'next';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
-import { getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
+import { getSettings, getSiteCopy } from '@/server/queries';
+import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  return {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  return pageMetadata({
     title: pageTitle('Contact', settings.name),
-    description:
-      'Get in touch about a software engineering role, or a project that needs building. Based in Dhaka, open to remote.',
-    alternates: canonical('/contact'),
-  };
+    description: copy.contact.metaDescription,
+    path: '/contact',
+    siteName: settings.name,
+  });
 }
 
 export default async function ContactPage() {
-  const settings = await getSettings();
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
 
   return (
     <Section density="spacious" ambient={['blob']} className="pt-10 sm:pt-16">
@@ -25,12 +25,9 @@ export default async function ContactPage() {
           <div className="min-w-0">
             <Eyebrow rule>Contact</Eyebrow>
             <h1 className="font-display mt-6 max-w-xl text-4xl font-bold tracking-tighter text-balance">
-              Tell me what you are building.
+              {copy.contact.heading}
             </h1>
-            <p className="text-fg-muted mt-5 max-w-lg text-lg text-pretty">
-              Hiring, or have something that needs building? Either way, a couple of sentences is
-              enough to start. If I am not the right fit I will say so plainly.
-            </p>
+            <p className="text-fg-muted mt-5 max-w-lg text-lg text-pretty">{copy.contact.intro}</p>
 
             <div className="mt-12">
               <ContactForm email={settings.email} />

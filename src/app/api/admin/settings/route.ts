@@ -6,6 +6,7 @@ import { writeAuditLog } from '@/server/audit';
 import { Settings, SETTINGS_SINGLETON_ID } from '@/server/models/settings';
 import { settingsSchema } from '@/server/schemas';
 import { normalizeDoc } from '@/server/mongo-utils';
+import { recordRevision } from '@/server/revisions';
 
 export async function GET(request: NextRequest) {
   const { response } = await requirePermission(request, 'settings:read');
@@ -27,10 +28,21 @@ export async function PATCH(request: NextRequest) {
   }
 
   await connectToDatabase();
+  const before = await Settings.findById(SETTINGS_SINGLETON_ID).lean();
   const updated = await Settings.findByIdAndUpdate(SETTINGS_SINGLETON_ID, result.data, {
     upsert: true,
     returnDocument: 'after',
   }).lean();
+
+  if (before) {
+    await recordRevision({
+      entityType: 'settings',
+      entityId: SETTINGS_SINGLETON_ID,
+      before: before as Record<string, unknown>,
+      action: 'update',
+      userEmail: session.email,
+    });
+  }
 
   await writeAuditLog({
     userEmail: session.email,

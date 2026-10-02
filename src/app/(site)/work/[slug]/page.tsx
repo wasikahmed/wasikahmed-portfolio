@@ -12,8 +12,14 @@ import { ViewTransition } from '@/components/motion/view-transition';
 import { Architecture } from '@/components/case-study/architecture';
 import { Toc } from '@/components/case-study/toc';
 import { MdxContent } from '@/components/mdx/mdx-content';
-import { getProjectSlugs, getProject, getAdjacentProjects, getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
+import {
+  getProjectSlugs,
+  getProject,
+  getAdjacentProjects,
+  getSettings,
+  getSiteCopy,
+} from '@/server/queries';
+import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateStaticParams() {
   // Best-effort pre-render: `next build` runs this with no guarantee the
@@ -42,16 +48,17 @@ export async function generateMetadata({
   // The CMS's SEO override fields (publish-fields.tsx) had nowhere to land
   // until now — PLAN.md W3. A blank override falls back to the same values
   // the page body renders.
-  return {
+  return pageMetadata({
     title: pageTitle(project.seo?.title ?? project.title, settings.name),
     description: project.seo?.description ?? project.problem,
-    alternates: canonical(`/work/${slug}`),
-  };
+    path: `/work/${slug}`,
+    siteName: settings.name,
+  });
 }
 
 export default async function CaseStudyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const project = await getProject(slug);
+  const [project, copy] = await Promise.all([getProject(slug), getSiteCopy()]);
   if (!project) notFound();
 
   const { next } = await getAdjacentProjects(slug);
@@ -202,7 +209,7 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
       <Section bordered density="compact">
         <Container className="flex flex-wrap items-center justify-between gap-6">
-          <p className="text-fg-muted max-w-md">Got a problem shaped like this one?</p>
+          <p className="text-fg-muted max-w-md">{copy.caseStudy.ctaText}</p>
           <Button href="/contact" className="group">
             Start a conversation
             <ArrowRight />

@@ -3,10 +3,10 @@ import { Button, ArrowRight } from '@/components/ui/button';
 import { Magnetic } from '@/components/motion/magnetic';
 import { Reveal } from '@/components/motion/reveal';
 import { StatusDot } from '@/components/ui/eyebrow';
-import { getSettings } from '@/server/queries';
+import { getSettings, getSiteCopy } from '@/server/queries';
 
 export async function CtaBand() {
-  const settings = await getSettings();
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
 
   return (
     <Section id="contact" density="spacious" bordered ambient={['blob', 'noise']}>
@@ -20,12 +20,9 @@ export async function CtaBand() {
           ) : null}
 
           <h2 className="font-display mx-auto max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-            Hiring, or just curious?
+            {copy.home.ctaHeading}
           </h2>
-          <p className="text-fg-muted mx-auto mt-5 max-w-md text-pretty">
-            I am open to software engineering roles, remote preferred, and to automation work
-            alongside them. Tell me what you are building.
-          </p>
+          <p className="text-fg-muted mx-auto mt-5 max-w-md text-pretty">{copy.home.ctaBody}</p>
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Magnetic>

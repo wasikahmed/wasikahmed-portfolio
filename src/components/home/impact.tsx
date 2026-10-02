@@ -1,7 +1,7 @@
 import { Section, Container } from '@/components/ui/section';
 import { Metric } from '@/components/motion/metric';
 import { Reveal } from '@/components/motion/reveal';
-import { getProjects } from '@/server/queries';
+import { getProjects, getSiteCopy } from '@/server/queries';
 
 /**
  * Full-bleed statement moment — the second deliberate break from the card
@@ -12,19 +12,17 @@ import { getProjects } from '@/server/queries';
  * strands itself alone on a second row.
  */
 export async function Impact() {
-  const projects = (await getProjects()).slice(0, 4);
+  const [allProjects, copy] = await Promise.all([getProjects(), getSiteCopy()]);
+  const projects = allProjects.slice(0, 4);
 
   return (
     <Section id="impact" density="spacious" bordered ambient={['scanlines', 'guides']}>
       <Container>
         <Reveal>
           <h2 className="font-display max-w-3xl text-3xl font-bold tracking-tight text-balance">
-            The numbers, and where you can go and check them.
+            {copy.home.impactHeading}
           </h2>
-          <p className="text-fg-muted mt-4 max-w-xl text-sm">
-            A figure on its own is marketing. Each of these points at something public — a store
-            listing, a published package, a test suite that runs on every push.
-          </p>
+          <p className="text-fg-muted mt-4 max-w-xl text-sm">{copy.home.impactIntro}</p>
         </Reveal>
 
         <div className="mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">

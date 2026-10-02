@@ -25,7 +25,7 @@ import type { Role } from '@/lib/types';
  *
  * `roles` arrives sorted by `order` ascending (queries.ts's `getRoles()`).
  */
-export function Experience({ roles }: { roles: Role[] }) {
+export function Experience({ roles, heading }: { roles: Role[]; heading: string }) {
   const work = roles.filter((role) => role.kind !== 'education');
 
   return (
@@ -35,7 +35,7 @@ export function Experience({ roles }: { roles: Role[] }) {
           <div>
             <Eyebrow rule>Experience</Eyebrow>
             <h2 className="font-display mt-5 max-w-xl text-3xl font-bold tracking-tight text-balance">
-              Where I&apos;ve built.
+              {heading}
             </h2>
           </div>
           {/* Not "Full experience" any more — the full list is right here.

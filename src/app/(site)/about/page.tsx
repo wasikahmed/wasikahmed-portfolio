@@ -6,24 +6,25 @@ import { Button, ArrowRight } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { RoleAccordion } from '@/components/experience/role-accordion';
-import { getSkillGroups, getRoles, getSettings } from '@/server/queries';
-import { pageTitle, canonical } from '@/lib/seo';
+import { getSkillGroups, getRoles, getSettings, getSiteCopy } from '@/server/queries';
+import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  return {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  return pageMetadata({
     title: pageTitle('About', settings.name),
-    description:
-      'Backend engineer in Dhaka building Django and TypeScript systems — live apps, offline-first desktop software, and automation.',
-    alternates: canonical('/about'),
-  };
+    description: copy.about.metaDescription,
+    path: '/about',
+    siteName: settings.name,
+  });
 }
 
 export default async function AboutPage() {
-  const [skillGroups, roles, settings] = await Promise.all([
+  const [skillGroups, roles, settings, copy] = await Promise.all([
     getSkillGroups(),
     getRoles(),
     getSettings(),
+    getSiteCopy(),
   ]);
 
   return (
@@ -34,7 +35,7 @@ export default async function AboutPage() {
             <Reveal>
               <Eyebrow rule>About</Eyebrow>
               <h1 className="font-display mt-6 max-w-2xl text-4xl font-bold tracking-tighter text-balance">
-                I build software that removes a problem.
+                {copy.about.heading}
               </h1>
               <div className="mt-8 flex max-w-xl flex-col gap-5">
                 {settings.story.map((paragraph, i) => (
@@ -107,7 +108,7 @@ export default async function AboutPage() {
         <Container>
           <Eyebrow rule>Skills</Eyebrow>
           <h2 className="font-display mt-5 max-w-xl text-3xl font-bold tracking-tight text-balance">
-            What I reach for.
+            {copy.about.skillsHeading}
           </h2>
 
           <Stagger

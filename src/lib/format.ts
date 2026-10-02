@@ -36,3 +36,19 @@ const SMALL_NUMBER_WORDS = [
 export function spelledOutCount(n: number): string {
   return SMALL_NUMBER_WORDS[n] ?? String(n);
 }
+
+/**
+ * Fills the count tokens site-copy headings may use — `{count}` ("seven"),
+ * `{Count}` ("Seven") and `{s}` (plural suffix). The headings that mention
+ * how many projects are live used to compute this inline (see
+ * spelledOutCount's note above); once that copy moved into the CMS, the
+ * number still has to come from the data, not from whoever last edited
+ * the sentence, or it drifts exactly the way the hardcoded "Four" did.
+ */
+export function fillCount(template: string, n: number): string {
+  const word = spelledOutCount(n);
+  return template
+    .replaceAll('{Count}', word.charAt(0).toUpperCase() + word.slice(1))
+    .replaceAll('{count}', word)
+    .replaceAll('{s}', n === 1 ? '' : 's');
+}

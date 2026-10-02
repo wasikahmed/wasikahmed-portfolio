@@ -28,7 +28,13 @@ function ColumnLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Footer({ settings }: { settings: Settings }) {
+export function Footer({
+  settings,
+  unavailableText,
+}: {
+  settings: Settings;
+  unavailableText: string;
+}) {
   const meta: [string, string][] = [
     ['Replies', settings.responseTime],
     ['Based in', settings.location],
@@ -140,7 +146,7 @@ export function Footer({ settings }: { settings: Settings }) {
                 {settings.availableFor}
               </p>
             ) : (
-              <p className="text-fg-muted text-sm">Not taking on new work right now.</p>
+              <p className="text-fg-muted text-sm">{unavailableText}</p>
             )}
 
             <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 font-mono text-xs">

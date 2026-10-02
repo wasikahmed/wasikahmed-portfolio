@@ -1,7 +1,7 @@
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
-import { getSettings } from '@/server/queries';
+import { getSettings, getSiteCopy } from '@/server/queries';
 
 /**
  * Editorial two-column — the third deliberate break from the card grid
@@ -9,7 +9,7 @@ import { getSettings } from '@/server/queries';
  * the right; no cards, no borders around each step.
  */
 export async function Process() {
-  const settings = await getSettings();
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
 
   return (
     <Section id="process" bordered ambient={['grid']}>
@@ -18,12 +18,9 @@ export async function Process() {
           <Reveal className="lg:sticky lg:top-28 lg:self-start">
             <Eyebrow rule>Approach</Eyebrow>
             <h2 className="font-display mt-5 text-3xl font-bold tracking-tight text-balance">
-              How I actually work.
+              {copy.home.approachHeading}
             </h2>
-            <p className="text-fg-muted mt-5 text-sm leading-relaxed">
-              The hardest part is rarely the code. It is understanding the problem precisely enough
-              to know what to build, and then building it so somebody else can keep it running.
-            </p>
+            <p className="text-fg-muted mt-5 text-sm leading-relaxed">{copy.home.approachIntro}</p>
           </Reveal>
 
           <Stagger className="flex flex-col" gap={0.09}>

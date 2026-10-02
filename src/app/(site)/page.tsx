@@ -7,17 +7,18 @@ import { Process } from '@/components/home/process';
 import { Shipped } from '@/components/home/shipped';
 import { CtaBand } from '@/components/home/cta-band';
 import { SectionRail } from '@/components/layout/section-rail';
-import { getSettings, getRoles } from '@/server/queries';
-import { canonical } from '@/lib/seo';
+import { getSettings, getRoles, getSiteCopy } from '@/server/queries';
+import { pageMetadata } from '@/lib/seo';
 import { personJsonLd } from '@/lib/json-ld';
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
-  return {
+  return pageMetadata({
     title: `${settings.name} — ${settings.role}`,
     description: settings.proof,
-    alternates: canonical('/'),
-  };
+    path: '/',
+    siteName: settings.name,
+  });
 }
 
 const RAIL = [
@@ -31,7 +32,7 @@ const RAIL = [
 ];
 
 export default async function HomePage() {
-  const [roles, settings] = await Promise.all([getRoles(), getSettings()]);
+  const [roles, settings, copy] = await Promise.all([getRoles(), getSettings(), getSiteCopy()]);
 
   return (
     <>
@@ -45,7 +46,7 @@ export default async function HomePage() {
       <Hero />
       <SelectedWork />
       <Impact />
-      <Experience roles={roles} />
+      <Experience roles={roles} heading={copy.home.experienceHeading} />
       <Process />
       <Shipped />
       <CtaBand />
