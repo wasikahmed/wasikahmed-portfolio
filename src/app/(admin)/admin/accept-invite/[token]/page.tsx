@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { turnstileSiteKey } from '@/server/turnstile';
 import { AcceptInviteForm } from './accept-invite-form';
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default async function AcceptInvitePage({ params }: { params: Promise<{ t
         </span>
         <h1 className="font-display text-xl font-bold tracking-tight">Accept invite</h1>
       </div>
-      <AcceptInviteForm token={token} />
+      <AcceptInviteForm token={token} turnstileSiteKey={turnstileSiteKey()} />
     </main>
   );
 }

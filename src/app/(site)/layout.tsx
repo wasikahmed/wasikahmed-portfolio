@@ -49,13 +49,18 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     getSiteCopy(),
   ]);
 
+  // SiteShell is a Client Component, so everything handed to it is
+  // serialized into every page's HTML. The WhatsApp number must not be:
+  // keeping it out of the markup is the whole point of /whatsapp.
+  const publicSettings = { ...settings, whatsapp: undefined };
+
   return (
-    <SiteShell settings={settings} projects={projects} posts={posts}>
+    <SiteShell settings={publicSettings} projects={projects} posts={posts}>
       {/* pt-16 clears the fixed header. */}
       <main id="main" className="flex-1 pt-16">
         {children}
       </main>
-      <Footer settings={settings} unavailableText={copy.footer.unavailableText} />
+      <Footer settings={publicSettings} unavailableText={copy.footer.unavailableText} />
       {/* Umami, public pages only — see components/analytics/analytics.tsx. */}
       <Analytics />
     </SiteShell>

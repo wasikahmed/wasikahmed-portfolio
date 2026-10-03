@@ -6,7 +6,7 @@ import { leadSchema } from '@/server/schemas';
 import { getSettings } from '@/server/queries';
 import { checkRateLimit, getClientIp, hashIp } from '@/server/rate-limit';
 import { verifyTurnstile } from '@/server/turnstile';
-import { sendLeadNotification } from '@/server/email';
+import { sendLeadNotification, sendLeadReceipt } from '@/server/email';
 
 /**
  * Public — no session, no CSRF (there is no cookie to check for an
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Verification failed. Please try again.' }, { status: 422 });
   }
 
-  const { intent, name, email, company, budget, message } = result.data;
-  const lead = { intent, name, email, company, budget, message };
+  const { name, email, company, budget, message } = result.data;
+  const lead = { name, email, company, budget, message };
 
   await connectToDatabase();
   await Lead.create({
@@ -47,8 +47,23 @@ export async function POST(request: NextRequest) {
     userAgent: request.headers.get('user-agent') ?? undefined,
   });
 
+  // The lead is saved — from here on, an email failure is ours to see in
+  // the logs, not the visitor's to retry. Reporting it as an error used to
+  // invite a resubmit, which only duplicated a lead that already existed.
   const settings = await getSettings();
-  await sendLeadNotification(lead, settings.email);
+  const [notified, receipt] = await Promise.allSettled([
+    sendLeadNotification(lead, settings.email),
+    sendLeadReceipt(email, settings),
+  ]);
+  if (notified.status === 'rejected') {
+    console.error('[contact] lead notification failed', notified.reason);
+  }
+  if (receipt.status === 'rejected') {
+    console.error('[contact] lead receipt failed', receipt.reason);
+  }
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, receiptSent: receipt.status === 'fulfilled' && receipt.value },
+    { status: 201 },
+  );
 }

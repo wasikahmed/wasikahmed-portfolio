@@ -76,6 +76,8 @@ const leadResponseSchema = leadSchema
   .omit({ turnstileToken: true })
   .extend({
     id: idField,
+    // Present only on leads submitted before the form stopped asking.
+    intent: z.enum(['project', 'role']).optional(),
     notes: z.string().max(5000).optional(),
     source: z.string().optional(),
     ipHash: z.string().optional(),
@@ -1007,7 +1009,10 @@ const publicAuthPaths: ZodOpenApiPathsObject = {
       security: PUBLIC,
       requestBody: { content: { 'application/json': { schema: leadSchema } } },
       responses: {
-        '201': jsonResponse('201 Created', okSchema),
+        '201': jsonResponse(
+          '201 Created. `receiptSent` says whether a confirmation email went to the submitted address.',
+          okSchema.extend({ receiptSent: z.boolean() }).meta({ id: 'ContactSubmitted' }),
+        ),
         '422': VALIDATION_FAILED,
         '429': jsonResponse('429 — rate limited.', errorSchema),
       },

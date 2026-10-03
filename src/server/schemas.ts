@@ -199,6 +199,11 @@ export const skillGroupSchema = z.object({
   order: z.number().int().default(0),
 });
 
+/** What wa.me wants: digits only, country code first, no `+`. */
+export function whatsappDigits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
 export const settingsSchema = z.object({
   name: z.string().min(1),
   initials: z.string().min(1).max(4),
@@ -212,6 +217,17 @@ export const settingsSchema = z.object({
   available: z.boolean(),
   availableFor: z.string().min(1),
   responseTime: z.string().min(1),
+  // Empty clears it. Spaces, dashes and brackets are fine (it is stored as
+  // typed, and read back that way in the admin); /whatsapp strips them.
+  // 8–15 digits is E.164's range, country code included.
+  whatsapp: z
+    .string()
+    .trim()
+    .refine(
+      (v) => v === '' || (/^\+?[\d\s().-]+$/.test(v) && /^\d{8,15}$/.test(whatsappDigits(v))),
+      { message: 'Use the full international number, country code first, e.g. +44 7700 900123.' },
+    )
+    .optional(),
   socials: z.array(linkSchema),
   portrait: mediaRefSchema.optional(),
   // Defaulted, not required: settings documents written before these
@@ -281,7 +297,6 @@ export const resumeUpdateSchema = z
 
 /** The public submission contract for POST /api/contact. */
 export const leadSchema = z.object({
-  intent: z.enum(['project', 'role']),
   name: z.string().min(1).max(200),
   email: z.string().email(),
   company: z.string().max(200).optional(),

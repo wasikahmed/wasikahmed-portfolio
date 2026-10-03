@@ -22,6 +22,8 @@ export const EVENTS = {
   emailCopy: 'email_copy',
   /** /resume or /wasik-ahmed-resume.pdf opened. */
   resumeDownload: 'resume_download',
+  /** /whatsapp opened — the redirect to wa.me. */
+  whatsappClick: 'whatsapp_click',
   /** A link that leaves the site. */
   outboundClick: 'outbound_click',
   /** A primary call to action (anything marked `data-track="cta_click"`). */

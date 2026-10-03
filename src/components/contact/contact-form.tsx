@@ -1,55 +1,64 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Field, Input, Textarea, Select } from '@/components/ui/field';
+import { Field, Input, Textarea } from '@/components/ui/field';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { TurnstileWidget } from '@/components/contact/turnstile-widget';
 import { EmailLink } from '@/components/ui/email-link';
 import { EVENTS, track } from '@/lib/analytics';
 
-type Intent = 'project' | 'role';
 type Status = 'idle' | 'pending' | 'sent' | 'error';
 
 /**
- * One short form, no branching.
+ * One short form, no branching, no qualifying questions.
  *
- * Earlier versions made "a role or a project?" the first thing a visitor
- * had to answer — first as two cards gating every other field, then as
- * two cards that stayed but swapped fields in and out beneath them. Both
- * put a qualifying question ahead of the message, on the one page whose
- * entire job is receiving a message, and the animated show/hide moved
- * fields under the cursor while someone was reading.
+ * It used to open with "a role or a project?" — first as two cards gating
+ * every other field, then as cards swapping fields in and out, and last as
+ * a compact select. Even the select was a question asked for the owner's
+ * triage, not the visitor's benefit, and it had no right answer for anyone
+ * who was neither hiring nor commissioning (a collaborator, a question, a
+ * hello) — while defaulting to "role" skewed the data it existed to
+ * collect. It went in 2026-10; the message itself says what it is about.
  *
- * It is now a single compact select sitting in the same row as everything
- * else. The triage signal is still captured — /admin/leads filters on it
- * — but it costs a glance rather than a decision, and every field is
- * present and stable from the moment the page loads.
- *
- * `budget` is gone. It was the most transactional thing on the page, it
- * only ever applied to one of the two paths, and the ranges were
- * guesswork. It stays optional in the schema, so leads that already carry
- * one still render.
+ * `budget` went earlier for the same reason. Both stay optional in the
+ * Lead model, so leads that already carry them still render.
  */
-export function ContactForm({ email }: { email: string }) {
-  const [intent, setIntent] = useState<Intent>('role');
+export function ContactForm({
+  email,
+  turnstileSiteKey,
+}: {
+  email: string;
+  turnstileSiteKey: string | undefined;
+}) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  // The address a confirmation went to, shown back so a typo is caught
+  // here rather than by a reply that never arrives. Null when none was sent.
+  const [receiptTo, setReceiptTo] = useState<string | null>(null);
   // contact_start fires once per form shown — the funnel step between
   // landing on /contact and submitting, which is where people drop out.
   const started = useRef(false);
   const onFirstFocus = () => {
     if (started.current) return;
     started.current = true;
-    track(EVENTS.contactStart, { intent });
+    track(EVENTS.contactStart);
   };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    // Caught here rather than by a round trip that can only answer
+    // "Verification failed" — the check may simply not have finished yet.
+    if (turnstileSiteKey && !turnstileToken) {
+      setErrorMessage('Complete the verification check above, then send it again.');
+      setStatus('error');
+      return;
+    }
+
     const form = new FormData(event.currentTarget);
     const payload = {
-      intent,
       name: String(form.get('name') ?? ''),
       email: String(form.get('email') ?? ''),
       company: form.get('company') ? String(form.get('company')) : undefined,
@@ -69,17 +78,22 @@ export function ContactForm({ email }: { email: string }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        track(EVENTS.contactError, { intent, status: res.status });
+        track(EVENTS.contactError, { status: res.status });
         reported = true;
         throw new Error(body?.error ?? 'Something went wrong. Please try again.');
       }
+      const body = (await res.json().catch(() => null)) as { receiptSent?: boolean } | null;
       // Only what the form was about — never the name, address or message.
-      track(EVENTS.contactSubmit, { intent, hasCompany: Boolean(payload.company) });
+      track(EVENTS.contactSubmit, { hasCompany: Boolean(payload.company) });
+      setReceiptTo(body?.receiptSent ? payload.email : null);
       setStatus('sent');
     } catch (err) {
-      if (!reported) track(EVENTS.contactError, { intent, status: 0 });
+      if (!reported) track(EVENTS.contactError, { status: 0 });
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
       setStatus('error');
+      // The token was spent on that attempt whether or not it was the
+      // reason it failed; a retry needs a fresh one.
+      setTurnstileReset((n) => n + 1);
     }
   };
 
@@ -88,14 +102,28 @@ export function ContactForm({ email }: { email: string }) {
       <div className="border-border bg-surface-1 rounded-lg border p-8">
         <p className="font-display text-2xl font-bold tracking-tight">Sent.</p>
         <p className="text-fg-muted mt-3 text-sm leading-relaxed">
-          Thanks — I&apos;ll get back to you soon.
+          {receiptTo ? (
+            <>
+              Thanks for reaching out. A confirmation is on its way to{' '}
+              <span className="text-fg">{receiptTo}</span> — if it doesn&apos;t arrive, that address
+              may have a typo, and you can{' '}
+              <EmailLink email={email} className="underline underline-offset-4">
+                email me directly
+              </EmailLink>{' '}
+              instead.
+            </>
+          ) : (
+            <>Thanks for reaching out — I&apos;ll be in touch.</>
+          )}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button
             variant="ghost"
             onClick={() => {
+              // The form remounts with a fresh widget; the old token is spent.
+              setTurnstileToken(undefined);
+              setReceiptTo(null);
               setStatus('idle');
-              setIntent('role');
               started.current = false;
             }}
           >
@@ -118,39 +146,23 @@ export function ContactForm({ email }: { email: string }) {
           </Field>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          {/* "Optional" lives in the label, not the hint slot: a hint
-              renders below the input and would make this column taller
-              than the select beside it. */}
-          <Field label="Company (optional)" htmlFor="company">
-            <Input id="company" name="company" autoComplete="organization" />
-          </Field>
-          <Field label="What is this about?" htmlFor="intent">
-            <Select
-              id="intent"
-              name="intent"
-              value={intent}
-              onChange={(e) => setIntent(e.target.value as Intent)}
-            >
-              <option value="role">A role</option>
-              <option value="project">A project</option>
-            </Select>
-          </Field>
-        </div>
+        <Field label="Company (optional)" htmlFor="company">
+          <Input id="company" name="company" autoComplete="organization" />
+        </Field>
 
         <Field
           label="Message"
           htmlFor="message"
-          hint={
-            intent === 'role'
-              ? 'Team, stack, and what you need someone to own.'
-              : 'The problem, not the solution — I will get to that part.'
-          }
+          hint="What you're working on, and where you think I'd fit in."
         >
           <Textarea id="message" name="message" required rows={7} />
         </Field>
 
-        <TurnstileWidget onVerify={setTurnstileToken} />
+        <TurnstileWidget
+          siteKey={turnstileSiteKey}
+          onToken={setTurnstileToken}
+          resetSignal={turnstileReset}
+        />
 
         {status === 'error' ? (
           <p className="text-signal-rose text-sm">

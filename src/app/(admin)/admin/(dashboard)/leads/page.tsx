@@ -9,7 +9,7 @@ import { adminFetchJson } from '@/lib/admin-fetch';
 import { LeadStatusControl } from '@/components/admin/lead-status-control';
 import type { Lead } from '@/lib/types';
 
-const INTENT_LABEL: Record<Lead['intent'], string> = {
+const INTENT_LABEL: Record<NonNullable<Lead['intent']>, string> = {
   project: 'Project',
   role: 'Role',
 };
@@ -32,7 +32,8 @@ function LeadRow({ lead, onUpdate }: { lead: Lead; onUpdate: (lead: Lead) => voi
           </p>
         </div>
         <p className="text-2xs text-fg-subtle mt-1 font-mono uppercase">
-          {INTENT_LABEL[lead.intent]} · {new Date(lead.createdAt).toLocaleString()}
+          {lead.intent ? `${INTENT_LABEL[lead.intent]} · ` : null}
+          {new Date(lead.createdAt).toLocaleString()}
         </p>
         <p className="text-fg-muted mt-1.5 line-clamp-1 text-sm">{lead.message}</p>
       </Link>

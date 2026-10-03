@@ -143,19 +143,23 @@ test.describe('Case study', () => {
 });
 
 test.describe('Contact form', () => {
-  // The form is visible on arrival, with intent as a select rather than a
-  // gate. Intent no longer adds or removes fields (the budget field went);
-  // it only changes what the message hint asks for.
-  test('renders immediately, with intent switching the message hint', async ({ page }) => {
+  // Every field is present on arrival, with nothing to answer first — the
+  // "role or project?" select is gone (contact-form.tsx has why).
+  test('renders immediately, with no qualifying question', async ({ page }) => {
     await page.goto('/contact');
 
-    // 'role' is the default — no interaction needed for the form to be complete.
+    await expect(page.getByLabel('Name')).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Message')).toBeVisible();
-    await expect(page.getByText('Team, stack, and what you need someone to own.')).toBeVisible();
+    await expect(
+      page.getByText("What you're working on, and where you think I'd fit in."),
+    ).toBeVisible();
+    await expect(page.getByLabel('What is this about?')).toHaveCount(0);
+  });
 
-    await page.getByLabel('What is this about?').selectOption('project');
-    await expect(page.getByText('The problem, not the solution')).toBeVisible();
-    await expect(page.getByText('Team, stack, and what you need someone to own.')).toBeHidden();
+  // The seed sets no WhatsApp number, and the link must not render without one.
+  test('shows no WhatsApp link when none is configured', async ({ page }) => {
+    await page.goto('/contact');
+    await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveCount(0);
   });
 });

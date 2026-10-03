@@ -20,12 +20,19 @@ type LoadState =
  * contact form uses (PLAN.md W11): this is a public, unauthenticated
  * endpoint that turns a pending invite into a real account.
  */
-export function AcceptInviteForm({ token }: { token: string }) {
+export function AcceptInviteForm({
+  token,
+  turnstileSiteKey,
+}: {
+  token: string;
+  turnstileSiteKey: string | undefined;
+}) {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,6 +48,10 @@ export function AcceptInviteForm({ token }: { token: string }) {
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (turnstileSiteKey && !turnstileToken) {
+      setError('Complete the verification check above, then try again.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -55,6 +66,8 @@ export function AcceptInviteForm({ token }: { token: string }) {
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       setError(body?.error ?? 'Something went wrong. Try again.');
+      // Spent on that attempt either way — see TurnstileWidget's comment.
+      setTurnstileReset((n) => n + 1);
       return;
     }
 
@@ -128,7 +141,11 @@ export function AcceptInviteForm({ token }: { token: string }) {
           />
         </Field>
 
-        <TurnstileWidget onVerify={setTurnstileToken} />
+        <TurnstileWidget
+          siteKey={turnstileSiteKey}
+          onToken={setTurnstileToken}
+          resetSignal={turnstileReset}
+        />
 
         {error ? <p className="text-signal-rose text-sm">{error}</p> : null}
 

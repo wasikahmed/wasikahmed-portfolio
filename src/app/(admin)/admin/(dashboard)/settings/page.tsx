@@ -153,6 +153,21 @@ export default function SettingsPage() {
           </Field>
         </div>
 
+        <Field
+          label="WhatsApp number"
+          htmlFor="whatsapp"
+          hint="Optional. Full international number, country code first. Shown on /contact as a WhatsApp link — the number itself is never printed on the page. Leave empty to hide it."
+        >
+          <Input
+            id="whatsapp"
+            type="tel"
+            inputMode="tel"
+            placeholder="+44 7700 900123"
+            value={draft.whatsapp ?? ''}
+            onChange={(e) => set('whatsapp', e.target.value)}
+          />
+        </Field>
+
         <div className="border-border-subtle flex flex-col gap-3 rounded-md border p-4">
           <label className="text-fg flex items-center gap-2 text-sm">
             <input

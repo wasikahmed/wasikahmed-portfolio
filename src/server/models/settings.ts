@@ -37,6 +37,7 @@ const settingsSchema = new Schema(
     available: { type: Boolean, required: true },
     availableFor: { type: String, required: true },
     responseTime: { type: String, required: true },
+    whatsapp: { type: String },
     socials: { type: [linkSchema], default: [] },
     portrait: { type: mediaRefSchema, default: undefined },
     story: { type: [String], default: [] },

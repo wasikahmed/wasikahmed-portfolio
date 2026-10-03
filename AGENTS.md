@@ -359,6 +359,19 @@ too.
   page with no per-request data need is still a candidate for this exact
   trap; force dynamic rendering explicitly rather than relying on data
   fetching to imply it.
+- **No `NEXT_PUBLIC_*` value the Docker build doesn't have.** Next inlines
+  them into the client bundle at build time, and the image is built with no
+  `.env` — deploy.yml writes that on the VPS afterwards. A runtime-only
+  `NEXT_PUBLIC_` var therefore ships as `undefined` while working fine in
+  `pnpm dev`. The Turnstile site key hit this for real (fixed 2026-10-04):
+  the widget never rendered in production, so every contact submission and
+  invite acceptance failed verification. Read config like that on the
+  server per request and pass it down as a prop (`turnstileSiteKey()`,
+  `UMAMI_URL`).
+- Anything passed to `SiteShell` is serialized into every public page's
+  HTML, because it is a Client Component. `(site)/layout.tsx` blanks
+  `settings.whatsapp` before handing settings over: keeping the number out
+  of the markup is the point of the `/whatsapp` redirect.
 - Don't use Umami's own `data-umami-event` attribute on a link. Its click
   handler cancels a same-tab navigation, waits for the beacon, then sets
   `location.href` — turning every Next.js client-side navigation it

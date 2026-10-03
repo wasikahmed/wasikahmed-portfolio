@@ -71,6 +71,11 @@ function onDocumentClick(event: MouseEvent) {
     return;
   }
 
+  if (url.pathname === '/whatsapp') {
+    track(EVENTS.whatsappClick, { label: labelOf(element), location });
+    return;
+  }
+
   if (url.hash && url.pathname === window.location.pathname) {
     track(EVENTS.sectionJump, { target: url.hash.slice(1), location });
     return;

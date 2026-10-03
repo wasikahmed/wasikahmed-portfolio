@@ -176,6 +176,12 @@ export interface Settings {
   available: boolean;
   availableFor: string;
   responseTime: string;
+  /**
+   * Optional WhatsApp number, as typed in the admin. Never rendered: the
+   * contact page links to /whatsapp, which redirects to wa.me, so the
+   * number stays out of the HTML that scrapers harvest.
+   */
+  whatsapp?: string;
   socials: { label: string; href: string }[];
   /** /about's portrait (PLAN.md W15 item 1). Absent renders exactly as before. */
   portrait?: MediaRef;
@@ -203,7 +209,8 @@ export interface Media {
 
 export interface Lead {
   id: string;
-  intent: 'project' | 'role';
+  /** Only on leads from before the form stopped asking — see models/lead.ts. */
+  intent?: 'project' | 'role';
   name: string;
   email: string;
   company?: string;

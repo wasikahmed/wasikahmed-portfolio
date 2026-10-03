@@ -242,11 +242,24 @@ describe('settingsSchema', () => {
   it('rejects an invalid email', () => {
     expect(settingsSchema.safeParse({ ...valid, email: 'not-an-email' }).success).toBe(false);
   });
+  it('accepts a WhatsApp number as typed, or empty to clear it', () => {
+    expect(settingsSchema.safeParse({ ...valid, whatsapp: '+44 7700 900123' }).success).toBe(true);
+    expect(settingsSchema.safeParse({ ...valid, whatsapp: '(880) 1712-345678' }).success).toBe(
+      true,
+    );
+    expect(settingsSchema.safeParse({ ...valid, whatsapp: '' }).success).toBe(true);
+  });
+
+  it('rejects a WhatsApp value that is not a full international number', () => {
+    // Too short to carry a country code, letters, and a wa.me URL pasted whole.
+    for (const whatsapp of ['12345', '+44 7700 CALLME', 'https://wa.me/447700900123']) {
+      expect(settingsSchema.safeParse({ ...valid, whatsapp }).success).toBe(false);
+    }
+  });
 });
 
 describe('leadSchema — the public /api/contact boundary', () => {
   const valid = {
-    intent: 'project',
     name: 'Jane Doe',
     email: 'jane@example.com',
     message: 'I need a system built.',
@@ -256,8 +269,12 @@ describe('leadSchema — the public /api/contact boundary', () => {
     expect(leadSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('rejects an unknown intent', () => {
-    expect(leadSchema.safeParse({ ...valid, intent: 'sales' }).success).toBe(false);
+  // A page loaded before the select was removed still sends `intent` —
+  // stripped, never stored and never a rejection.
+  it('strips a stale intent field rather than rejecting it', () => {
+    const result = leadSchema.safeParse({ ...valid, intent: 'role' });
+    expect(result.success).toBe(true);
+    expect(result.data).not.toHaveProperty('intent');
   });
 
   it('rejects an invalid email', () => {

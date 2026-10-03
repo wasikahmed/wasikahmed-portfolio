@@ -9,7 +9,7 @@ import { adminFetchJson } from '@/lib/admin-fetch';
 import { LeadStatusControl } from '@/components/admin/lead-status-control';
 import type { Lead } from '@/lib/types';
 
-const INTENT_LABEL: Record<Lead['intent'], string> = {
+const INTENT_LABEL: Record<NonNullable<Lead['intent']>, string> = {
   project: 'Project inquiry',
   role: 'Role inquiry',
 };
@@ -84,7 +84,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {lead.email}
               </a>
               <p className="text-2xs text-fg-subtle mt-2 font-mono uppercase">
-                {INTENT_LABEL[lead.intent]} · {new Date(lead.createdAt).toLocaleString()}
+                {lead.intent ? `${INTENT_LABEL[lead.intent]} · ` : null}
+                {new Date(lead.createdAt).toLocaleString()}
               </p>
             </div>
             <LeadStatusControl lead={lead} onUpdate={setLead} />

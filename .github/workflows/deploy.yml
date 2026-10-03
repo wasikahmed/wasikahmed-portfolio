@@ -222,7 +222,10 @@ jobs:
             IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
             GMAIL_USER=${{ vars.GMAIL_USER }}
             GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+            # The repo variable keeps its old NEXT_PUBLIC_ name so nothing in
+            # GitHub has to change; the app reads TURNSTILE_SITE_KEY at
+            # request time (src/server/turnstile.ts has why).
+            TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
             TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
             UMAMI_URL=${{ vars.UMAMI_URL }}
             UMAMI_WEBSITE_ID=${{ vars.UMAMI_WEBSITE_ID }}

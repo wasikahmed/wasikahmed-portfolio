@@ -4,6 +4,7 @@ import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
 import { EmailLink } from '@/components/ui/email-link';
 import { getSettings, getSiteCopy } from '@/server/queries';
+import { turnstileSiteKey } from '@/server/turnstile';
 import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,7 +32,7 @@ export default async function ContactPage() {
             <p className="text-fg-muted mt-5 max-w-lg text-lg text-pretty">{copy.contact.intro}</p>
 
             <div className="mt-12">
-              <ContactForm email={settings.email} />
+              <ContactForm email={settings.email} turnstileSiteKey={turnstileSiteKey()} />
             </div>
           </div>
 
@@ -47,10 +48,25 @@ export default async function ContactPage() {
               <p className="text-2xs text-fg-subtle mb-3 font-mono tracking-widest uppercase">
                 Direct
               </p>
-              <EmailLink
-                email={settings.email}
-                className="text-fg duration-fast hover:text-accent text-sm transition-colors"
-              />
+              <div className="flex flex-col gap-2">
+                <EmailLink
+                  email={settings.email}
+                  className="text-fg duration-fast hover:text-accent text-sm transition-colors"
+                />
+                {/* Through /whatsapp, never a wa.me link here — that route's
+                    comment has why. A plain <a>, not <Link>: it is a route
+                    handler that redirects off-site, not a page. */}
+                {settings.whatsapp ? (
+                  <a
+                    href="/whatsapp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-fg duration-fast hover:text-accent text-sm transition-colors"
+                  >
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
             </div>
 
             <div>
