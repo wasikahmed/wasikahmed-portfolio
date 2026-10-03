@@ -53,8 +53,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    /*
+     * `data-scroll-behavior="smooth"` tells Next to switch off globals.css's
+     * smooth scrolling while it resets scroll on a route change. Without it,
+     * Next 16 scrolls each of the new page's top-level sections into view,
+     * last to first. With smooth scrolling on, those calls animate instead of
+     * jumping, and the final one (to the top) is a no-op from scrollY 0, so it
+     * never cancels the in-flight scroll to the second section. /about opened
+     * on Skills.
+     */
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full`}
     >
       <body className="flex min-h-full flex-col">
