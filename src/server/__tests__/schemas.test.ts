@@ -195,6 +195,19 @@ describe('roleSchema', () => {
     }
   });
 
+  it('accepts an http(s) website, or empty to clear it', () => {
+    for (const website of ['https://factoryze.tech/', 'http://example.com', '']) {
+      expect(roleSchema.safeParse({ ...valid, website }).success).toBe(true);
+    }
+  });
+
+  // It is rendered as a public link, so a script URL must never get through.
+  it('rejects a website that is not an http(s) URL', () => {
+    for (const website of ['javascript:alert(1)', 'factoryze.tech', 'ftp://example.com']) {
+      expect(roleSchema.safeParse({ ...valid, website }).success).toBe(false);
+    }
+  });
+
   it('rejects a logo that is neither a URL nor a root-relative path', () => {
     expect(roleSchema.safeParse({ ...valid, logo: 'acme.svg' }).success).toBe(false);
   });

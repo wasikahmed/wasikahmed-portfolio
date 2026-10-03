@@ -183,6 +183,16 @@ export const roleSchema = z.object({
   // '' rather than absent to clear it: updates go through
   // findByIdAndUpdate, which never removes a key that arrives undefined.
   logo: z.union([z.literal(''), mediaRefSchema.shape.url]).optional(),
+  // http(s) only: this becomes a public link, and `javascript:` is a URL too.
+  website: z
+    .union([
+      z.literal(''),
+      z
+        .string()
+        .url()
+        .refine((v) => /^https?:\/\//.test(v), { message: 'Must start with http:// or https://' }),
+    ])
+    .optional(),
   shipped: z.array(z.string().min(1)).min(1),
   order: z.number().int().default(0),
 });

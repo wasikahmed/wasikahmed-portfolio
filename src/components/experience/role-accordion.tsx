@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Tag } from '@/components/ui/tag';
-import { CompanyMark, hasAnyLogo } from '@/components/experience/company-mark';
+import { CompanyMark, displayHost, hasAnyLogo } from '@/components/experience/company-mark';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { EVENTS, track } from '@/lib/analytics';
@@ -101,19 +101,35 @@ export function RoleAccordion({ roles }: { roles: Role[] }) {
                   {/* With marks, the bullets start under the title rather
                       than under the tile: pl-16 is the tile (size-10) plus
                       the button's gap-6. */}
-                  <ul
-                    className={cn('flex flex-col gap-3 pb-7', showMarks ? 'sm:pl-16' : 'sm:pl-1')}
-                  >
-                    {role.shipped.map((item) => (
-                      <li key={item} className="text-fg-muted flex gap-3 text-sm leading-relaxed">
-                        <span
-                          aria-hidden
-                          className="bg-accent mt-[0.55rem] h-1 w-1 shrink-0 rounded-full"
-                        />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className={cn('pb-7', showMarks ? 'sm:pl-16' : 'sm:pl-1')}>
+                    <ul className="flex flex-col gap-3">
+                      {role.shipped.map((item) => (
+                        <li key={item} className="text-fg-muted flex gap-3 text-sm leading-relaxed">
+                          <span
+                            aria-hidden
+                            className="bg-accent mt-[0.55rem] h-1 w-1 shrink-0 rounded-full"
+                          />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                    {/* Here rather than on the company name above: that whole
+                      header is the toggle button, and a link inside a
+                      button is invalid HTML and a confusing click target. */}
+                    {role.website ? (
+                      <a
+                        href={role.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-fg-muted duration-fast hover:text-accent mt-5 inline-flex items-center gap-1.5 font-mono text-xs transition-colors"
+                      >
+                        {displayHost(role.website)}
+                        <span aria-hidden className="text-fg-subtle">
+                          ↗
+                        </span>
+                      </a>
+                    ) : null}
+                  </div>
                 </motion.div>
               ) : null}
             </AnimatePresence>

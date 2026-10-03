@@ -82,7 +82,21 @@ export function Experience({ roles, heading }: { roles: Role[]; heading: string 
                     <h3 className="font-display text-fg text-xl font-semibold tracking-tight">
                       {role.title}
                     </h3>
-                    <p className="text-fg-muted mt-1 text-sm">{role.company}</p>
+                    {role.website ? (
+                      <a
+                        href={role.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-fg-muted duration-fast hover:text-fg mt-1 inline-flex items-center gap-1.5 text-sm transition-colors"
+                      >
+                        {role.company}
+                        <span aria-hidden className="text-2xs text-fg-subtle">
+                          ↗
+                        </span>
+                      </a>
+                    ) : (
+                      <p className="text-fg-muted mt-1 text-sm">{role.company}</p>
+                    )}
                   </div>
                 </div>
                 {/* Falls back to the first CV bullet so a role added

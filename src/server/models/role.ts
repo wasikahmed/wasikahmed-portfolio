@@ -9,6 +9,7 @@ const roleSchema = new Schema(
     kind: { type: String, enum: ['work', 'education'], default: 'work' },
     summary: { type: String },
     logo: { type: String },
+    website: { type: String },
     shipped: { type: [String], required: true },
     order: { type: Number, default: 0 },
   },

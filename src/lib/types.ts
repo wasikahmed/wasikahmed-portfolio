@@ -137,12 +137,17 @@ export interface Role {
    */
   summary?: string;
   /**
-   * The company's logo, as a media-library URL. Drawn as a silhouette in a
-   * text token (CompanyMark), so it only reads as the logo if the file has
-   * a transparent background — an opaque one renders as a filled square.
-   * Absent or '' falls back to the company's initials.
+   * The company's logo, as a media-library URL, shown in its own colours
+   * filling a 40px tile (CompanyMark) — so the file carries its own padding
+   * and background. Absent or '' falls back to the company's initials.
    */
   logo?: string;
+  /**
+   * The company's site. Home links the company name to it; /about puts it
+   * under the expanded detail, since that row's header is a button and a
+   * link can't sit inside one. Absent or '' renders the name unlinked.
+   */
+  website?: string;
   shipped: string[];
   order: number;
 }

@@ -135,13 +135,26 @@ export function RoleForm({ role }: { role?: Role }) {
       <Field
         label="Logo"
         htmlFor="logo"
-        hint="Optional. Paste a URL copied from the media library. Use an SVG or a PNG with a transparent background — it is drawn in one colour to match the site, so an opaque background shows as a solid square. Leave empty for the company's initials."
+        hint="Optional. Paste a URL copied from the media library. A square image, shown in its own colours filling a small tile — leave some padding around the mark in the file itself. Leave empty for the company's initials."
       >
         <Input
           id="logo"
           placeholder="https://…"
           value={draft.logo ?? ''}
           onChange={(e) => set('logo', e.target.value.trim())}
+        />
+      </Field>
+      <Field
+        label="Website"
+        htmlFor="website"
+        hint="Optional. The company's site — linked from the company name on the home page and /about. Leave empty if the site is down; a dead link reads worse than none."
+      >
+        <Input
+          id="website"
+          type="url"
+          placeholder="https://…"
+          value={draft.website ?? ''}
+          onChange={(e) => set('website', e.target.value.trim())}
         />
       </Field>
       <Field label="What I shipped" htmlFor="shipped">

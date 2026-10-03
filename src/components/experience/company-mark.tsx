@@ -3,16 +3,18 @@ import { cn } from '@/lib/cn';
 /**
  * A company's logo in a small tile, or its initials when there isn't one.
  *
- * The logo is used as a CSS mask over a text-token fill rather than shown
- * as an <img>: uploaded logos arrive in every brand colour there is, and
- * drawn as-is they would turn the timeline into a row of mismatched
- * badges on a dark page (AGENTS.md §4 rule 2). As a mask, every logo is
- * the same `fg-muted` silhouette, whatever colour the file was.
+ * The logo is shown as-is, in its own colours, filling the tile edge to
+ * edge. That makes the file responsible for its own padding and ground: a
+ * transparent mark needs margin baked in, and a logo drawn for white
+ * (thin lines that vanish on a dark tile) should keep its white square.
+ * Logos come in every shape there is; letting each file decide is what
+ * lets every one of them look the way its owner designed it.
  *
- * Cross-origin masks are fetched with CORS — Cloudinary sends
- * `Access-Control-Allow-Origin: *`, and root-relative files are
- * same-origin, so both work. Always decorative: the company name is the
- * text right beside it.
+ * It started as a single-colour CSS mask, so every logo matched the page.
+ * It didn't survive contact with real logos: a seal or a two-colour mark
+ * flattened to one grey stopped looking like the company at all.
+ *
+ * Always decorative: the company name is the text right beside it.
  */
 export function CompanyMark({
   company,
@@ -27,15 +29,16 @@ export function CompanyMark({
     <span
       aria-hidden
       className={cn(
-        'border-border-subtle bg-surface-2 grid size-10 shrink-0 place-items-center rounded-md border',
+        'border-border-subtle bg-surface-2 grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border',
         className,
       )}
     >
       {logo ? (
-        <span
-          className="bg-fg-muted size-6 mask-contain mask-center mask-no-repeat"
-          style={{ maskImage: `url(${JSON.stringify(logo)})` }}
-        />
+        // A plain <img>, not next/image: the URL is whatever was pasted in
+        // the admin, and next/image throws at render for any host missing
+        // from images.remotePatterns. At 40px there is nothing to optimise.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" width={40} height={40} className="size-full object-contain" />
       ) : (
         <span className="text-2xs text-fg-subtle font-mono tracking-wide">
           {initialsOf(company)}
@@ -68,4 +71,13 @@ function initialsOf(company: string): string {
  */
 export function hasAnyLogo(roles: { logo?: string }[]): boolean {
   return roles.some((role) => Boolean(role.logo));
+}
+
+/** "https://www.factoryze.tech/" → "factoryze.tech", for link text. */
+export function displayHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
