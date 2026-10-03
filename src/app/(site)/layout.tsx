@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { SiteShell } from '@/components/layout/site-shell';
 import { Footer } from '@/components/layout/footer';
 import { Analytics } from '@/components/analytics/analytics';
+import { SITE_CARD } from '@/lib/seo';
 import { getSettings, getProjects, getPosts, getSiteCopy } from '@/server/queries';
 
 /*
@@ -33,7 +34,10 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: settings.name,
       title: settings.name,
       description: copy.seo.siteDescription,
+      // See SITE_CARD for why the root card has to be named here.
+      images: [SITE_CARD],
     },
+    twitter: { card: 'summary_large_image', images: [SITE_CARD] },
   };
 }
 

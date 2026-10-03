@@ -53,6 +53,7 @@ export async function generateMetadata({
     description: project.seo?.description ?? project.problem,
     path: `/work/${slug}`,
     siteName: settings.name,
+    ownCard: true,
   });
 }
 

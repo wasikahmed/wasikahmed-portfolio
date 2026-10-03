@@ -39,6 +39,7 @@ export async function generateMetadata({
     description: post.seo?.description ?? post.excerpt,
     path: `/writing/${slug}`,
     siteName: settings.name,
+    ownCard: true,
   });
 }
 
