@@ -35,23 +35,23 @@ Shipped and deployed since the last plan was written, in order:
 Decided 2026-10-03: this VPS stops hosting Umami. Wasik runs a self-hosted
 Umami (v3) on another domain, and the portfolio becomes a website there.
 
-Today: `docker-compose.prod.yml` runs `umami` + `umami-db` (Postgres),
-served at `analytics.wasikahmed.me` through its own Cloudflare Tunnel
-hostname rule; `vps-backup.sh` `pg_dump`s it nightly; production loads
-`https://analytics.wasikahmed.me/script.js`. The Next app itself only reads
-`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID`, at runtime —
-neither is a Docker build arg, so changing them is a GitHub variable edit
-plus a redeploy, not a rebuild.
+Until this change, `docker-compose.prod.yml` ran `umami` + `umami-db`
+(Postgres), served at `analytics.wasikahmed.me` through its own Cloudflare
+Tunnel hostname rule, and `vps-backup.sh` `pg_dump`ed it nightly. The Next
+app itself only reads `NEXT_PUBLIC_UMAMI_SCRIPT_URL`/
+`NEXT_PUBLIC_UMAMI_WEBSITE_ID`, at runtime — neither is a Docker build arg,
+so changing them is a GitHub variable edit plus a redeploy, not a rebuild.
 
-1. **Tear down, in the repo:** drop both services and the `umami-db-data`
+1. **Tear down, in the repo — done, 2026-10-03 (ships with the next
+   deploy):** dropped both services and the `umami-db-data`
    volume from `docker-compose.prod.yml`, the `pg_dump` step from
    `vps-backup.sh` (it would fail every night once the container is gone),
    the four `UMAMI_*` lines from `deploy.yml`'s heredoc and header, the
    block from `.env.example`, and AGENTS.md §10's section. `deploy.yml`
    already runs `up -d --remove-orphans`, so the next deploy stops and
    removes both containers by itself.
-2. **Tear down, by hand** (none of this is reachable from the repo): decide
-   whether to keep a final `pg_dump`; `docker volume rm` the Postgres
+2. **Tear down, by hand** (none of this is reachable from the repo). The
+   old data is discarded, no final dump (Wasik, 2026-10-03). `docker volume rm` the Postgres
    volume (`--remove-orphans` never deletes named volumes); delete the
    `analytics.wasikahmed.me` public-hostname rule in the Cloudflare Tunnel;
    delete `UMAMI_DB_USER`, `UMAMI_PORT_HOST` (vars) and `UMAMI_DB_PASSWORD`,
@@ -59,12 +59,18 @@ plus a redeploy, not a rebuild.
 3. **Point at the new instance:** add the site there, set the two
    `NEXT_PUBLIC_UMAMI_*` GitHub variables, redeploy, and confirm a pageview
    arrives — checked against production, not the dev server.
-4. **Use what Umami v3 offers**, not just pageviews: custom events with
-   properties (contact submit, résumé downloads, outbound links, project
-   and post engagement), Web Vitals (`data-performance`), replays and
-   heatmaps (`recorder.js` — a CSP and privacy decision, not just a tag),
-   `data-domains` so dev traffic is never counted, and excluding admin
-   users' own visits. Scope to be settled before implementation.
+4. **Use what Umami v3 offers**, not just pageviews. Decided 2026-10-03:
+   - custom events with properties (contact submit, résumé downloads,
+     outbound links, project and post engagement), Web Vitals
+     (`data-performance`), `data-domains` so dev traffic is never
+     counted, and admin users' own visits excluded;
+   - **replays and heatmaps on**, at Umami's 15% sample, inputs masked,
+     `/admin` never recorded — `recorder.js` must be proven to work under
+     `proxy.ts`'s nonce CSP in production, not assumed;
+   - **tracker proxied through `wasikahmed.me`** so ad blockers don't hide
+     a developer audience — visitor IP/country must still reach Umami
+     correctly through Cloudflare and the proxy;
+   - no analytics view inside `/admin` for now.
 
 ## 2. Security — urgent
 
