@@ -62,23 +62,19 @@ a "Portfolio overview" board, and an annotation marking the switch.
 2. Cloudflare Zero Trust: delete the Tunnel's `analytics.wasikahmed.me`
    public-hostname rule (it now points at nothing and 502s).
 
-## 2. Security — urgent
+## 2. Dependency advisories
 
-From `pnpm audit --prod`, 2026-10-03:
+`pnpm audit --prod`, re-run 2026-10-04: one low-severity advisory left.
 
-1. **`next` 16.3.3 — critical: remote code execution in `next/og`'s
-   `ImageResponse`** (fixed in ≥16.3.6; 16.3.8 is current). This site
-   renders `ImageResponse` on public, unauthenticated routes — the root,
-   `/work/[slug]` and `/writing/[slug]` `opengraph-image.tsx`, and
-   `apple-icon.tsx` — and production is on 16.3.3. The same bump clears a
-   high-severity `sharp` advisory. Patch-level; do this first.
-2. **`nodemailer` 9.0.6 — two high, five moderate** (address-parser
-   complexity, recipient-domain validation bypasses). A direct dependency
-   (`src/server/email.ts`, lead notifications) and `@auth/core`'s. Fixed
-   in ≥10.0.6 — a major bump, so read its changelog and re-send a real
-   lead notification before calling it done.
-3. `@ai-sdk/provider-utils` (low) arrives through `@scalar`'s `/docs`
-   reference; clears whenever `@scalar/api-reference-react` picks it up.
+- **Resolved:** `next` moved to 16.3.8 in `c651637` (the `next/og`
+  advisory, plus `sharp`'s). `nodemailer` moved from 9.0.6 to 10.0.13 on
+  2026-10-04, clearing its seven advisories. 10.x's only breaking change
+  is requiring Node 20+ (the image runs 22), and it ships its own types,
+  so `@types/nodemailer` went. Still to do by hand: send one real message
+  through `/contact` and confirm the lead notification arrives.
+- **Open (low):** `@ai-sdk/provider-utils` arrives through `@scalar`'s
+  `/docs` reference; clears whenever `@scalar/api-reference-react` picks
+  it up.
 
 ## 3. E2E — fixed 2026-10-04
 
