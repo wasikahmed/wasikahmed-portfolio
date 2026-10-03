@@ -4,7 +4,7 @@ My portfolio site and the CMS behind it. One Next.js app serves the public
 site and an admin area where all content is edited: projects, writing,
 experience, page copy and the résumé.
 
-Live: [wasikahmed.me](https://wasikahmed.me) · API reference: [wasikahmed.me/docs](https://wasikahmed.me/docs)
+Live: [wasikahmed.me](https://wasikahmed.me/?utm_source=github&utm_medium=readme&utm_campaign=portfolio&utm_content=wasikahmed-portfolio) · API reference: [wasikahmed.me/docs](https://wasikahmed.me/docs?utm_source=github&utm_medium=readme&utm_campaign=portfolio&utm_content=wasikahmed-portfolio)
 
 ## What's in it
 
