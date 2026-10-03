@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
-import { BRAND_COLORS, markDataUri } from '@/lib/brand';
+import { BRAND_COLORS } from '@/lib/brand';
 import { loadDisplayFont } from '@/lib/og-font';
-import { getPost } from '@/server/queries';
+import { avatarBadge, loadAvatar, ogByline } from '@/server/og-avatar';
+import { getPost, getSettings } from '@/server/queries';
 
 /*
  * Per-post OG card — same reasoning as work/[slug]'s, see that file's
@@ -18,7 +19,12 @@ export default async function PostOpengraphImage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [post, font] = await Promise.all([getPost(slug), loadDisplayFont()]);
+  const [post, settings, font, avatar] = await Promise.all([
+    getPost(slug),
+    getSettings(),
+    loadDisplayFont(),
+    loadAvatar(),
+  ]);
   const fontFamily = font ? 'Space Grotesk' : 'sans-serif';
   const fonts = font
     ? [{ name: 'Space Grotesk', data: font, style: 'normal' as const, weight: 600 as const }]
@@ -37,7 +43,7 @@ export default async function PostOpengraphImage({
           fontFamily,
         }}
       >
-        <img src={markDataUri({ size: 96 })} width={96} height={96} alt="" />
+        {avatarBadge(avatar, 120)}
       </div>,
       { ...size, fonts },
     );
@@ -69,12 +75,7 @@ export default async function PostOpengraphImage({
         fontFamily,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <img src={markDataUri({ size: 48 })} width={48} height={48} alt="" />
-        <span style={{ fontSize: 24, color: BRAND_COLORS.fgMuted }}>
-          {post.kind === 'til' ? 'TIL' : 'Writing'}
-        </span>
-      </div>
+      {ogByline(avatar, settings.name, post.kind === 'til' ? 'TIL' : 'Writing')}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', fontSize: 56, letterSpacing: '-0.03em' }}>

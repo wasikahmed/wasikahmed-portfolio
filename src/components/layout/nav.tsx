@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { LogoMark, Wordmark } from '@/components/brand/logo';
+import { Wordmark } from '@/components/brand/wordmark';
 import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
@@ -104,15 +104,12 @@ export function Nav({
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-[1280px] items-center justify-between gap-4 px-6 lg:px-10">
-        <Link
-          href="/"
-          className="group flex shrink-0 items-center gap-2.5"
-          aria-label={`${settings.name} — home`}
-        >
-          {/* Hover brightens the terminal node — confirms the lockup is a link
-              without adding a transform. Motion rule: confirm, not decorate. */}
-          <LogoMark className="text-accent group-hover:text-accent-bright duration-fast h-7 w-7 transition-colors" />
-          <Wordmark name={settings.name} className="hidden text-sm sm:block" />
+        <Link href="/" className="group shrink-0" aria-label={`${settings.name} — home`}>
+          {/* Visible at every width: with the mark gone the name is the only
+              identity in the header, and below `sm` the menu toggle is all
+              that shares the row, so there is room for it. Hover lifts the
+              family name (see Wordmark) — confirm, not decorate. */}
+          <Wordmark name={settings.name} className="text-base" />
         </Link>
 
         <nav aria-label="Primary" className="hidden md:block">

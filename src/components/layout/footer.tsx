@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LogoMark, Wordmark } from '@/components/brand/logo';
+import { Wordmark } from '@/components/brand/wordmark';
 import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
@@ -65,13 +65,8 @@ export function Footer({
           {/* Identity — the same lockup as the nav, so the two ends of the page
               read as one brand. */}
           <div className="col-span-2 min-w-0 sm:col-span-1">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2.5"
-              aria-label={`${settings.name} — home`}
-            >
-              <LogoMark className="text-accent h-7 w-7 shrink-0" />
-              <Wordmark name={settings.name} className="text-sm" />
+            <Link href="/" className="group inline-flex" aria-label={`${settings.name} — home`}>
+              <Wordmark name={settings.name} className="text-base" />
             </Link>
 
             <p className="text-fg-muted mt-4 max-w-xs text-sm text-pretty">{settings.proof}</p>

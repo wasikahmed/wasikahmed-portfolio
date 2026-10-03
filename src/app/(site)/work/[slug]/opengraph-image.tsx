@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
-import { BRAND_COLORS, markDataUri } from '@/lib/brand';
+import { BRAND_COLORS } from '@/lib/brand';
 import { loadDisplayFont } from '@/lib/og-font';
-import { getProject } from '@/server/queries';
+import { avatarBadge, loadAvatar, ogByline } from '@/server/og-avatar';
+import { getProject, getSettings } from '@/server/queries';
 
 /*
  * Per-case-study OG card (PLAN.md W3) — the root `opengraph-image.tsx`
@@ -24,7 +25,12 @@ export default async function ProjectOpengraphImage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [project, font] = await Promise.all([getProject(slug), loadDisplayFont()]);
+  const [project, settings, font, avatar] = await Promise.all([
+    getProject(slug),
+    getSettings(),
+    loadDisplayFont(),
+    loadAvatar(),
+  ]);
   const fontFamily = font ? 'Space Grotesk' : 'sans-serif';
   const fonts = font
     ? [{ name: 'Space Grotesk', data: font, style: 'normal' as const, weight: 600 as const }]
@@ -45,7 +51,7 @@ export default async function ProjectOpengraphImage({
           fontFamily,
         }}
       >
-        <img src={markDataUri({ size: 96 })} width={96} height={96} alt="" />
+        {avatarBadge(avatar, 120)}
       </div>,
       { ...size, fonts },
     );
@@ -77,10 +83,7 @@ export default async function ProjectOpengraphImage({
         fontFamily,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <img src={markDataUri({ size: 48 })} width={48} height={48} alt="" />
-        <span style={{ fontSize: 24, color: BRAND_COLORS.fgMuted }}>Case study</span>
-      </div>
+      {ogByline(avatar, settings.name, 'Case study')}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', fontSize: 60, letterSpacing: '-0.03em' }}>
