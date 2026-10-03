@@ -100,6 +100,11 @@ src/
     (admin)/admin/   CMS. Gated by src/proxy.ts + a re-check in the layout.
     api/admin/       CMS API. Auth + CSRF + Zod + audit log on every mutation.
     api/health/      Liveness + DB ping. Docker HEALTHCHECK and CI both use it.
+    api/contact/     Public contact form: Turnstile + rate limit, then a Lead.
+    api/openapi.json Generated API spec (src/server/openapi.ts); /docs renders it.
+    docs/            Public API reference. force-dynamic layout — see §9.
+    resume/, wasik-ahmed-resume.pdf/
+                     Both stream the live résumé (server/resume-response.ts).
     layout.tsx       Root: fonts, MotionProvider.
     globals.css      The entire design token layer. Read §5 before editing.
   proxy.ts           Next 16's middleware (renamed from middleware.ts).
@@ -120,9 +125,11 @@ src/
     motion/          Reveal, Metric, TextReveal, Magnetic, ViewTransition.
     ambient/         Decorative background layers. Budget of 2 — see §5.
     layout/          Nav, Footer, CommandPalette, SectionRail, ReadingProgress.
-    home/ work/ case-study/ contact/ mdx/ admin/
-e2e/                 Playwright: smoke, route/responsive sweep, motion contract.
-scripts/             seed.ts, seed-admin.ts
+    home/ work/ case-study/ contact/ experience/ brand/ mdx/ admin/
+e2e/                 Playwright: smoke, route/responsive sweep, motion contract,
+                     admin pipeline, invitation round trip.
+scripts/             seed.ts, seed-admin.ts, seed-e2e-*.ts, vps-backup.sh
+docs/history/        Archived PLAN.md files. Read-only record; PLAN.md is live.
 ```
 
 ---
@@ -424,7 +431,10 @@ Mongo and Umami's Postgres are the two things left with only a local
 copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
 bucket) as its own task if that risk becomes worth carrying.
 
-**Self-hosted Umami analytics.** `docker-compose.prod.yml` runs Umami
+**Self-hosted Umami analytics — being removed (PLAN.md §1, decided
+2026-10-03).** Analytics moves to an externally hosted Umami; this section
+describes what still runs today and goes away with the teardown.
+`docker-compose.prod.yml` runs Umami
 (privacy-first, no cookies) as two extra services: `umami` (the app
 itself) and `umami-db` (Postgres — Umami's own requirement, unrelated to
 this app's Mongo). Both are bound to `127.0.0.1` like `web`, on
@@ -454,63 +464,44 @@ so change it immediately from Umami's own settings, the same way
 
 ## 11. Current state — read PLAN.md
 
-The public site, design system, data layer, and admin CMS are complete and
-deployed. The contact form is real end to end (Turnstile + rate limiting +
-Gmail SMTP notifications + a working `/admin/leads` list/detail/status
-pipeline), and TOTP has been verified working in dev. `/admin` is protected by
-both layers described in §7 — session and credentials; Cloudflare Access was
-removed 2026-09 (PLAN.md W8) to unblock multi-user auth, and the Cloudflare
-Tunnel is unaffected. **The CMS is now genuinely multi-user** (PLAN.md
-W9–W11): fixed roles with real permission enforcement on every admin route
-(not just a session check), database-backed sessions so a role/status change
-takes effect on the changed user's very next request, and a full
-invite → accept → suspend/reactivate → delete → transfer-ownership
-`/admin/users` surface, plus optional Google sign-in as a second login path
-(never a signup path — see §7). **Programmatic clients can now authenticate
-too** (PLAN.md W12): Bearer tokens with rotation, reuse detection, and
-per-token scopes intersected with the caller's live role, resolved through
-the same permission layer the cookie session uses — see §7. **The API is
-documented and publicly discoverable** (PLAN.md W13): `GET /api/openapi.json`
-is generated from the same Zod schemas every route validates against, and
-`/docs` renders it (self-hosted `@scalar/api-reference-react`, not a CDN
-embed — `proxy.ts`'s CSP would block that outright). Public, not
-admin-gated — a deliberate call, not a default. The SEO surface is done
-(sitemap, robots, per-page dynamic OG images, RSS, JSON-LD,
-canonical URLs) — see PLAN.md W3. CI now gates every push to `main`
-(typecheck/lint/format:check/test/build) before it ships, with E2E running
-separately on PRs and a daily schedule — see PLAN.md W4. See
-`PLAN.md` for what is left and in what order.
+Last reviewed 2026-10-03 against the repo, CI history and the live site.
 
-**All of the above is deployed and live, not just committed, as of
-2026-09-20** — W7 through W15 sat on local `main`, unpushed, for two weeks
-before that. Deploying surfaced and fixed three real bugs no code review
-caught: a stale Cloudflare Access env config left over from before W8 that
-was fail-closed and locking every real admin out of `/admin` in production;
-two of four new GitHub Actions secrets landed in the wrong namespace
-(`vars.*` vs `secrets.*`), which would have silently disabled Turnstile and
-lead-notification email in production; and `/docs` rendering as a
-completely blank page because it was statically prerendered against a CSP
-whose nonce is generated fresh per request (§9, and PLAN.md's 2026-09-20
-progress note has the full account of each). Worth internalizing: "verified
-live" only means what it says if it was checked against the actual
-production runtime, not the dev server — the two diverge exactly on static
-vs. dynamic rendering and on `HOSTNAME=0.0.0.0` binding behavior, neither of
-which is visible from reading source.
+**Built and deployed:** the public site, design system, data layer and admin
+CMS. The contact form is real end to end (Turnstile + rate limiting + Gmail
+SMTP notifications + `/admin/leads`). The CMS is genuinely multi-user
+(PLAN.md W9–W11 in `docs/history/`): fixed roles with permission checks on
+every admin route, database-backed sessions, invite → accept →
+suspend/reactivate → delete → transfer-ownership at `/admin/users`, and
+optional Google sign-in (never a signup path, §7). Programmatic clients use
+Bearer tokens (W12, §7); the API is documented at `/api/openapi.json` and
+rendered at `/docs` (W13 — public on purpose). SEO is done (sitemap,
+robots, per-page OG images, `/writing/feed.xml`, JSON-LD, canonicals). Media
+lives on Cloudinary (§10). Page copy, résumé versions and content history
+are edited in the CMS (§4 rules 8–9, §6). Real content replaced the
+placeholders on 2026-09-20 (commit `7e42655`).
 
-**Everything PLAN.md's 2026-09-20 forward plan listed is now implemented**
-(same day) — the one remaining test (PLAN.md W14 item 6, the invitation
-round trip), the whole W15 design pass, and the media library's move to
-Cloudinary. Full gate (`typecheck`/`lint`/`format:check`/`test`/`build`)
-and the entire `pnpm e2e` suite pass locally. Cloudinary is configured and
-verified in dev — a real image was uploaded and deleted through
-`/admin/media` against the live account, confirmed both in Cloudinary's own
-Admin API and in the browser, not just assumed from the code (see PLAN.md's
-Cloudinary section for the one permission hiccup that surfaced and how it
-was fixed). **None of it is deployed yet** — per the lesson two paragraphs
-up, that only gets claimed once it's been checked against the running
-production container, not before. Two things still need a person, not
-code, before that can happen: the same Cloudinary credentials added to
-GitHub Actions (dev has them, production doesn't yet) and the production
-owner-role migration (needs an interactive Cloudflare Access SSH session
-and a password only the person running it should see — see PLAN.md's
-housekeeping section).
+**Deployed as of 2026-10-02** — every push to `main` since has passed
+`deploy.yml`'s `verify` gate and shipped. Locally, the full gate passes.
+
+**Not healthy — see PLAN.md for each:**
+
+- Production runs `next@16.3.3`, inside the range of a critical RCE in
+  `next/og`'s `ImageResponse`, which this site serves on public routes.
+  Fix before anything else (PLAN.md §2).
+- `e2e.yml`'s daily run has been red since 2026-09-21 on stale seed slugs,
+  not a site bug — but until it is fixed it catches nothing (PLAN.md §3).
+- Umami is being moved off this VPS to an externally hosted instance
+  (PLAN.md §1). §10's self-hosted Umami section describes what is running
+  today, not what is staying.
+
+**Lessons that still apply.** "Verified live" means checked against the
+running production container, not the dev server — the two diverge on
+static vs. dynamic rendering (§9's `/docs` trap) and on `HOSTNAME=0.0.0.0`
+binding (§7's `AUTH_URL`), neither visible from source. The 2026-09-20
+deploy found four bugs no review had caught that way: a fail-closed stale
+Cloudflare Access config locking every admin out, two GitHub Actions values
+in the wrong namespace (`vars.*` vs `secrets.*`) that would have silently
+disabled Turnstile and lead email, the sign-out redirect leaking the bind
+address, and `/docs` rendering blank (`docs/history/PLAN-2026-09.md` has
+the full account). And a scheduled CI job that fails quietly is no safety
+net: check `gh run list` when picking up work, not only after a push.
