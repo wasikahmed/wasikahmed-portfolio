@@ -20,7 +20,7 @@ MongoDB + Mongoose · Auth.js v5 · Zod · `motion` · MDX
 pnpm install
 cp .env.example .env      # fill in MONGODB_URI at minimum
 pnpm seed                 # idempotent — seeds initial content
-pnpm seed:admin            # creates the one admin account, prints a password once
+pnpm seed:admin           # creates the owner account, prints a password once
 pnpm dev
 ```
 

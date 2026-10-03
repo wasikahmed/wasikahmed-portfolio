@@ -210,7 +210,12 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
       <Section bordered density="compact">
         <Container className="flex flex-wrap items-center justify-between gap-6">
           <p className="text-fg-muted max-w-md">{copy.caseStudy.ctaText}</p>
-          <Button href="/contact" className="group">
+          <Button
+            href="/contact"
+            className="group"
+            data-track="cta_click"
+            data-track-cta="start_conversation"
+          >
             Start a conversation
             <ArrowRight />
           </Button>

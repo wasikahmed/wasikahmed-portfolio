@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Analytics } from '@/components/analytics/analytics';
 
 /**
  * `page.tsx` is a Client Component (Scalar's reference needs the DOM), so
@@ -18,5 +19,12 @@ import type { ReactNode } from 'react';
 export const dynamic = 'force-dynamic';
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
-  return children;
+  // The API reference is a public page like any other, so it is counted
+  // like one — it sits outside (site)'s layout, which renders this there.
+  return (
+    <>
+      {children}
+      <Analytics />
+    </>
+  );
 }

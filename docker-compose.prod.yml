@@ -67,47 +67,5 @@ services:
       retries: 20
       start_period: 40s
 
-  # Self-hosted Umami analytics (AGENTS.md §10) — bound to 127.0.0.1 like
-  # `web` above; the Cloudflare Tunnel gets its own public-hostname rule for
-  # analytics.<domain> pointed at UMAMI_PORT_HOST, same loopback topology as
-  # the main app. Needs Postgres, not Mongo — that's Umami's own requirement,
-  # not a stack choice, so it gets its own db service rather than trying to
-  # share `mongo`.
-  umami:
-    image: ghcr.io/umami-software/umami:latest
-    restart: unless-stopped
-    init: true
-    ports:
-      - '127.0.0.1:${UMAMI_PORT_HOST:-5010}:3000'
-    environment:
-      DATABASE_URL: postgresql://${UMAMI_DB_USER}:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET}
-    depends_on:
-      umami-db:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/api/heartbeat || exit 1']
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-  umami-db:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: umami
-      POSTGRES_USER: ${UMAMI_DB_USER}
-      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
-    volumes:
-      - umami-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${UMAMI_DB_USER} -d umami']
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 20s
-
 volumes:
   mongo-data:
-  umami-db-data:

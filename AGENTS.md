@@ -100,6 +100,14 @@ src/
     (admin)/admin/   CMS. Gated by src/proxy.ts + a re-check in the layout.
     api/admin/       CMS API. Auth + CSRF + Zod + audit log on every mutation.
     api/health/      Liveness + DB ping. Docker HEALTHCHECK and CI both use it.
+    api/contact/     Public contact form: Turnstile + rate limit, then a Lead.
+    api/openapi.json Generated API spec (src/server/openapi.ts); /docs renders it.
+    docs/            Public API reference. force-dynamic layout — see §9.
+    resume/, wasik-ahmed-resume.pdf/
+                     Both stream the live résumé (server/resume-response.ts).
+    x/               First-party Umami relay — scripts and beacons (§10).
+    (site)/[...missing]/  Sends unknown URLs to (site)/not-found.tsx, inside
+                     the site layout — nav, footer and analytics included.
     layout.tsx       Root: fonts, MotionProvider.
     globals.css      The entire design token layer. Read §5 before editing.
   proxy.ts           Next 16's middleware (renamed from middleware.ts).
@@ -114,15 +122,19 @@ src/
     session.ts       getAdminSession() — database-backed, see §7.
     auth.ts          Full Auth.js config (Node runtime only).
     auth.config.ts   Edge-safe half, for proxy.ts. Do not merge these.
-  lib/               Client-safe shared code (cn, types, format, admin-fetch).
+  lib/               Client-safe shared code (cn, types, format, admin-fetch,
+                     analytics — the event registry and track()).
   components/
     ui/              Primitives: Section, Container, Button, Card, Tag, Field.
     motion/          Reveal, Metric, TextReveal, Magnetic, ViewTransition.
     ambient/         Decorative background layers. Budget of 2 — see §5.
+    analytics/       Umami script tags, click classification, admin opt-out (§10).
     layout/          Nav, Footer, CommandPalette, SectionRail, ReadingProgress.
-    home/ work/ case-study/ contact/ mdx/ admin/
-e2e/                 Playwright: smoke, route/responsive sweep, motion contract.
-scripts/             seed.ts, seed-admin.ts
+    home/ work/ case-study/ contact/ experience/ brand/ mdx/ admin/
+e2e/                 Playwright: smoke, route/responsive sweep, motion contract,
+                     admin pipeline, invitation round trip.
+scripts/             seed.ts, seed-admin.ts, seed-e2e-*.ts, vps-backup.sh
+docs/history/        Archived PLAN.md files. Read-only record; PLAN.md is live.
 ```
 
 ---
@@ -346,6 +358,14 @@ too.
   page with no per-request data need is still a candidate for this exact
   trap; force dynamic rendering explicitly rather than relying on data
   fetching to imply it.
+- Don't use Umami's own `data-umami-event` attribute on a link. Its click
+  handler cancels a same-tab navigation, waits for the beacon, then sets
+  `location.href` — turning every Next.js client-side navigation it
+  touches into a full page reload. Use `data-track` (§10), which only
+  observes.
+- The `(site)/[...missing]` catch-all makes `@next/next/no-html-link-for-pages`
+  treat every path as a page, so a deliberate plain `<a>` to a route
+  handler (`/resume`) needs a disable comment saying why.
 - `next build` runs `generateStaticParams()` with no reachable database (by
   design, inside Docker). Those functions catch and return `[]`. Any new
   `generateStaticParams` must do the same.
@@ -412,105 +432,96 @@ documents alongside the old ones rather than replacing them; the only
 clean states are an empty volume or deleting the stale records yourself.
 
 **Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
-backup cron job" step runs `scripts/vps-backup.sh` nightly — `mongodump`
-and `pg_dump` (Umami's database, see below), dated and rotated locally
-under `$DEPLOY_PATH/backups` (default 7-day retention). Local retention
+backup cron job" step runs `scripts/vps-backup.sh` nightly — a
+`mongodump`, dated and rotated locally under `$DEPLOY_PATH/backups` (default 7-day retention). Local retention
 only, deliberately, decided 2026-08-30 (PLAN.md W4) — it protects against
 a bad migration or an admin-CMS mistake, not against losing the VPS
 itself. Media no longer needs a local-volume backup of its own (PLAN.md
 W15 item 1 moved it to Cloudinary — off-box and versioned on its own, on
 an account this app never has write access outside its own folder in).
-Mongo and Umami's Postgres are the two things left with only a local
-copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
+Mongo is the one thing left with only a local copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
 bucket) as its own task if that risk becomes worth carrying.
 
-**Self-hosted Umami analytics.** `docker-compose.prod.yml` runs Umami
-(privacy-first, no cookies) as two extra services: `umami` (the app
-itself) and `umami-db` (Postgres — Umami's own requirement, unrelated to
-this app's Mongo). Both are bound to `127.0.0.1` like `web`, on
-`UMAMI_PORT_HOST` (default 5010 — picked to clear every other tenant's
-published port on the shared VPS at the time this was set up; re-check
-`docker ps` before reusing this default if the box's port map has since
-moved on); the Cloudflare Tunnel needs its own
-public-hostname rule pointing a subdomain (e.g. `analytics.<domain>`) at
-that port — that rule lives in Cloudflare's dashboard, not this repo, so
-it has to be added by hand once. The Next app itself only ever reads
-`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID` (§7's
-sibling env vars, read by `src/app/(site)/layout.tsx` — unset either one
-and no tracking script renders at all); those two values come from
-Umami's own dashboard after you add the website there, post-deploy —
-don't hand-construct the script URL, copy the exact tracking code Umami
-gives you, since the script's served path isn't a fixed convention across
-versions. Self-hosting is free under Umami's MIT license with no feature
-gate in the code — the only things its own Cloud service adds that the
-self-hosted app doesn't have are scheduled email reports and the
-streaming API; everything else (funnels, retention, goals, heatmaps,
-session replays, the REST/MCP API) ships in the open-source app itself.
-First login after deploy is `admin`/`umami` — a publicly known default,
-so change it immediately from Umami's own settings, the same way
-`pnpm seed:admin`'s printed password is meant to be rotated once used.
+**Analytics: Umami, hosted elsewhere, served first-party.** Analytics is
+an externally hosted Umami (v3, `analytics.redelevators.com`, decided
+2026-10-03 — this VPS ran its own Umami + Postgres from 2026-09-22 until
+then; nothing analytics-related runs in this compose project any more).
+
+- **Config:** `UMAMI_URL` (the instance's base URL) and `UMAMI_WEBSITE_ID`,
+  server-only and read at request time — unset either one and no script
+  renders and `/x/` 404s. Changing them is a GitHub variable edit plus a
+  redeploy, never a rebuild. Local development points at a separate
+  "Portfolio — Dev (localhost)" website in the same Umami, so localhost
+  traffic never reaches production's numbers; the tracker's
+  `data-domains` (from `NEXT_PUBLIC_SITE_URL`'s hostname) is the second
+  guard.
+- **The relay** (`src/app/x/[...path]`, `src/server/umami-proxy.ts`):
+  the tracker (`/x/a.js`), the session recorder (`/x/r.js`) and every
+  beacon go through this origin, so ad blockers don't hide visitors and
+  the CSP needs no third-party origin. It injects the visitor's real IP
+  (`cf-connecting-ip`) into each beacon's `payload.ip` — without it, Umami
+  (itself behind Cloudflare) would see this VPS as every visitor, collapse
+  sessions and geolocate everyone to the VPS. It is an allowlist: five
+  paths, collect always lands on `/api/send`, and every body must carry
+  this site's website ID. `proxy.ts`'s matcher skips `/x/`.
+- **What's tracked:** pageviews, Core Web Vitals (`data-performance`),
+  replays + heatmaps (sampling and masking set per website in Umami's own
+  settings, no deploy needed), and the custom events registered in
+  `src/lib/analytics.ts`'s `EVENTS` — goals and funnels in the Umami
+  dashboard match those names exactly, so rename one there too or the
+  report silently empties. Clicks are classified by one delegated listener
+  (`components/analytics/analytics-client.tsx`): outbound links, résumé
+  downloads, in-page anchors, links into case studies and articles, nav,
+  and anything marked `data-track="<event>"` + `data-track-<prop>`.
+  Interactive state (contact form, palette, filters, accordion) calls
+  `track()` directly. Event data never carries what a visitor typed.
+- **Who isn't counted:** any browser that has opened `/admin`
+  (`ExcludeFromAnalytics` sets Umami's `umami.disabled` opt-out), and
+  `/admin` itself, which never renders the script.
 
 ---
 
 ## 11. Current state — read PLAN.md
 
-The public site, design system, data layer, and admin CMS are complete and
-deployed. The contact form is real end to end (Turnstile + rate limiting +
-Gmail SMTP notifications + a working `/admin/leads` list/detail/status
-pipeline), and TOTP has been verified working in dev. `/admin` is protected by
-both layers described in §7 — session and credentials; Cloudflare Access was
-removed 2026-09 (PLAN.md W8) to unblock multi-user auth, and the Cloudflare
-Tunnel is unaffected. **The CMS is now genuinely multi-user** (PLAN.md
-W9–W11): fixed roles with real permission enforcement on every admin route
-(not just a session check), database-backed sessions so a role/status change
-takes effect on the changed user's very next request, and a full
-invite → accept → suspend/reactivate → delete → transfer-ownership
-`/admin/users` surface, plus optional Google sign-in as a second login path
-(never a signup path — see §7). **Programmatic clients can now authenticate
-too** (PLAN.md W12): Bearer tokens with rotation, reuse detection, and
-per-token scopes intersected with the caller's live role, resolved through
-the same permission layer the cookie session uses — see §7. **The API is
-documented and publicly discoverable** (PLAN.md W13): `GET /api/openapi.json`
-is generated from the same Zod schemas every route validates against, and
-`/docs` renders it (self-hosted `@scalar/api-reference-react`, not a CDN
-embed — `proxy.ts`'s CSP would block that outright). Public, not
-admin-gated — a deliberate call, not a default. The SEO surface is done
-(sitemap, robots, per-page dynamic OG images, RSS, JSON-LD,
-canonical URLs) — see PLAN.md W3. CI now gates every push to `main`
-(typecheck/lint/format:check/test/build) before it ships, with E2E running
-separately on PRs and a daily schedule — see PLAN.md W4. See
-`PLAN.md` for what is left and in what order.
+Last reviewed 2026-10-03 against the repo, CI history and the live site.
 
-**All of the above is deployed and live, not just committed, as of
-2026-09-20** — W7 through W15 sat on local `main`, unpushed, for two weeks
-before that. Deploying surfaced and fixed three real bugs no code review
-caught: a stale Cloudflare Access env config left over from before W8 that
-was fail-closed and locking every real admin out of `/admin` in production;
-two of four new GitHub Actions secrets landed in the wrong namespace
-(`vars.*` vs `secrets.*`), which would have silently disabled Turnstile and
-lead-notification email in production; and `/docs` rendering as a
-completely blank page because it was statically prerendered against a CSP
-whose nonce is generated fresh per request (§9, and PLAN.md's 2026-09-20
-progress note has the full account of each). Worth internalizing: "verified
-live" only means what it says if it was checked against the actual
-production runtime, not the dev server — the two diverge exactly on static
-vs. dynamic rendering and on `HOSTNAME=0.0.0.0` binding behavior, neither of
-which is visible from reading source.
+**Built and deployed:** the public site, design system, data layer and admin
+CMS. The contact form is real end to end (Turnstile + rate limiting + Gmail
+SMTP notifications + `/admin/leads`). The CMS is genuinely multi-user
+(PLAN.md W9–W11 in `docs/history/`): fixed roles with permission checks on
+every admin route, database-backed sessions, invite → accept →
+suspend/reactivate → delete → transfer-ownership at `/admin/users`, and
+optional Google sign-in (never a signup path, §7). Programmatic clients use
+Bearer tokens (W12, §7); the API is documented at `/api/openapi.json` and
+rendered at `/docs` (W13 — public on purpose). SEO is done (sitemap,
+robots, per-page OG images, `/writing/feed.xml`, JSON-LD, canonicals). Media
+lives on Cloudinary (§10). Page copy, résumé versions and content history
+are edited in the CMS (§4 rules 8–9, §6). Real content replaced the
+placeholders on 2026-09-20 (commit `7e42655`).
 
-**Everything PLAN.md's 2026-09-20 forward plan listed is now implemented**
-(same day) — the one remaining test (PLAN.md W14 item 6, the invitation
-round trip), the whole W15 design pass, and the media library's move to
-Cloudinary. Full gate (`typecheck`/`lint`/`format:check`/`test`/`build`)
-and the entire `pnpm e2e` suite pass locally. Cloudinary is configured and
-verified in dev — a real image was uploaded and deleted through
-`/admin/media` against the live account, confirmed both in Cloudinary's own
-Admin API and in the browser, not just assumed from the code (see PLAN.md's
-Cloudinary section for the one permission hiccup that surfaced and how it
-was fixed). **None of it is deployed yet** — per the lesson two paragraphs
-up, that only gets claimed once it's been checked against the running
-production container, not before. Two things still need a person, not
-code, before that can happen: the same Cloudinary credentials added to
-GitHub Actions (dev has them, production doesn't yet) and the production
-owner-role migration (needs an interactive Cloudflare Access SSH session
-and a password only the person running it should see — see PLAN.md's
-housekeeping section).
+**Deployed as of 2026-10-02** — every push to `main` since has passed
+`deploy.yml`'s `verify` gate and shipped. Locally, the full gate passes.
+
+**Not healthy — see PLAN.md for each:**
+
+- Production runs `next@16.3.3`, inside the range of a critical RCE in
+  `next/og`'s `ImageResponse`, which this site serves on public routes.
+  Fix before anything else (PLAN.md §2).
+- `e2e.yml`'s daily run has been red since 2026-09-21 on stale seed slugs,
+  not a site bug — but until it is fixed it catches nothing (PLAN.md §3).
+- Analytics moved to an externally hosted Umami with a first-party relay,
+  custom events, Web Vitals, replays and heatmaps (§10, PLAN.md §1) —
+  verified end to end locally against the dev website; production
+  verification is part of the deploy, not assumed from it.
+
+**Lessons that still apply.** "Verified live" means checked against the
+running production container, not the dev server — the two diverge on
+static vs. dynamic rendering (§9's `/docs` trap) and on `HOSTNAME=0.0.0.0`
+binding (§7's `AUTH_URL`), neither visible from source. The 2026-09-20
+deploy found four bugs no review had caught that way: a fail-closed stale
+Cloudflare Access config locking every admin out, two GitHub Actions values
+in the wrong namespace (`vars.*` vs `secrets.*`) that would have silently
+disabled Turnstile and lead email, the sign-out redirect leaking the bind
+address, and `/docs` rendering blank (`docs/history/PLAN-2026-09.md` has
+the full account). And a scheduled CI job that fails quietly is no safety
+net: check `gh run list` when picking up work, not only after a push.

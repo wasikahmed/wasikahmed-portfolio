@@ -48,24 +48,14 @@ const PUBLIC_ADMIN_PATHS = [
  * Turbopack/webpack's HMR client relies on it in dev, and there is no
  * tunnel or real attacker surface in front of `pnpm dev`.
  *
- * Umami's origin (when `NEXT_PUBLIC_UMAMI_SCRIPT_URL` is set — see the root
- * layout's analytics script) is derived once at module load rather than
- * parsed per request: the nonce'd `<script>` tag
- * itself loads fine under `strict-dynamic` regardless of host, but the
- * tracking beacon it fires is a `fetch`/`XHR` to that same origin by
- * default, which `connect-src` has to explicitly allow.
+ * Analytics needs no allowance of its own: the Umami tracker, recorder and
+ * every beacon go through this origin's /x/ relay (src/server/umami-proxy.ts),
+ * so `'self'` already covers `script-src` and `connect-src`. The one
+ * addition is `worker-src blob:` — the session recorder (rrweb) starts its
+ * canvas-snapshot Web Worker from a blob: URL, and without an explicit
+ * `worker-src` that falls back to `script-src`, whose nonce a blob can't
+ * carry.
  */
-const umamiOrigin = (() => {
-  try {
-    return process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL
-      ? new URL(process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL).origin
-      : null;
-  } catch {
-    // Malformed env value — fail closed (no extra CSP origin) rather than
-    // crash every request's middleware.
-    return null;
-  }
-})();
 
 function buildCsp(nonce: string): string {
   const scriptSrc = [
@@ -76,11 +66,7 @@ function buildCsp(nonce: string): string {
     ...(process.env.NODE_ENV === 'production' ? [] : ["'unsafe-eval'"]),
   ].join(' ');
 
-  const connectSrc = [
-    "'self'",
-    'https://challenges.cloudflare.com',
-    ...(umamiOrigin ? [umamiOrigin] : []),
-  ].join(' ');
+  const connectSrc = ["'self'", 'https://challenges.cloudflare.com'].join(' ');
 
   return [
     `default-src 'self'`,
@@ -93,6 +79,7 @@ function buildCsp(nonce: string): string {
     `img-src 'self' data: https://res.cloudinary.com`,
     `font-src 'self'`,
     `connect-src ${connectSrc}`,
+    `worker-src 'self' blob:`,
     `frame-src https://challenges.cloudflare.com`,
     `object-src 'none'`,
     `base-uri 'self'`,
@@ -206,5 +193,8 @@ export const config = {
   // response. `_next/static`/`_next/image`/`favicon.ico` are excluded
   // because they're immutable build assets and Next's own image
   // optimizer, neither of which render anything a CSP applies to.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // `x/` — the analytics relay. Every page view sends a beacon or two
+  // there; none needs a CSP header, a session check or a nonce, so they
+  // skip this middleware entirely rather than pay for a JWT decode each.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|x/).*)'],
 };

@@ -34,7 +34,13 @@ export async function SelectedWork() {
                 {fillCount(copy.home.workHeading, projects.length)}
               </h2>
             </div>
-            <Button href="/work" variant="ghost" className="group">
+            <Button
+              href="/work"
+              variant="ghost"
+              className="group"
+              data-track="cta_click"
+              data-track-cta="all_work"
+            >
               All work
               <ArrowRight />
             </Button>

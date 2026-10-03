@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/cn';
 import type { Post, Project, Settings } from '@/lib/types';
+import { EVENTS, track } from '@/lib/analytics';
 
 interface Command {
   id: string;
@@ -115,6 +116,7 @@ export function CommandPalette({
         keywords: 'email copy contact mail address',
         run: ({ close: c }) => {
           void navigator.clipboard?.writeText(settings.email);
+          track(EVENTS.emailCopy, { location: 'palette', trigger: 'palette', copied: true });
           c();
         },
       },
@@ -151,6 +153,7 @@ export function CommandPalette({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
+        if (!open) track(EVENTS.paletteOpen, { method: 'shortcut' });
         onOpenChange(!open);
       }
     };
@@ -189,6 +192,17 @@ export function CommandPalette({
     };
   }, [open]);
 
+  // Which entry, from which group, and whether it was found by typing or
+  // by browsing — never the query itself, which is free text.
+  const select = (command: Command) => {
+    track(EVENTS.paletteSelect, {
+      group: command.group.toLowerCase(),
+      item: command.id,
+      searched: query.trim().length > 0,
+    });
+    command.run({ router, close });
+  };
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -207,7 +221,8 @@ export function CommandPalette({
     }
     if (event.key === 'Enter') {
       event.preventDefault();
-      results[active]?.run({ router, close });
+      const command = results[active];
+      if (command) select(command);
     }
   };
 
@@ -291,7 +306,7 @@ export function CommandPalette({
                               aria-selected={isActive}
                               data-active={isActive}
                               onMouseEnter={() => setActive(index)}
-                              onClick={() => command.run({ router, close })}
+                              onClick={() => select(command)}
                               className={cn(
                                 'duration-fast flex w-full items-center justify-between gap-4 rounded-md px-3 py-2.5 text-left transition-colors',
                                 isActive ? 'bg-accent-soft text-fg' : 'text-fg-muted',

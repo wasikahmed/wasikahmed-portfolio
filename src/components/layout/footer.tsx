@@ -4,6 +4,7 @@ import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
 import { Container } from '@/components/ui/section';
+import { EmailLink } from '@/components/ui/email-link';
 
 /**
  * Site footer — wayfinding, identity, and live status.
@@ -75,18 +76,20 @@ export function Footer({
 
             <p className="text-fg-muted mt-4 max-w-xs text-sm text-pretty">{settings.proof}</p>
 
-            <a
-              href={`mailto:${settings.email}`}
-              className="group text-fg duration-fast hover:text-accent mt-5 inline-flex items-center gap-2 text-sm transition-colors"
-            >
-              {settings.email}
-              <span
-                aria-hidden
-                className="duration-fast transition-transform group-hover:translate-x-0.5"
+            <div className="mt-5">
+              <EmailLink
+                email={settings.email}
+                className="group text-fg duration-fast hover:text-accent inline-flex items-center gap-2 text-sm transition-colors"
               >
-                →
-              </span>
-            </a>
+                {settings.email}
+                <span
+                  aria-hidden
+                  className="duration-fast transition-transform group-hover:translate-x-0.5"
+                >
+                  →
+                </span>
+              </EmailLink>
+            </div>
           </div>
 
           <nav aria-label="Footer">
@@ -118,6 +121,20 @@ export function Footer({
                 // The arrow is information, not ornament: it marks the links
                 // that leave the site.
                 const external = social.href.startsWith('http');
+                // A mailto social gets the same no-mail-app fallback as
+                // the address above.
+                if (social.href.startsWith('mailto:')) {
+                  return (
+                    <li key={social.label}>
+                      <EmailLink
+                        email={social.href.slice('mailto:'.length)}
+                        className={`group inline-flex items-center gap-1.5 ${LINK}`}
+                      >
+                        {social.label}
+                      </EmailLink>
+                    </li>
+                  );
+                }
                 return (
                   <li key={social.label}>
                     <a

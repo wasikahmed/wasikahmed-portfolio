@@ -28,7 +28,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: '/admin',
+      // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
+      // and beacons, nothing to index.
+      disallow: ['/admin', '/x/'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

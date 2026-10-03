@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ProjectCard } from './project-card';
 import type { Category, Project } from '@/lib/types';
 import { cn } from '@/lib/cn';
+import { EVENTS, track } from '@/lib/analytics';
 
 const FILTERS: (Category | 'All')[] = ['All', 'AI', 'Automation', 'Systems', 'Web'];
 
@@ -41,7 +42,10 @@ export function WorkIndex({ projects }: { projects: Project[] }) {
             <button
               key={filter}
               type="button"
-              onClick={() => setCategory(filter)}
+              onClick={() => {
+                setCategory(filter);
+                track(EVENTS.workFilter, { category: filter, source: 'chips' });
+              }}
               aria-pressed={active}
               className={cn(
                 'text-2xs duration-fast relative rounded-sm border px-3 py-1.5 font-mono transition-colors',

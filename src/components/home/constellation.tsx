@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Tech } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/components/motion/use-reduced-motion';
 import { cn } from '@/lib/cn';
+import { EVENTS, track } from '@/lib/analytics';
 
 const WIDTH = 820;
 const HEIGHT = 280;
@@ -243,7 +244,10 @@ export function Constellation({ tech }: { tech: Tech[] }) {
     };
   }, [nodes, prefersReduced]);
 
-  const open = (name: string) => router.push(`/work?tech=${encodeURIComponent(name)}`);
+  const open = (name: string) => {
+    track(EVENTS.workFilter, { tech: name, source: 'constellation' });
+    router.push(`/work?tech=${encodeURIComponent(name)}`);
+  };
 
   return (
     <div className="w-full">
