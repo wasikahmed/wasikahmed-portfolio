@@ -80,16 +80,13 @@ From `pnpm audit --prod`, 2026-10-03:
 3. `@ai-sdk/provider-utils` (low) arrives through `@scalar`'s `/docs`
    reference; clears whenever `@scalar/api-reference-react` picks it up.
 
-## 3. E2E — red every day since 2026-09-21
+## 3. E2E — fixed 2026-10-04
 
-`e2e.yml`'s daily run has failed twelve days running, unnoticed, because
-`e2e/site.spec.ts` still navigates to slugs `7e42655` deleted from the seed
-data (`/work/docflow-ai`, `/work/autoschedule`,
-`/writing/when-to-build-vs-buy-ai`). Not a site bug — but a suite that is
-always red protects nothing. Point the tests at the current seed slugs
-(`scorelivepro`, `advergo`, … and `live-data-should-cost-you-once`),
-ideally read from `src/server/seed-data/` rather than hardcoded again, then
-re-check `admin.spec.ts`/`invite.spec.ts` for the same drift.
+`e2e.yml`'s daily run was red from 2026-09-21 because `e2e/site.spec.ts`
+still navigated to slugs `7e42655` deleted from the seed. The seed is now
+fictional demo content (ahead of making the repository public, so it
+carries no claims about real work), and the spec targets its slugs. The
+seed refuses to run in production (AGENTS.md §10).
 
 ## 4. Housekeeping
 

@@ -1,7 +1,7 @@
 /**
- * Seeds the database from src/server/seed-data/* — the content that used
- * to be static imports, now the source of truth for the initial state of
- * each collection (AGENTS.md §6).
+ * Seeds the database from src/server/seed-data/* — fictional demo content
+ * for local development and the E2E suite (AGENTS.md §6). The live site's
+ * content is edited in the CMS and never comes from here.
  *
  * Idempotent: upserts by each collection's natural key, so running this
  * repeatedly converges rather than duplicating. Validates every record
@@ -59,6 +59,15 @@ async function main() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     console.error('MONGODB_URI is not set. Run with: pnpm seed (loads .env automatically)');
+    process.exit(1);
+  }
+
+  // The seed is fictional demo content (seed-data/projects.ts). Run against
+  // production it would add demo projects to the live site and overwrite
+  // the real settings singleton, so the bundled copy in the runner image
+  // refuses outright. Production content is restored from backups instead.
+  if (process.env.NODE_ENV === 'production' && !dryRun) {
+    console.error('Refusing to seed: NODE_ENV is production and the seed is demo content.');
     process.exit(1);
   }
 

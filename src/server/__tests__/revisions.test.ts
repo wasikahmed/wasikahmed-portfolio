@@ -54,19 +54,19 @@ let listRoute: typeof import('@/app/api/admin/revisions/route');
 let settingsRoute: typeof import('@/app/api/admin/settings/route');
 
 const validProject = {
-  slug: 'scorelivepro',
-  title: 'ScoreLivePro',
-  tagline: 'Live football scores that stay live.',
+  slug: 'ledger-sync',
+  title: 'Ledger Sync',
+  tagline: 'Two accounting systems, one set of numbers.',
   categories: ['Systems'],
-  problem: 'Match data had to stay current.',
-  headline: { value: '10K+', label: 'downloads' },
-  metrics: [{ value: '10K+', label: 'downloads' }],
+  problem: 'The two systems had to agree.',
+  headline: { value: '5 min', label: 'sync interval' },
+  metrics: [{ value: '5 min', label: 'sync interval' }],
   stack: ['Django'],
-  role: 'Sole Backend Engineer',
-  timeline: 'Dec 2025 — Feb 2026',
+  role: 'Backend Engineer',
+  timeline: 'Demo project',
   year: 2026,
   accent: '#0fbf7a',
-  architecture: [{ id: 'a', label: 'Sync', detail: 'Every 15 seconds' }],
+  architecture: [{ id: 'a', label: 'Sync', detail: 'Every 5 minutes' }],
   sections: [{ id: 'problem', title: 'The problem', bodyMdx: 'Original text.' }],
   status: 'published',
 };
@@ -131,12 +131,12 @@ describe('recording revisions', () => {
       .sort({ createdAt: 1 })
       .lean();
     expect(history.map((r) => r.snapshot.tagline)).toEqual([
-      'Live football scores that stay live.',
+      'Two accounting systems, one set of numbers.',
       'Second.',
     ]);
     expect(history[0]).toMatchObject({
       action: 'update',
-      label: 'ScoreLivePro',
+      label: 'Ledger Sync',
       userEmail: 'admin@example.com',
     });
     expect(history[0].snapshot).not.toHaveProperty('_id');
@@ -162,7 +162,7 @@ describe('recording revisions', () => {
 
     const revision = await Revision.findOne({ entityId: id }).lean();
     expect(revision?.action).toBe('delete');
-    expect(revision?.snapshot.slug).toBe('scorelivepro');
+    expect(revision?.snapshot.slug).toBe('ledger-sync');
   });
 
   it('trims a record to the newest MAX_REVISIONS_PER_RECORD', async () => {
@@ -235,7 +235,7 @@ describe('restoring', () => {
     expect(res.status).toBe(200);
 
     const project = await Project.findById(id).lean();
-    expect(project?.tagline).toBe('Live football scores that stay live.');
+    expect(project?.tagline).toBe('Two accounting systems, one set of numbers.');
     expect(project?.links).toBeUndefined();
   });
 
@@ -246,7 +246,7 @@ describe('restoring', () => {
     const latest = await Revision.findOne({ entityId: id }).sort({ createdAt: -1 }).lean();
     expect(latest?.action).toBe('restore');
     expect(latest?.snapshot.tagline).toBe('Changed.');
-    expect(await AuditLog.countDocuments({ summary: /^Restored ScoreLivePro/ })).toBe(1);
+    expect(await AuditLog.countDocuments({ summary: /^Restored Ledger Sync/ })).toBe(1);
   });
 
   it('leaves the drag-and-drop order alone', async () => {
@@ -268,7 +268,7 @@ describe('restoring', () => {
 
     const res = await restore(String(revision!._id));
     expect(res.status).toBe(200);
-    expect((await Project.findById(id).lean())?.slug).toBe('scorelivepro');
+    expect((await Project.findById(id).lean())?.slug).toBe('ledger-sync');
   });
 
   it('409s when a deleted record’s slug has been taken since', async () => {
