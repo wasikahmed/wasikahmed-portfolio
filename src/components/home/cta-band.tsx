@@ -1,5 +1,6 @@
 import { Section, Container } from '@/components/ui/section';
-import { Button, ArrowRight } from '@/components/ui/button';
+import { Button, ArrowRight, buttonVariants } from '@/components/ui/button';
+import { EmailLink } from '@/components/ui/email-link';
 import { Magnetic } from '@/components/motion/magnetic';
 import { Reveal } from '@/components/motion/reveal';
 import { StatusDot } from '@/components/ui/eyebrow';
@@ -26,14 +27,21 @@ export async function CtaBand() {
 
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Magnetic>
-              <Button href="/contact" size="lg" className="group">
+              <Button
+                href="/contact"
+                size="lg"
+                className="group"
+                data-track="cta_click"
+                data-track-cta="start_conversation"
+              >
                 Start a conversation
                 <ArrowRight />
               </Button>
             </Magnetic>
-            <Button href={`mailto:${settings.email}`} variant="ghost" size="lg">
-              {settings.email}
-            </Button>
+            <EmailLink
+              email={settings.email}
+              className={buttonVariants({ variant: 'ghost', size: 'lg' })}
+            />
           </div>
 
           <p className="text-fg-subtle mt-6 font-mono text-xs">

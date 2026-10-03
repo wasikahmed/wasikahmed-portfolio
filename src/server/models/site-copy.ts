@@ -41,6 +41,7 @@ const siteCopySchema = new Schema(
     contact: { type: group(['metaDescription', 'heading', 'intro']), default: undefined },
     caseStudy: { type: group(['ctaText']), default: undefined },
     footer: { type: group(['unavailableText']), default: undefined },
+    notFound: { type: group(['heading', 'body']), default: undefined },
   },
   { timestamps: true },
 );

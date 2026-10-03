@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Field, Input, Textarea, Select } from '@/components/ui/field';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { TurnstileWidget } from '@/components/contact/turnstile-widget';
+import { EmailLink } from '@/components/ui/email-link';
+import { EVENTS, track } from '@/lib/analytics';
 
 type Intent = 'project' | 'role';
 type Status = 'idle' | 'pending' | 'sent' | 'error';
@@ -33,6 +35,14 @@ export function ContactForm({ email }: { email: string }) {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
+  // contact_start fires once per form shown — the funnel step between
+  // landing on /contact and submitting, which is where people drop out.
+  const started = useRef(false);
+  const onFirstFocus = () => {
+    if (started.current) return;
+    started.current = true;
+    track(EVENTS.contactStart, { intent });
+  };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -48,6 +58,9 @@ export function ContactForm({ email }: { email: string }) {
     };
 
     setStatus('pending');
+    // Set once an HTTP error has been reported, so the catch below only
+    // reports what never got a response at all (status 0: offline, DNS).
+    let reported = false;
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
@@ -56,10 +69,15 @@ export function ContactForm({ email }: { email: string }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
+        track(EVENTS.contactError, { intent, status: res.status });
+        reported = true;
         throw new Error(body?.error ?? 'Something went wrong. Please try again.');
       }
+      // Only what the form was about — never the name, address or message.
+      track(EVENTS.contactSubmit, { intent, hasCompany: Boolean(payload.company) });
       setStatus('sent');
     } catch (err) {
+      if (!reported) track(EVENTS.contactError, { intent, status: 0 });
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
       setStatus('error');
     }
@@ -78,6 +96,7 @@ export function ContactForm({ email }: { email: string }) {
             onClick={() => {
               setStatus('idle');
               setIntent('role');
+              started.current = false;
             }}
           >
             Send another
@@ -88,7 +107,7 @@ export function ContactForm({ email }: { email: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-6">
+    <form onSubmit={onSubmit} onFocus={onFirstFocus} className="flex flex-col gap-6">
       <div className="flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Name" htmlFor="name">
@@ -136,9 +155,9 @@ export function ContactForm({ email }: { email: string }) {
         {status === 'error' ? (
           <p className="text-signal-rose text-sm">
             {errorMessage}{' '}
-            <a href={`mailto:${email}`} className="underline underline-offset-4">
+            <EmailLink email={email} className="underline underline-offset-4">
               Email me directly instead.
-            </a>
+            </EmailLink>
           </p>
         ) : null}
 

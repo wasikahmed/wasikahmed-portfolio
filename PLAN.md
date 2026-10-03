@@ -30,47 +30,32 @@ Shipped and deployed since the last plan was written, in order:
 
 ---
 
-## 1. Analytics — move to an external Umami — in progress
+## 1. Analytics — move to an external Umami — implemented, deploying
 
-Decided 2026-10-03: this VPS stops hosting Umami. Wasik runs a self-hosted
-Umami (v3) on another domain, and the portfolio becomes a website there.
+Decided 2026-10-03: this VPS stops hosting Umami. Analytics goes to
+Wasik's self-hosted Umami 3.4 at `analytics.redelevators.com` (website
+"Portfolio - Wasik Ahmed", plus "Portfolio — Dev (localhost)" for local
+development). AGENTS.md §10 describes the setup as built.
 
-Until this change, `docker-compose.prod.yml` ran `umami` + `umami-db`
-(Postgres), served at `analytics.wasikahmed.me` through its own Cloudflare
-Tunnel hostname rule, and `vps-backup.sh` `pg_dump`ed it nightly. The Next
-app itself only reads `NEXT_PUBLIC_UMAMI_SCRIPT_URL`/
-`NEXT_PUBLIC_UMAMI_WEBSITE_ID`, at runtime — neither is a Docker build arg,
-so changing them is a GitHub variable edit plus a redeploy, not a rebuild.
-
-1. **Tear down, in the repo — done, 2026-10-03 (ships with the next
-   deploy):** dropped both services and the `umami-db-data`
-   volume from `docker-compose.prod.yml`, the `pg_dump` step from
-   `vps-backup.sh` (it would fail every night once the container is gone),
-   the four `UMAMI_*` lines from `deploy.yml`'s heredoc and header, the
-   block from `.env.example`, and AGENTS.md §10's section. `deploy.yml`
-   already runs `up -d --remove-orphans`, so the next deploy stops and
-   removes both containers by itself.
-2. **Tear down, by hand** (none of this is reachable from the repo). The
-   old data is discarded, no final dump (Wasik, 2026-10-03). `docker volume rm` the Postgres
-   volume (`--remove-orphans` never deletes named volumes); delete the
-   `analytics.wasikahmed.me` public-hostname rule in the Cloudflare Tunnel;
-   delete `UMAMI_DB_USER`, `UMAMI_PORT_HOST` (vars) and `UMAMI_DB_PASSWORD`,
-   `UMAMI_APP_SECRET` (secrets) from GitHub Actions.
-3. **Point at the new instance:** add the site there, set the two
-   `NEXT_PUBLIC_UMAMI_*` GitHub variables, redeploy, and confirm a pageview
-   arrives — checked against production, not the dev server.
-4. **Use what Umami v3 offers**, not just pageviews. Decided 2026-10-03:
-   - custom events with properties (contact submit, résumé downloads,
-     outbound links, project and post engagement), Web Vitals
-     (`data-performance`), `data-domains` so dev traffic is never
-     counted, and admin users' own visits excluded;
-   - **replays and heatmaps on**, at Umami's 15% sample, inputs masked,
-     `/admin` never recorded — `recorder.js` must be proven to work under
-     `proxy.ts`'s nonce CSP in production, not assumed;
-   - **tracker proxied through `wasikahmed.me`** so ad blockers don't hide
-     a developer audience — visitor IP/country must still reach Umami
-     correctly through Cloudflare and the proxy;
-   - no analytics view inside `/admin` for now.
+1. **Teardown, in the repo — done.** `umami`/`umami-db`, the
+   `umami-db-data` volume, the `pg_dump` step and every `UMAMI_*` setting
+   are gone; the next deploy's `--remove-orphans` stops both containers.
+2. **Teardown, by hand — still open after the deploy.** Old data is
+   discarded, no final dump (Wasik, 2026-10-03). On the VPS:
+   `docker volume rm portfolio_umami-db-data` and
+   `rm -f "$DEPLOY_PATH"/backups/umami-*.dump`; in Cloudflare Zero Trust,
+   delete the Tunnel's `analytics.wasikahmed.me` public-hostname rule.
+3. **The integration — done, verified locally** against the dev website:
+   first-party relay at `/x/` with the visitor IP injected, custom events,
+   Web Vitals, replays and heatmaps (no CSP violations), `data-domains`,
+   admin browsers excluded, a tracked in-layout 404, and every mailto
+   link falling back to copying the address when no mail app opens.
+4. **Production verification — after the deploy:** a pageview and an
+   event arrive in Umami from `wasikahmed.me` with a real country (proves
+   the IP injection through Cloudflare), a replay records, and nothing
+   appears from a browser that has opened `/admin`.
+5. **Dashboard** — goals, funnels, links, pixels and a board, set up in
+   Umami itself against the event names in `src/lib/analytics.ts`.
 
 ## 2. Security — urgent
 

@@ -37,6 +37,9 @@ const button = cva(
 
 export type ButtonVariants = VariantProps<typeof button>;
 
+/** The class string alone, for a link that needs its own behaviour (EmailLink). */
+export const buttonVariants = button;
+
 type ButtonAsButton = ButtonVariants &
   React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: never };
 

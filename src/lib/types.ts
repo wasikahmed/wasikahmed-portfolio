@@ -292,6 +292,7 @@ export interface SiteCopy {
   contact: { metaDescription: string; heading: string; intro: string };
   caseStudy: { ctaText: string };
   footer: { unavailableText: string };
+  notFound: { heading: string; body: string };
 }
 
 /**

@@ -196,6 +196,7 @@ export function Nav({
         {open ? (
           <motion.div
             id="mobile-menu"
+            data-track-location="mobile_menu"
             ref={panelRef}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}

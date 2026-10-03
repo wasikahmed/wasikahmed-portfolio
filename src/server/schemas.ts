@@ -253,6 +253,7 @@ export const siteCopySchema = z.object({
   contact: z.object({ metaDescription, heading: copyText, intro: copyText }),
   caseStudy: z.object({ ctaText: copyText }),
   footer: z.object({ unavailableText: copyText }),
+  notFound: z.object({ heading: copyText, body: copyText }),
 });
 
 /**

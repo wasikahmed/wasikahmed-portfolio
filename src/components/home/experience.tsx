@@ -40,7 +40,13 @@ export function Experience({ roles, heading }: { roles: Role[]; heading: string 
           </div>
           {/* Not "Full experience" any more — the full list is right here.
               What /about adds is the shipped-work detail behind each row. */}
-          <Button href="/about#experience" variant="ghost" className="group">
+          <Button
+            href="/about#experience"
+            variant="ghost"
+            className="group"
+            data-track="cta_click"
+            data-track-cta="full_experience"
+          >
             Full detail
             <ArrowRight />
           </Button>

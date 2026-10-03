@@ -105,6 +105,9 @@ src/
     docs/            Public API reference. force-dynamic layout — see §9.
     resume/, wasik-ahmed-resume.pdf/
                      Both stream the live résumé (server/resume-response.ts).
+    x/               First-party Umami relay — scripts and beacons (§10).
+    (site)/[...missing]/  Sends unknown URLs to (site)/not-found.tsx, inside
+                     the site layout — nav, footer and analytics included.
     layout.tsx       Root: fonts, MotionProvider.
     globals.css      The entire design token layer. Read §5 before editing.
   proxy.ts           Next 16's middleware (renamed from middleware.ts).
@@ -119,11 +122,13 @@ src/
     session.ts       getAdminSession() — database-backed, see §7.
     auth.ts          Full Auth.js config (Node runtime only).
     auth.config.ts   Edge-safe half, for proxy.ts. Do not merge these.
-  lib/               Client-safe shared code (cn, types, format, admin-fetch).
+  lib/               Client-safe shared code (cn, types, format, admin-fetch,
+                     analytics — the event registry and track()).
   components/
     ui/              Primitives: Section, Container, Button, Card, Tag, Field.
     motion/          Reveal, Metric, TextReveal, Magnetic, ViewTransition.
     ambient/         Decorative background layers. Budget of 2 — see §5.
+    analytics/       Umami script tags, click classification, admin opt-out (§10).
     layout/          Nav, Footer, CommandPalette, SectionRail, ReadingProgress.
     home/ work/ case-study/ contact/ experience/ brand/ mdx/ admin/
 e2e/                 Playwright: smoke, route/responsive sweep, motion contract,
@@ -353,6 +358,14 @@ too.
   page with no per-request data need is still a candidate for this exact
   trap; force dynamic rendering explicitly rather than relying on data
   fetching to imply it.
+- Don't use Umami's own `data-umami-event` attribute on a link. Its click
+  handler cancels a same-tab navigation, waits for the beacon, then sets
+  `location.href` — turning every Next.js client-side navigation it
+  touches into a full page reload. Use `data-track` (§10), which only
+  observes.
+- The `(site)/[...missing]` catch-all makes `@next/next/no-html-link-for-pages`
+  treat every path as a page, so a deliberate plain `<a>` to a route
+  handler (`/resume`) needs a disable comment saying why.
 - `next build` runs `generateStaticParams()` with no reachable database (by
   design, inside Docker). Those functions catch and return `[]`. Any new
   `generateStaticParams` must do the same.
@@ -429,18 +442,42 @@ an account this app never has write access outside its own folder in).
 Mongo is the one thing left with only a local copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
 bucket) as its own task if that risk becomes worth carrying.
 
-**Analytics: Umami, hosted elsewhere.** This VPS ran its own Umami +
-Postgres from 2026-09-22 until 2026-10-03, when analytics moved to an
-externally hosted Umami (v3) — nothing analytics-related runs in this
-compose project any more, and the nightly backup no longer has a second
-database to dump. The Next app only reads
-`NEXT_PUBLIC_UMAMI_SCRIPT_URL`/`NEXT_PUBLIC_UMAMI_WEBSITE_ID` (read by
-`src/app/(site)/layout.tsx` — unset either one and no tracking script
-renders at all). They're read at runtime, not passed as Docker build args,
-so changing them is a GitHub variable edit plus a redeploy, never a
-rebuild. Copy the script URL from Umami's own tracking-code dialog rather
-than hand-constructing it — its served path is configurable
-(`TRACKER_SCRIPT_NAME`) and isn't a fixed convention.
+**Analytics: Umami, hosted elsewhere, served first-party.** Analytics is
+an externally hosted Umami (v3, `analytics.redelevators.com`, decided
+2026-10-03 — this VPS ran its own Umami + Postgres from 2026-09-22 until
+then; nothing analytics-related runs in this compose project any more).
+
+- **Config:** `UMAMI_URL` (the instance's base URL) and `UMAMI_WEBSITE_ID`,
+  server-only and read at request time — unset either one and no script
+  renders and `/x/` 404s. Changing them is a GitHub variable edit plus a
+  redeploy, never a rebuild. Local development points at a separate
+  "Portfolio — Dev (localhost)" website in the same Umami, so localhost
+  traffic never reaches production's numbers; the tracker's
+  `data-domains` (from `NEXT_PUBLIC_SITE_URL`'s hostname) is the second
+  guard.
+- **The relay** (`src/app/x/[...path]`, `src/server/umami-proxy.ts`):
+  the tracker (`/x/a.js`), the session recorder (`/x/r.js`) and every
+  beacon go through this origin, so ad blockers don't hide visitors and
+  the CSP needs no third-party origin. It injects the visitor's real IP
+  (`cf-connecting-ip`) into each beacon's `payload.ip` — without it, Umami
+  (itself behind Cloudflare) would see this VPS as every visitor, collapse
+  sessions and geolocate everyone to the VPS. It is an allowlist: five
+  paths, collect always lands on `/api/send`, and every body must carry
+  this site's website ID. `proxy.ts`'s matcher skips `/x/`.
+- **What's tracked:** pageviews, Core Web Vitals (`data-performance`),
+  replays + heatmaps (sampling and masking set per website in Umami's own
+  settings, no deploy needed), and the custom events registered in
+  `src/lib/analytics.ts`'s `EVENTS` — goals and funnels in the Umami
+  dashboard match those names exactly, so rename one there too or the
+  report silently empties. Clicks are classified by one delegated listener
+  (`components/analytics/analytics-client.tsx`): outbound links, résumé
+  downloads, in-page anchors, links into case studies and articles, nav,
+  and anything marked `data-track="<event>"` + `data-track-<prop>`.
+  Interactive state (contact form, palette, filters, accordion) calls
+  `track()` directly. Event data never carries what a visitor typed.
+- **Who isn't counted:** any browser that has opened `/admin`
+  (`ExcludeFromAnalytics` sets Umami's `umami.disabled` opt-out), and
+  `/admin` itself, which never renders the script.
 
 ---
 
@@ -472,10 +509,10 @@ placeholders on 2026-09-20 (commit `7e42655`).
   Fix before anything else (PLAN.md §2).
 - `e2e.yml`'s daily run has been red since 2026-09-21 on stale seed slugs,
   not a site bug — but until it is fixed it catches nothing (PLAN.md §3).
-- Analytics is mid-move to an externally hosted Umami (PLAN.md §1): the
-  VPS's own Umami is removed from the repo, the new instance and the
-  full feature set (events, replays, heatmaps, Web Vitals, ad-blocker
-  proxy) are still to come.
+- Analytics moved to an externally hosted Umami with a first-party relay,
+  custom events, Web Vitals, replays and heatmaps (§10, PLAN.md §1) —
+  verified end to end locally against the dev website; production
+  verification is part of the deploy, not assumed from it.
 
 **Lessons that still apply.** "Verified live" means checked against the
 running production container, not the dev server — the two diverge on

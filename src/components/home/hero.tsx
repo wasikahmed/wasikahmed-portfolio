@@ -43,12 +43,24 @@ export async function Hero() {
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Magnetic>
-                <Button href="/work" size="lg" className="group">
+                <Button
+                  href="/work"
+                  size="lg"
+                  className="group"
+                  data-track="cta_click"
+                  data-track-cta="view_work"
+                >
                   View work
                   <ArrowRight />
                 </Button>
               </Magnetic>
-              <Button href="/contact" variant="ghost" size="lg">
+              <Button
+                href="/contact"
+                variant="ghost"
+                size="lg"
+                data-track="cta_click"
+                data-track-cta="get_in_touch"
+              >
                 Get in touch
               </Button>
             </div>

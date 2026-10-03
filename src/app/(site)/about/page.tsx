@@ -45,11 +45,21 @@ export default async function AboutPage() {
                 ))}
               </div>
               <div className="mt-10 flex flex-wrap gap-3">
-                <Button href="/contact" className="group">
+                <Button
+                  href="/contact"
+                  className="group"
+                  data-track="cta_click"
+                  data-track-cta="get_in_touch"
+                >
                   Get in touch
                   <ArrowRight />
                 </Button>
-                <Button href="/work" variant="ghost">
+                <Button
+                  href="/work"
+                  variant="ghost"
+                  data-track="cta_click"
+                  data-track-cta="see_work"
+                >
                   See the work
                 </Button>
               </div>

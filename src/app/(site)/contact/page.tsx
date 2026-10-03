@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
+import { EmailLink } from '@/components/ui/email-link';
 import { getSettings, getSiteCopy } from '@/server/queries';
 import { pageTitle, pageMetadata } from '@/lib/seo';
 
@@ -46,18 +47,21 @@ export default async function ContactPage() {
               <p className="text-2xs text-fg-subtle mb-3 font-mono tracking-widest uppercase">
                 Direct
               </p>
-              <a
-                href={`mailto:${settings.email}`}
+              <EmailLink
+                email={settings.email}
                 className="text-fg duration-fast hover:text-accent text-sm transition-colors"
-              >
-                {settings.email}
-              </a>
+              />
             </div>
 
             <div>
               <p className="text-2xs text-fg-subtle mb-3 font-mono tracking-widest uppercase">
                 Résumé
               </p>
+              {/* A plain <a>, not <Link>: /resume is a route handler that
+                  streams a PDF, not a page. The rule only flags it because
+                  the (site)/[...missing] catch-all makes every path look
+                  like a page to it. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
               <a
                 href="/resume"
                 className="text-fg duration-fast hover:text-accent text-sm transition-colors"
@@ -73,15 +77,24 @@ export default async function ContactPage() {
               <ul className="flex flex-col gap-2">
                 {settings.socials.map((social) => (
                   <li key={social.label}>
-                    <a
-                      href={social.href}
-                      {...(social.href.startsWith('http')
-                        ? { target: '_blank', rel: 'noopener noreferrer' }
-                        : {})}
-                      className="text-fg-muted duration-fast hover:text-fg text-sm transition-colors"
-                    >
-                      {social.label}
-                    </a>
+                    {social.href.startsWith('mailto:') ? (
+                      <EmailLink
+                        email={social.href.slice('mailto:'.length)}
+                        className="text-fg-muted duration-fast hover:text-fg text-sm transition-colors"
+                      >
+                        {social.label}
+                      </EmailLink>
+                    ) : (
+                      <a
+                        href={social.href}
+                        {...(social.href.startsWith('http')
+                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                          : {})}
+                        className="text-fg-muted duration-fast hover:text-fg text-sm transition-colors"
+                      >
+                        {social.label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

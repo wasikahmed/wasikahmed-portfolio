@@ -60,4 +60,8 @@ export const siteCopyDefaults: SiteCopy = {
   footer: {
     unavailableText: 'Not taking on new work right now.',
   },
+  notFound: {
+    heading: 'Nothing lives at this address.',
+    body: 'The link may be old or mistyped. Everything that was here is still somewhere below.',
+  },
 };

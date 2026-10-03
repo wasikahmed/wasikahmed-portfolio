@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Nav } from './nav';
 import { CommandPalette } from './command-palette';
 import type { Post, Project, Settings } from '@/lib/types';
+import { EVENTS, track } from '@/lib/analytics';
 
 /**
  * Client boundary for the site chrome. Kept as thin as possible so every
@@ -35,7 +36,13 @@ export function SiteShell({
       >
         Skip to content
       </a>
-      <Nav onOpenPalette={() => setPaletteOpen(true)} settings={settings} />
+      <Nav
+        onOpenPalette={() => {
+          track(EVENTS.paletteOpen, { method: 'button' });
+          setPaletteOpen(true);
+        }}
+        settings={settings}
+      />
       <CommandPalette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}

@@ -30,11 +30,11 @@ name: Build and deploy
 #   NEXT_PUBLIC_SITE_URL   e.g. https://wasikahmed.me
 #   ADMIN_EMAIL             Bootstrap admin account email
 #   MONGO_ROOT_USER         Mongo root username for the prod container
-#   NEXT_PUBLIC_UMAMI_SCRIPT_URL   Umami tracker script URL (an externally
-#                                  hosted instance — not this VPS).
-#                                  Unset = no analytics script at all (see
-#                                  src/app/(site)/layout.tsx) — optional.
-#   NEXT_PUBLIC_UMAMI_WEBSITE_ID   The Umami site's website ID.
+#   UMAMI_URL               Base URL of the externally hosted Umami, e.g.
+#                            https://analytics.example.com. Optional —
+#                            unset = no analytics at all. Read at runtime by
+#                            the /x/ relay (src/server/umami-proxy.ts).
+#   UMAMI_WEBSITE_ID        This site's website ID in that Umami.
 #   CLOUDINARY_CLOUD_NAME   Cloudinary account identifier (media library,
 #                            PLAN.md W15 item 1) — not secret on its own.
 #   CLOUDINARY_FOLDER       Optional — scopes every asset this app writes
@@ -224,8 +224,8 @@ jobs:
             GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
             NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
             TURNSTILE_SECRET_KEY=${{ secrets.TURNSTILE_SECRET_KEY }}
-            NEXT_PUBLIC_UMAMI_SCRIPT_URL=${{ vars.NEXT_PUBLIC_UMAMI_SCRIPT_URL }}
-            NEXT_PUBLIC_UMAMI_WEBSITE_ID=${{ vars.NEXT_PUBLIC_UMAMI_WEBSITE_ID }}
+            UMAMI_URL=${{ vars.UMAMI_URL }}
+            UMAMI_WEBSITE_ID=${{ vars.UMAMI_WEBSITE_ID }}
             CLOUDINARY_CLOUD_NAME=${{ vars.CLOUDINARY_CLOUD_NAME }}
             CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
             CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}

@@ -170,4 +170,13 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
       },
     ],
   }),
+  group({
+    group: 'notFound',
+    title: 'Page not found',
+    description: 'The 404 page — a mistyped address, or a link to something since removed.',
+    fields: [
+      { key: 'heading', label: 'Heading' },
+      { key: 'body', label: 'Text', multiline: true },
+    ],
+  }),
 ];

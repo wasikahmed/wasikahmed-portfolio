@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Tag } from '@/components/ui/tag';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/cn';
+import { EVENTS, track } from '@/lib/analytics';
 
 /**
  * Progressive disclosure done right — this was already the strongest
@@ -33,7 +34,10 @@ export function RoleAccordion({ roles }: { roles: Role[] }) {
                 type="button"
                 aria-expanded={open}
                 aria-controls={panelId}
-                onClick={() => setOpenIndex(open ? null : index)}
+                onClick={() => {
+                  if (!open) track(EVENTS.roleExpand, { company: role.company, role: role.title });
+                  setOpenIndex(open ? null : index);
+                }}
                 className="group flex w-full items-start justify-between gap-6 py-6 text-left"
               >
                 <span className="flex min-w-0 flex-col gap-1.5">
