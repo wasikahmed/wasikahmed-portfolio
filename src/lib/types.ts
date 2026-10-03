@@ -136,6 +136,13 @@ export interface Role {
    * before the field existed.
    */
   summary?: string;
+  /**
+   * The company's logo, as a media-library URL. Drawn as a silhouette in a
+   * text token (CompanyMark), so it only reads as the logo if the file has
+   * a transparent background — an opaque one renders as a filled square.
+   * Absent or '' falls back to the company's initials.
+   */
+  logo?: string;
   shipped: string[];
   order: number;
 }

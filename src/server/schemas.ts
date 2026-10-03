@@ -180,6 +180,9 @@ export const roleSchema = z.object({
   type: z.string().min(1),
   kind: z.enum(['work', 'education']).default('work'),
   summary: z.string().optional(),
+  // '' rather than absent to clear it: updates go through
+  // findByIdAndUpdate, which never removes a key that arrives undefined.
+  logo: z.union([z.literal(''), mediaRefSchema.shape.url]).optional(),
   shipped: z.array(z.string().min(1)).min(1),
   order: z.number().int().default(0),
 });

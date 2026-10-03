@@ -3,6 +3,8 @@ import { Section, Container } from '@/components/ui/section';
 import { Eyebrow, StatusDot } from '@/components/ui/eyebrow';
 import { ContactForm } from '@/components/contact/contact-form';
 import { EmailLink } from '@/components/ui/email-link';
+import { BrandIcon } from '@/components/ui/brand-icon';
+import { socialIcon } from '@/lib/brand-icons';
 import { getSettings, getSiteCopy } from '@/server/queries';
 import { turnstileSiteKey } from '@/server/turnstile';
 import { pageTitle, pageMetadata } from '@/lib/seo';
@@ -51,8 +53,11 @@ export default async function ContactPage() {
               <div className="flex flex-col gap-2">
                 <EmailLink
                   email={settings.email}
-                  className="text-fg duration-fast hover:text-accent text-sm transition-colors"
-                />
+                  className="text-fg duration-fast hover:text-accent inline-flex items-center gap-2 text-sm transition-colors"
+                >
+                  <BrandIcon icon={socialIcon('mailto:')} />
+                  {settings.email}
+                </EmailLink>
                 {/* Through /whatsapp, never a wa.me link here — that route's
                     comment has why. A plain <a>, not <Link>: it is a route
                     handler that redirects off-site, not a page. */}
@@ -61,8 +66,9 @@ export default async function ContactPage() {
                     href="/whatsapp"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-fg duration-fast hover:text-accent text-sm transition-colors"
+                    className="text-fg duration-fast hover:text-accent inline-flex items-center gap-2 text-sm transition-colors"
                   >
+                    <BrandIcon icon={socialIcon('/whatsapp')} />
                     WhatsApp
                   </a>
                 ) : null}
@@ -96,8 +102,9 @@ export default async function ContactPage() {
                     {social.href.startsWith('mailto:') ? (
                       <EmailLink
                         email={social.href.slice('mailto:'.length)}
-                        className="text-fg-muted duration-fast hover:text-fg text-sm transition-colors"
+                        className="text-fg-muted duration-fast hover:text-fg inline-flex items-center gap-2 text-sm transition-colors"
                       >
+                        <BrandIcon icon={socialIcon(social.href)} />
                         {social.label}
                       </EmailLink>
                     ) : (
@@ -106,8 +113,9 @@ export default async function ContactPage() {
                         {...(social.href.startsWith('http')
                           ? { target: '_blank', rel: 'noopener noreferrer' }
                           : {})}
-                        className="text-fg-muted duration-fast hover:text-fg text-sm transition-colors"
+                        className="text-fg-muted duration-fast hover:text-fg inline-flex items-center gap-2 text-sm transition-colors"
                       >
+                        <BrandIcon icon={socialIcon(social.href)} />
                         {social.label}
                       </a>
                     )}

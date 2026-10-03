@@ -189,6 +189,16 @@ describe('roleSchema', () => {
     expect(roleSchema.safeParse(valid).success).toBe(true);
   });
 
+  it('accepts a logo URL, a root-relative path, or empty to clear it', () => {
+    for (const logo of ['https://res.cloudinary.com/x/logo.svg', '/logos/acme.svg', '']) {
+      expect(roleSchema.safeParse({ ...valid, logo }).success).toBe(true);
+    }
+  });
+
+  it('rejects a logo that is neither a URL nor a root-relative path', () => {
+    expect(roleSchema.safeParse({ ...valid, logo: 'acme.svg' }).success).toBe(false);
+  });
+
   it('rejects an empty shipped array', () => {
     expect(roleSchema.safeParse({ ...valid, shipped: [] }).success).toBe(false);
   });

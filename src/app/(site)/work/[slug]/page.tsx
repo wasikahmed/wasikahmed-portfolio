@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
+import { BrandIcon } from '@/components/ui/brand-icon';
+import { techIcon } from '@/lib/brand-icons';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { Metric } from '@/components/motion/metric';
 import { Reveal } from '@/components/motion/reveal';
@@ -168,8 +170,15 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
                     Stack
                   </p>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Marks only here, in the case study's own stack list —
+                        not on home's or /work's cards, where a row of logos
+                        per card would be the chip wall TagList exists to
+                        prevent. Unknown items stay plain (brand-icons.ts). */}
                     {project.stack.map((item) => (
-                      <Tag key={item}>{item}</Tag>
+                      <Tag key={item} className="gap-1.5">
+                        <BrandIcon icon={techIcon(item)} className="size-3" />
+                        {item}
+                      </Tag>
                     ))}
                   </div>
                 </div>

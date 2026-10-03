@@ -5,6 +5,8 @@ import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
 import { Container } from '@/components/ui/section';
 import { EmailLink } from '@/components/ui/email-link';
+import { BrandIcon } from '@/components/ui/brand-icon';
+import { socialIcon } from '@/lib/brand-icons';
 
 /**
  * Site footer — wayfinding, identity, and live status.
@@ -123,8 +125,9 @@ export function Footer({
                     <li key={social.label}>
                       <EmailLink
                         email={social.href.slice('mailto:'.length)}
-                        className={`group inline-flex items-center gap-1.5 ${LINK}`}
+                        className={`group inline-flex items-center gap-2 ${LINK}`}
                       >
+                        <BrandIcon icon={socialIcon(social.href)} />
                         {social.label}
                       </EmailLink>
                     </li>
@@ -135,8 +138,9 @@ export function Footer({
                     <a
                       href={social.href}
                       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                      className={`group inline-flex items-center gap-1.5 ${LINK}`}
+                      className={`group inline-flex items-center gap-2 ${LINK}`}
                     >
+                      <BrandIcon icon={socialIcon(social.href)} />
                       {social.label}
                       {external ? (
                         <span aria-hidden className="text-2xs text-fg-subtle">

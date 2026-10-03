@@ -132,6 +132,18 @@ export function RoleForm({ role }: { role?: Role }) {
           onChange={(e) => set('summary', e.target.value)}
         />
       </Field>
+      <Field
+        label="Logo"
+        htmlFor="logo"
+        hint="Optional. Paste a URL copied from the media library. Use an SVG or a PNG with a transparent background — it is drawn in one colour to match the site, so an opaque background shows as a solid square. Leave empty for the company's initials."
+      >
+        <Input
+          id="logo"
+          placeholder="https://…"
+          value={draft.logo ?? ''}
+          onChange={(e) => set('logo', e.target.value.trim())}
+        />
+      </Field>
       <Field label="What I shipped" htmlFor="shipped">
         <StringList value={draft.shipped} onChange={(v) => set('shipped', v)} />
       </Field>
