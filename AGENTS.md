@@ -491,9 +491,23 @@ then; nothing analytics-related runs in this compose project any more).
   and anything marked `data-track="<event>"` + `data-track-<prop>`.
   Interactive state (contact form, palette, filters, accordion) calls
   `track()` directly. Event data never carries what a visitor typed.
+- **One server-sent event:** `resume_view`, from `resume-response.ts`,
+  for every open of the live PDF however the visitor arrived — a PDF runs
+  no tracker, so links from GitHub, LinkedIn or an application were
+  otherwise invisible. Same session as the visitor's page views (same IP
+  and UA), `source` = `utm_source`, else referrer host, else `direct`.
+  Umami's bot check drops link previewers; follow-up byte ranges and
+  prefetches are skipped here (`isCountableOpen`). `resume_download` stays
+  the on-site click.
+- **Links to the site from elsewhere carry UTMs**, not `/q/` short links,
+  so nothing public depends on the Umami host:
+  `utm_source` = platform (`github`, `linkedin`, `email`, `resume`),
+  `utm_medium` = placement (`readme`, `profile`, `signature`, `pdf`),
+  `utm_campaign=portfolio`, `utm_content` = the specific page or repo.
 - **Who isn't counted:** any browser that has opened `/admin`
   (`ExcludeFromAnalytics` sets Umami's `umami.disabled` opt-out), and
-  `/admin` itself, which never renders the script.
+  `/admin` itself, which never renders the script. For `resume_view`,
+  any request carrying an admin session cookie.
 
 ---
 

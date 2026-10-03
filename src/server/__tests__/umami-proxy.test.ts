@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clientIp, handleUmamiProxy, resolveRoute } from '../umami-proxy';
+import {
+  buildServerEvent,
+  clientIp,
+  handleUmamiProxy,
+  isCountableOpen,
+  openSource,
+  resolveRoute,
+  sendServerEvent,
+} from '../umami-proxy';
 
 /**
  * The analytics relay (umami-proxy.ts). What matters most here is what it
@@ -189,5 +197,91 @@ describe('handleUmamiProxy', () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
     const res = await handleUmamiProxy(post('api/hit', event()), ['api', 'hit']);
     expect(res.status).toBe(502);
+  });
+});
+
+describe('server-sent events (résumé opens)', () => {
+  const UA =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/131 Safari/537.36';
+  const config = { origin: UMAMI, websiteId: WEBSITE_ID };
+  const open = (url = 'http://0.0.0.0:3000/resume', headers: Record<string, string> = {}) =>
+    new Request(url, { headers: { 'user-agent': UA, ...headers } });
+
+  it('counts a plain GET, and the first range request of a PDF viewer', () => {
+    expect(isCountableOpen(open())).toBe(true);
+    expect(isCountableOpen(open(undefined, { range: 'bytes=0-65535' }))).toBe(true);
+  });
+
+  it('does not count follow-up ranges, prefetches, HEAD, missing UAs or a signed-in admin', () => {
+    expect(isCountableOpen(open(undefined, { range: 'bytes=65536-131071' }))).toBe(false);
+    expect(isCountableOpen(open(undefined, { 'sec-purpose': 'prefetch;prerender' }))).toBe(false);
+    expect(isCountableOpen(open(undefined, { purpose: 'prefetch' }))).toBe(false);
+    expect(
+      isCountableOpen(
+        new Request('http://localhost/resume', { method: 'HEAD', headers: { 'user-agent': UA } }),
+      ),
+    ).toBe(false);
+    expect(isCountableOpen(new Request('http://localhost/resume'))).toBe(false);
+    expect(
+      isCountableOpen(open(undefined, { cookie: 'theme=dark; __Secure-authjs.session-token=abc' })),
+    ).toBe(false);
+    expect(isCountableOpen(open(undefined, { cookie: 'authjs.session-token=abc' }))).toBe(false);
+  });
+
+  it('names the source from utm_source, then the referrer, then direct', () => {
+    const site = 'wasikahmed.me';
+    expect(
+      openSource(new URL('http://x/resume?utm_source=GitHub'), 'https://github.com/', site),
+    ).toBe('github');
+    expect(openSource(new URL('http://x/resume'), 'https://www.linkedin.com/feed/', site)).toBe(
+      'linkedin.com',
+    );
+    expect(openSource(new URL('http://x/resume'), 'https://wasikahmed.me/about', site)).toBe(
+      'site',
+    );
+    expect(openSource(new URL('http://x/resume'), 'not a url', site)).toBe('direct');
+    expect(openSource(new URL('http://x/resume'), null, site)).toBe('direct');
+  });
+
+  it("builds a collect body like the tracker's: path and query only, visitor IP and UA", () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://wasikahmed.me');
+    const body = buildServerEvent(
+      open('http://0.0.0.0:3000/resume?utm_source=github&utm_medium=readme', {
+        'cf-connecting-ip': '203.0.113.7',
+        referer: 'https://github.com/',
+        'accept-language': 'en-GB,en;q=0.9',
+      }),
+      config,
+      'resume_view',
+      { response: 'full' },
+    );
+    expect(body).toEqual({
+      type: 'event',
+      payload: {
+        website: WEBSITE_ID,
+        hostname: 'wasikahmed.me',
+        url: '/resume?utm_source=github&utm_medium=readme',
+        referrer: 'https://github.com/',
+        language: 'en-GB',
+        name: 'resume_view',
+        data: { source: 'github', response: 'full' },
+        userAgent: UA,
+        ip: '203.0.113.7',
+      },
+    });
+  });
+
+  it("posts to /api/send with the visitor's user agent, and swallows failures", async () => {
+    const body = buildServerEvent(open(), config, 'resume_view');
+    await sendServerEvent(config, body);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${UMAMI}/api/send`);
+    expect(new Headers(init.headers).get('user-agent')).toBe(UA);
+
+    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(sendServerEvent(config, body)).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

@@ -2,8 +2,32 @@
 // leak — see https://nextjs.org/docs/app/getting-started/server-and-client-components#preventing-environment-poisoning
 import 'server-only';
 
+import { after } from 'next/server';
+
+import { EVENTS } from '@/lib/analytics';
 import { getCurrentResumeFile } from './queries';
 import { pdfHeaders, storedBytes } from './resume-files';
+import { buildServerEvent, getUmamiConfig, isCountableOpen, sendServerEvent } from './umami-proxy';
+
+/**
+ * Counts an open of the live résumé in Umami (`resume_view`).
+ *
+ * The PDF runs no tracker, so without this every open that doesn't start
+ * from a click on this site — a link in a GitHub README, on LinkedIn, in
+ * an application email — is invisible. Links to /resume carry UTMs for
+ * the same reason links to the site do; see umami-proxy.ts for what is
+ * and isn't counted. A no-op when analytics is unconfigured (local dev,
+ * tests), and never on the response's critical path.
+ */
+function recordResumeView(request: Request, status: 200 | 304) {
+  const config = getUmamiConfig();
+  if (!config || !isCountableOpen(request)) return;
+  const body = buildServerEvent(request, config, EVENTS.resumeView, {
+    // 304: an open the browser answered from its cache after revalidating.
+    response: status === 200 ? 'full' : 'cached',
+  });
+  after(() => sendServerEvent(config, body));
+}
 
 /**
  * Where /resume (and the legacy URL below) point until the first version
@@ -44,7 +68,9 @@ export async function currentResumeResponse(request: Request): Promise<Response>
   if (request.headers.get('if-none-match') === `"${current.sha256}"`) {
     const notModified: Record<string, string> = { ...headers };
     delete notModified['Content-Length'];
+    recordResumeView(request, 304);
     return new Response(null, { status: 304, headers: notModified });
   }
+  recordResumeView(request, 200);
   return new Response(storedBytes(current.data), { headers });
 }
