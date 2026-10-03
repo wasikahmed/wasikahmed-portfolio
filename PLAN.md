@@ -30,32 +30,37 @@ Shipped and deployed since the last plan was written, in order:
 
 ---
 
-## 1. Analytics — move to an external Umami — implemented, deploying
+## 1. Analytics — moved to an external Umami — live
 
 Decided 2026-10-03: this VPS stops hosting Umami. Analytics goes to
 Wasik's self-hosted Umami 3.4 at `analytics.redelevators.com` (website
 "Portfolio - Wasik Ahmed", plus "Portfolio — Dev (localhost)" for local
 development). AGENTS.md §10 describes the setup as built.
 
-1. **Teardown, in the repo — done.** `umami`/`umami-db`, the
-   `umami-db-data` volume, the `pg_dump` step and every `UMAMI_*` setting
-   are gone; the next deploy's `--remove-orphans` stops both containers.
-2. **Teardown, by hand — still open after the deploy.** Old data is
-   discarded, no final dump (Wasik, 2026-10-03). On the VPS:
-   `docker volume rm portfolio_umami-db-data` and
-   `rm -f "$DEPLOY_PATH"/backups/umami-*.dump`; in Cloudflare Zero Trust,
-   delete the Tunnel's `analytics.wasikahmed.me` public-hostname rule.
-3. **The integration — done, verified locally** against the dev website:
-   first-party relay at `/x/` with the visitor IP injected, custom events,
-   Web Vitals, replays and heatmaps (no CSP violations), `data-domains`,
-   admin browsers excluded, a tracked in-layout 404, and every mailto
-   link falling back to copying the address when no mail app opens.
-4. **Production verification — after the deploy:** a pageview and an
-   event arrive in Umami from `wasikahmed.me` with a real country (proves
-   the IP injection through Cloudflare), a replay records, and nothing
-   appears from a browser that has opened `/admin`.
-5. **Dashboard** — goals, funnels, links, pixels and a board, set up in
-   Umami itself against the event names in `src/lib/analytics.ts`.
+**Verified in production, 2026-10-03** (deploy of `c651637`): `/x/a.js`,
+`/x/r.js`, the recorder config and `/x/api/hit` all 200 on
+`wasikahmed.me`; a real visit arrived in Umami with its pageview and
+`scroll_depth` events and was placed in BD, the visitor's country rather
+than the VPS's — the `payload.ip` injection working through Cloudflare.
+Replays were verified at 100% sampling on the dev website; production
+samples 15%. The old `analytics.wasikahmed.me` now 502s — its containers
+were removed by the deploy.
+
+Set up in Umami the same day, against the names in `src/lib/analytics.ts`
+(rename an event there and the matching goal/funnel silently empties):
+8 goals, 5 funnels (hiring path, contact form completion, case-study and
+article read-through, home → about → résumé), 6 segments (LinkedIn,
+GitHub, search, outside Bangladesh, mobile, UTM-tagged), 2 cohorts, 6
+tracked links (`/q/wasik-*`, each to a UTM-tagged URL), 2 email pixels,
+a "Portfolio overview" board, and an annotation marking the switch.
+
+**Still open — by hand, not reachable from the repo:**
+
+1. On the VPS: `docker volume rm portfolio_umami-db-data` and
+   `rm -f "$DEPLOY_PATH"/backups/umami-*.dump` (old data discarded, no
+   final dump — Wasik, 2026-10-03).
+2. Cloudflare Zero Trust: delete the Tunnel's `analytics.wasikahmed.me`
+   public-hostname rule (it now points at nothing and 502s).
 
 ## 2. Security — urgent
 
