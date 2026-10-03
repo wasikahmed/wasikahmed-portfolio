@@ -20,8 +20,14 @@ export const EVENTS = {
   emailClick: 'email_click',
   /** Address copied — the mailto fallback, or the palette's copy action. */
   emailCopy: 'email_copy',
-  /** /resume or /wasik-ahmed-resume.pdf opened. */
+  /** A link to /resume or /wasik-ahmed-resume.pdf clicked on this site. */
   resumeDownload: 'resume_download',
+  /**
+   * The résumé PDF actually served, from anywhere — a GitHub README, a
+   * LinkedIn post, a link inside an application. Sent by the server
+   * (resume-response.ts), because a PDF runs no tracker of its own.
+   */
+  resumeView: 'resume_view',
   /** /whatsapp opened — the redirect to wa.me. */
   whatsappClick: 'whatsapp_click',
   /** A link that leaves the site. */

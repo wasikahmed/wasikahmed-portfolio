@@ -215,3 +215,107 @@ export async function handleUmamiProxy(request: Request, segments: string[]): Pr
     },
   });
 }
+
+/**
+ * Whether a request for a tracked file looks like a person opening it.
+ *
+ * Bots are Umami's job: it runs `isbot` on the forwarded user agent and
+ * drops the event, which covers the link previewers (Slack, LinkedIn,
+ * WhatsApp, Telegram) that fetch a URL the moment it is pasted. What only
+ * this side can see is the request's shape:
+ *
+ * - a browser's PDF viewer re-fetches the file in byte ranges after the
+ *   first response, so only a request starting at byte 0 is an open;
+ * - speculative prefetches and prerenders are not opens at all;
+ * - a signed-in admin checking their own résumé is not a visitor. This is
+ *   the server-side half of `ExcludeFromAnalytics`, which only reaches
+ *   pages that run the tracker.
+ */
+export function isCountableOpen(request: Request): boolean {
+  if (request.method !== 'GET') return false;
+  if (!request.headers.get('user-agent')) return false;
+
+  const purpose = `${request.headers.get('sec-purpose') ?? ''} ${request.headers.get('purpose') ?? ''}`;
+  if (/prefetch|prerender/i.test(purpose)) return false;
+
+  const range = request.headers.get('range');
+  if (range && !/^bytes=0-/i.test(range.trim())) return false;
+
+  const cookie = request.headers.get('cookie') ?? '';
+  if (/(?:^|;\s*)(?:__Secure-)?authjs\.session-token=/.test(cookie)) return false;
+
+  return true;
+}
+
+/**
+ * Where an open came from, for the event's `source` property: the link's
+ * `utm_source` if it has one, else the referring site, else `direct`.
+ * Umami also records the full UTM set and referrer on the event; this is
+ * the one-word version, readable straight off the Events tab.
+ */
+export function openSource(url: URL, referrer: string | null, siteHost: string): string {
+  const utmSource = url.searchParams.get('utm_source')?.trim().toLowerCase();
+  if (utmSource) return utmSource.slice(0, 50);
+  if (referrer) {
+    try {
+      const host = new URL(referrer).hostname.replace(/^www\./, '');
+      return host === siteHost ? 'site' : host;
+    } catch {
+      // A malformed Referer is as good as none.
+    }
+  }
+  return 'direct';
+}
+
+/**
+ * The collect body for an event this server sends on a visitor's behalf,
+ * shaped like the tracker's own so Umami attributes it the same way: same
+ * IP and user agent means the same session id as the visitor's page views,
+ * so the open lands in their journey rather than as a stray visit.
+ *
+ * Built from the incoming request before the response goes out — the
+ * send itself runs in `after()`, once the request is finished.
+ */
+export function buildServerEvent(
+  request: Request,
+  config: UmamiConfig,
+  name: string,
+  data: Record<string, string> = {},
+) {
+  const url = new URL(request.url);
+  const siteHost = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000').hostname;
+  const referrer = request.headers.get('referer');
+  const ip = clientIp(request.headers);
+
+  return {
+    type: 'event',
+    payload: {
+      website: config.websiteId,
+      hostname: siteHost,
+      // Path and query only: `request.url`'s host is the container's
+      // 0.0.0.0 bind address (AGENTS.md §7). The query carries the UTMs.
+      url: `${url.pathname}${url.search}`,
+      referrer: referrer ?? '',
+      language: request.headers.get('accept-language')?.split(',')[0]?.trim() ?? '',
+      name,
+      data: { source: openSource(url, referrer, siteHost), ...data },
+      userAgent: request.headers.get('user-agent') ?? '',
+      ...(ip ? { ip } : {}),
+    },
+  };
+}
+
+/** Posts a server-built event to Umami. Never throws: analytics is best-effort. */
+export async function sendServerEvent(
+  config: UmamiConfig,
+  body: ReturnType<typeof buildServerEvent>,
+): Promise<void> {
+  const res = await upstreamFetch(`${config.origin}/api/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': body.payload.userAgent },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  if (!res?.ok)
+    console.warn('[analytics] server event not recorded', body.payload.name, res?.status);
+}
