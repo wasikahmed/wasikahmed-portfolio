@@ -258,7 +258,7 @@ export default function ResumePage() {
           <Field
             label="Label"
             htmlFor="resume-label"
-            hint="How you'll recognise it later, e.g. “Oct 2026 — myMedPal added”."
+            hint="How you'll recognise it later, e.g. “Oct 2026 — new project added”."
           >
             <Input
               id="resume-label"

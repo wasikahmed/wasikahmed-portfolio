@@ -1,25 +1,37 @@
-# Wasik Ahmed — Portfolio
+# wasikahmed.me
 
-A personal portfolio site with a self-hosted admin CMS behind it. The public
-site and the admin are one Next.js app; content lives in MongoDB and is
-edited through `/admin`, not through code.
+My portfolio site and the CMS behind it. One Next.js app serves the public
+site and an admin area where all content is edited: projects, writing,
+experience, page copy and the résumé.
 
-Full operating details — commands, directory map, non-negotiable rules,
-design system, auth architecture, deployment, and known traps — live in
-[`AGENTS.md`](./AGENTS.md). Current status and the forward plan live in
-[`PLAN.md`](./PLAN.md). This file is just enough to get a checkout running.
+Live: [wasikahmed.me](https://wasikahmed.me) · API reference: [wasikahmed.me/docs](https://wasikahmed.me/docs)
+
+## What's in it
+
+- **Site:** case studies, writing with an RSS feed, a contact form with
+  Turnstile and rate limiting, and generated social images and sitemap
+- **CMS:** MDX editor with live preview, Cloudinary media library,
+  drag-and-drop ordering, version history with restore, résumé versions
+- **Security:** role-based access (4 roles, 19 permissions), argon2id
+  passwords, optional TOTP 2FA, rotating refresh tokens with reuse
+  detection, CSRF protection, per-request CSP, audit log
+- **API:** Zod-validated REST endpoints with an OpenAPI spec generated from
+  the same schemas
+- **Delivery:** Vitest and Playwright tests; each push to `main` runs
+  typecheck, lint, tests and build, then deploys a Docker image to a VPS,
+  with automatic rollback if the health check fails
 
 ## Stack
 
-Next.js 16 (App Router, React 19) · TypeScript, strict · Tailwind CSS v4 ·
-MongoDB + Mongoose · Auth.js v5 · Zod · `motion` · MDX
+Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · MongoDB · Auth.js ·
+Zod · Vitest · Playwright · Docker · GitHub Actions
 
-## Quick start
+## Run locally
 
 ```bash
 pnpm install
 cp .env.example .env      # fill in MONGODB_URI at minimum
-pnpm seed                 # idempotent — seeds initial content
+pnpm seed                 # loads fictional demo content
 pnpm seed:admin           # creates the owner account, prints a password once
 pnpm dev
 ```
@@ -31,21 +43,13 @@ of a host-side Mongo:
 docker compose watch
 ```
 
-Then visit `http://localhost:4000` (both the Docker stack and a host-side
-`pnpm dev` use the same port) and `/admin/login` for the CMS.
+Then visit `http://localhost:4000` and `/admin/login` for the CMS. The seed
+is placeholder content; the live site's content is edited in the CMS and is
+not part of this repository.
 
-## Commands
+Commands, architecture, conventions and deployment are documented in
+[`AGENTS.md`](./AGENTS.md); the current plan is in [`PLAN.md`](./PLAN.md).
 
-See [`AGENTS.md` §2](./AGENTS.md#2-commands) for the full list and the
-pre-push gate. The short version:
+---
 
-```bash
-pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
-```
-
-## Deployment
-
-Push to `main` builds a Docker image, runs it through CI
-(`typecheck`/`lint`/`format:check`/`test`/`build`), and deploys it to a VPS
-behind a Cloudflare Tunnel with automatic rollback on a failed healthcheck.
-See [`AGENTS.md` §10](./AGENTS.md#10-deployment).
+© Wasik Ahmed Apon. The code is public for reference; the site's content is not licensed for reuse.

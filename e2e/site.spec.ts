@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 
+// Slugs, titles and counts below come from the fictional demo seed in
+// src/server/seed-data/ — change them together.
 const ROUTES = [
   '/',
   '/work',
-  '/work/docflow-ai',
+  '/work/ledger-sync',
   '/writing',
-  '/writing/when-to-build-vs-buy-ai',
+  '/writing/demo-post',
   '/about',
   '/contact',
 ];
@@ -57,11 +59,11 @@ test.describe('Command palette', () => {
     const dialog = page.getByRole('dialog', { name: 'Search the site' });
     await expect(dialog).toBeVisible();
 
-    await page.getByLabel('Search', { exact: true }).fill('autoschedule');
+    await page.getByLabel('Search', { exact: true }).fill('fieldnotes');
     await expect(dialog.getByRole('option')).toHaveCount(1);
 
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/work\/autoschedule$/);
+    await expect(page).toHaveURL(/\/work\/fieldnotes$/);
   });
 
   test('closes on Escape', async ({ page }) => {
@@ -108,19 +110,19 @@ test.describe('Work filtering', () => {
 
     await page.getByRole('button', { name: 'AI', exact: true }).click();
     await expect(page.getByRole('status')).toHaveText('1 of 4');
-    await expect(page.getByRole('heading', { name: 'DocFlow AI' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Mail Sorter' })).toBeVisible();
   });
 
   test('constellation node deep-links into a filtered list', async ({ page }) => {
-    await page.goto('/work?tech=OR-Tools');
+    await page.goto('/work?tech=Electron');
     await expect(page.getByRole('status')).toHaveText('1 of 4');
-    await expect(page.getByRole('heading', { name: 'AutoSchedule' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Fieldnotes' })).toBeVisible();
   });
 });
 
 test.describe('Case study', () => {
   test('contents highlights the first section at the top of the page', async ({ page }) => {
-    await page.goto('/work/docflow-ai');
+    await page.goto('/work/ledger-sync');
     await page.evaluate(() => {
       document.documentElement.style.scrollBehavior = 'auto';
     });
@@ -135,27 +137,25 @@ test.describe('Case study', () => {
   });
 
   test('metric bar shows headline value with its baseline', async ({ page }) => {
-    await page.goto('/work/docflow-ai');
-    await expect(page.getByText('3.1 hrs/day → 14 min/day')).toBeVisible();
+    await page.goto('/work/ledger-sync');
+    await expect(page.getByText('down from a weekly manual export')).toBeVisible();
   });
 });
 
 test.describe('Contact form', () => {
-  // PLAN.md W15 item 3 — the form is visible on arrival, intent as its
-  // first field rather than a gate. This still exercises the qualifying
-  // signal (intent) and the project/role-specific fields that follow it.
-  test('renders immediately, with intent switching the project-only fields', async ({ page }) => {
+  // The form is visible on arrival, with intent as a select rather than a
+  // gate. Intent no longer adds or removes fields (the budget field went);
+  // it only changes what the message hint asks for.
+  test('renders immediately, with intent switching the message hint', async ({ page }) => {
     await page.goto('/contact');
 
-    // 'project' is the default — no click needed for the form to be complete.
+    // 'role' is the default — no interaction needed for the form to be complete.
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Rough budget')).toBeVisible();
+    await expect(page.getByLabel('Message')).toBeVisible();
+    await expect(page.getByText('Team, stack, and what you need someone to own.')).toBeVisible();
 
-    await page.getByRole('button', { name: /A role/ }).click();
-    await expect(page.getByLabel('Rough budget')).toBeHidden();
-    await expect(page.getByLabel('Email')).toBeVisible();
-
-    await page.getByRole('button', { name: /A project/ }).click();
-    await expect(page.getByLabel('Rough budget')).toBeVisible();
+    await page.getByLabel('What is this about?').selectOption('project');
+    await expect(page.getByText('The problem, not the solution')).toBeVisible();
+    await expect(page.getByText('Team, stack, and what you need someone to own.')).toBeHidden();
   });
 });

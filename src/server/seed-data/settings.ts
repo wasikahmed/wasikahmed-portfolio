@@ -1,27 +1,27 @@
-/** Seed data for the settings singleton. Edited live via the admin thereafter. */
+/**
+ * Fictional seed data for the settings singleton. The live site's settings
+ * are edited in the admin; this is only what a fresh database starts with,
+ * and what getSettings() falls back to before anything is seeded.
+ */
 export const settingsSeed = {
-  name: 'Wasik Ahmed',
-  initials: 'WA',
+  name: 'Demo Person',
+  initials: 'DP',
   role: 'Software Engineer',
-  discipline: 'Backend & Automation',
-  /*
-   * Nine words, first two accented by the hero's TextReveal. "in production"
-   * is the load-bearing half: it is what separates this from a portfolio of
-   * tutorials, and every project below can back it up with a public artifact.
-   */
-  tagline: 'I build backends that run in production.',
+  discipline: 'Backend · Full-Stack',
+  // Nine words or fewer reads best: the hero's TextReveal accents the first two.
+  tagline: 'Demo content for a fresh checkout.',
   proof:
-    'Django and TypeScript systems behind a 10K-download sports app, an offline-first clinic desktop app, and a live B2B order platform.',
-  email: 'aponwasikahmed@gmail.com',
-  location: 'Dhaka, Bangladesh',
-  timezone: 'BST · UTC+6',
+    'Placeholder settings seeded for local development. Edit them in the admin under Settings.',
+  email: 'hello@example.com',
+  location: 'Example City',
+  timezone: 'UTC',
   available: true,
-  availableFor: 'Open to software engineering roles — remote preferred',
+  availableFor: 'Open to software engineering roles',
   responseTime: '< 24h',
   socials: [
-    { label: 'GitHub', href: 'https://github.com/wasikahmed' },
-    { label: 'LinkedIn', href: 'https://linkedin.com/in/wasikahmed' },
-    { label: 'Email', href: 'mailto:aponwasikahmed@gmail.com' },
+    { label: 'GitHub', href: 'https://github.com' },
+    { label: 'LinkedIn', href: 'https://linkedin.com' },
+    { label: 'Email', href: 'mailto:hello@example.com' },
   ],
   /*
    * A fixed brand asset in public/, deliberately not a media-library upload:
@@ -30,35 +30,25 @@ export const settingsSeed = {
    */
   portrait: {
     url: '/portrait.webp',
-    alt: 'Wasik Ahmed',
+    alt: 'Portrait',
   },
-  /*
-   * /about's narrative and home's Approach list. These were hardcoded
-   * consts inside their components until now — the most personal copy on
-   * the site was the only copy that needed a deploy to change.
-   */
+  // /about's narrative and home's Approach list.
   story: [
-    'I am a backend engineer based in Dhaka, finishing a Computer Science degree at AIUB while working full-time on production systems. The degree gave me the theory; the last two years of shipping gave me everything else.',
-    'Most of my work is Django and Python on the server, with TypeScript wherever the frontend has to meet it. I like the problems that live behind the interface — data models, background jobs, sync, the things that decide whether a product holds up once real people are using it.',
-    'That has meant a live football app syncing match data every fifteen seconds for ten thousand-plus installs, a clinic desktop app that had to keep working with the internet switched off, and a B2B ordering system I am the sole backend engineer on.',
-    'More recently it has also meant automation — n8n pipelines and LLM workflows with a human kept in the loop. Not because the tools are fashionable, but because they are usually the right answer when the goal is to remove repetitive work without removing judgement.',
+    'This is placeholder story text seeded for local development.',
+    'On the live site this section is written in the admin under Settings, along with every other piece of personal copy.',
   ],
   approach: [
     {
       title: 'Model the problem, not the screen',
-      body: 'Advergo sells bespoke and off-the-shelf at once. Treating one as a variant of the other looks efficient for a week and then fills the codebase with conditionals that exist only to undo the wrong abstraction. Getting the shape right first is most of the work.',
+      body: 'Placeholder approach item. Getting the data model right first is most of the work.',
     },
     {
       title: 'Make it possible to tell what happened',
-      body: 'Anything that quotes a price, files a record or emails a customer needs an answer to "what did it do, and why". Audit trails on every mutation, confidence kept visible, logs that reconstruct a decision after the fact.',
-    },
-    {
-      title: 'Keep a human where judgement belongs',
-      body: 'The LLM reply drafting at Factoryze writes, a person sends. That ceiling is deliberate: one confidently wrong automated message to a paying guest costs more than every minute the approval step saves.',
+      body: 'Placeholder approach item. Audit trails and logs that reconstruct a decision after the fact.',
     },
     {
       title: 'Ship it the way it will actually run',
-      body: 'Tests on every push, Docker images, automated deploys, rollback on a failed health check. Four bugs in this site only ever appeared in production — the dev server and the real thing diverge exactly where you are not looking.',
+      body: 'Placeholder approach item. Tests on every push, automated deploys, rollback on a failed health check.',
     },
   ],
 } as const;

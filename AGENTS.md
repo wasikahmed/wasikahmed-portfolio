@@ -113,7 +113,8 @@ src/
   proxy.ts           Next 16's middleware (renamed from middleware.ts).
   server/            server-only. Never importable from a Client Component.
     models/          Mongoose schemas.
-    seed-data/       Initial content for `pnpm seed`, plus site-copy defaults.
+    seed-data/       Fictional demo content for `pnpm seed` and E2E, plus the
+                     site-copy defaults (those are real — they render live).
     revisions.ts     Content history registry: record + restore. See §6.
     queries.ts       The read layer. get*/getAll* split — see §6.
     admin-crud.ts    Generic CRUD route factory. Six collections share it.
@@ -410,26 +411,28 @@ single-file ESM with esbuild, and the Dockerfile copies the result to
 both are already traced into the standalone `node_modules`, and argon2 is
 a native binary that must not be bundled.
 
-On a database that starts empty — a fresh volume — nothing else will
-populate it, and without the second command there is no account to log in
-with:
+**`seed.mjs` refuses to run in production.** Since 2026-10-04 the seed is
+fictional demo content (`src/server/seed-data/`), so running it there would
+add demo projects to the live site and overwrite the real settings. It
+exits when `NODE_ENV` is `production`, which the runner image always sets.
+A lost production database is restored from the nightly backup (below),
+not re-seeded. `seed-admin.mjs` still works, and is the only way to create
+the owner account on a fresh volume:
 
 ```bash
 cd $DEPLOY_PATH
-docker compose -p portfolio -f docker-compose.prod.yml exec web node dist-scripts/seed.mjs
 docker compose -p portfolio -f docker-compose.prod.yml exec web node dist-scripts/seed-admin.mjs
 ```
 
 `MONGODB_URI` comes from the compose environment and `ADMIN_EMAIL` from
-`.env`, so neither needs arguments; pass an email to `seed-admin.mjs` to
-override it. Both are idempotent, so re-running converges rather than
-duplicating — but `seed-admin.mjs` resets the password and prints the new
-one once, so only run it when you intend that.
+`.env`, so it needs no arguments; pass an email to override it. It resets
+the password and prints the new one once, so only run it when you intend
+that.
 
 Note `pnpm seed` **upserts and never deletes** (scripts/seed.ts). Against
-a database that already holds superseded content, it adds the new
-documents alongside the old ones rather than replacing them; the only
-clean states are an empty volume or deleting the stale records yourself.
+a local database that already holds superseded seed content, it adds the
+new documents alongside the old ones; drop the local volume for a clean
+state.
 
 **Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
 backup cron job" step runs `scripts/vps-backup.sh` nightly — a
