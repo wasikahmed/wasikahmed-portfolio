@@ -139,7 +139,7 @@ export interface Role {
   /**
    * The company's logo, as a media-library URL, shown in its own colours
    * filling a 40px tile (CompanyMark) — so the file carries its own padding
-   * and background. Absent or '' falls back to the company's initials.
+   * and background. Absent or '' shows no tile at all.
    */
   logo?: string;
   /**

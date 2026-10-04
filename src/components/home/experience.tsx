@@ -2,7 +2,7 @@ import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Button, ArrowRight } from '@/components/ui/button';
 import { Reveal } from '@/components/motion/reveal';
-import { CompanyMark, hasAnyLogo } from '@/components/experience/company-mark';
+import { CompanyMark } from '@/components/experience/company-mark';
 import type { Role } from '@/lib/types';
 
 /**
@@ -28,7 +28,6 @@ import type { Role } from '@/lib/types';
  */
 export function Experience({ roles, heading }: { roles: Role[]; heading: string }) {
   const work = roles.filter((role) => role.kind !== 'education');
-  const showMarks = hasAnyLogo(work);
 
   return (
     <Section id="experience" bordered band ambient={['dots']}>
@@ -77,7 +76,7 @@ export function Experience({ roles, heading }: { roles: Role[]; heading: string 
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-4">
-                  {showMarks ? <CompanyMark company={role.company} logo={role.logo} /> : null}
+                  {role.logo ? <CompanyMark logo={role.logo} /> : null}
                   <div className="min-w-0">
                     <h3 className="font-display text-fg text-xl font-semibold tracking-tight">
                       {role.title}

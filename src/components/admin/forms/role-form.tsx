@@ -135,7 +135,7 @@ export function RoleForm({ role }: { role?: Role }) {
       <Field
         label="Logo"
         htmlFor="logo"
-        hint="Optional. Paste a URL copied from the media library. A square image, shown in its own colours filling a small tile — leave some padding around the mark in the file itself. Leave empty for the company's initials."
+        hint="Optional. Paste a URL copied from the media library. A square image, shown in its own colours filling a small tile — leave some padding around the mark in the file itself. Leave empty to show no logo."
       >
         <Input
           id="logo"

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Tag } from '@/components/ui/tag';
-import { CompanyMark, displayHost, hasAnyLogo } from '@/components/experience/company-mark';
+import { CompanyMark, displayHost } from '@/components/experience/company-mark';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/cn';
 import { EVENTS, track } from '@/lib/analytics';
@@ -21,7 +21,6 @@ import { EVENTS, track } from '@/lib/analytics';
  */
 export function RoleAccordion({ roles }: { roles: Role[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
-  const showMarks = hasAnyLogo(roles);
 
   return (
     <ul className="mt-10">
@@ -42,9 +41,7 @@ export function RoleAccordion({ roles }: { roles: Role[] }) {
                 }}
                 className="group flex w-full items-start justify-between gap-6 py-6 text-left"
               >
-                {showMarks ? (
-                  <CompanyMark company={role.company} logo={role.logo} className="mt-0.5" />
-                ) : null}
+                {role.logo ? <CompanyMark logo={role.logo} className="mt-0.5" /> : null}
                 <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span
@@ -98,10 +95,10 @@ export function RoleAccordion({ roles }: { roles: Role[] }) {
                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
-                  {/* With marks, the bullets start under the title rather
+                  {/* With a logo, the bullets start under the title rather
                       than under the tile: pl-16 is the tile (size-10) plus
                       the button's gap-6. */}
-                  <div className={cn('pb-7', showMarks ? 'sm:pl-16' : 'sm:pl-1')}>
+                  <div className={cn('pb-7', role.logo ? 'sm:pl-16' : 'sm:pl-1')}>
                     <ul className="flex flex-col gap-3">
                       {role.shipped.map((item) => (
                         <li key={item} className="text-fg-muted flex gap-3 text-sm leading-relaxed">
