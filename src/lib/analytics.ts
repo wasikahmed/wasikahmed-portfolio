@@ -28,6 +28,11 @@ export const EVENTS = {
    * (resume-response.ts), because a PDF runs no tracker of its own.
    */
   resumeView: 'resume_view',
+  /**
+   * A /go/<name> short link opened, from wherever it was placed. Sent by
+   * the server (short-links.ts) — the redirect runs no tracker either.
+   */
+  shortLinkOpen: 'short_link_open',
   /** /whatsapp opened — the redirect to wa.me. */
   whatsappClick: 'whatsapp_click',
   /** A link that leaves the site. */

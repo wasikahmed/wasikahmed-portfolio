@@ -33,10 +33,11 @@ export default function robots(): MetadataRoute.Robots {
       // shell. The longest matching rule wins, so this beats `/api/`.
       allow: ['/', '/api/openapi.json'],
       // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
-      // and beacons, nothing to index. /api/ is JSON: the health check, the
+      // and beacons, nothing to index. /go/ is short-link redirects: a
+      // crawler following them would only re-find pages it already knows. /api/ is JSON: the health check, the
       // contact endpoint, and the OpenAPI spec, whose human-readable form is
       // /docs. The OG cards are not under it — they live beside each page.
-      disallow: ['/admin', '/x/', '/api/'],
+      disallow: ['/admin', '/x/', '/go/', '/api/'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

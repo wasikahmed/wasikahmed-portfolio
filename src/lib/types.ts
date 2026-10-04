@@ -375,3 +375,23 @@ export interface Revision {
   snapshot: Record<string, unknown>;
   createdAt: string;
 }
+
+/** A tracked `/go/<slug>` link to the site (src/server/short-links.ts). */
+export interface ShortLink {
+  id: string;
+  slug: string;
+  /** Where the link is placed, for the admin list. */
+  label: string;
+  /** `utm_source` — the platform or kind of place. */
+  source: string;
+  /** `utm_medium` — the placement on it. */
+  medium: string;
+  /** Path on this site the link lands on. */
+  destination: string;
+  notes?: string;
+  /** Countable opens (people, not bots or a signed-in admin). Written only by the redirect. */
+  clicks: number;
+  lastClickedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -9,6 +9,7 @@ import {
   roleSchema,
   techItemSchema,
   skillGroupSchema,
+  shortLinkSchema,
   settingsSchema,
   siteCopySchema,
   resumeUpdateSchema,
@@ -71,6 +72,15 @@ const testimonialResponseSchema = withRecordFields(testimonialSchema).meta({
 const roleResponseSchema = withRecordFields(roleSchema).meta({ id: 'Experience' });
 const techResponseSchema = withRecordFields(techItemSchema).meta({ id: 'Tech' });
 const skillGroupResponseSchema = withRecordFields(skillGroupSchema).meta({ id: 'SkillGroup' });
+const shortLinkResponseSchema = withRecordFields(shortLinkSchema)
+  .extend({
+    clicks: z
+      .number()
+      .int()
+      .meta({ description: 'Countable opens, written only by GET /go/{slug}.' }),
+    lastClickedAt: timestampField.optional(),
+  })
+  .meta({ id: 'ShortLink' });
 
 const leadResponseSchema = leadSchema
   .omit({ turnstileToken: true })
@@ -347,6 +357,16 @@ const contentCollections: ZodOpenApiPathsObject = {
     writePermission: 'content:write',
     deletePermission: 'content:delete',
     reorderPermission: 'content:reorder',
+  }),
+  // No reorder: links list newest first.
+  ...collectionPaths({
+    path: '/api/admin/short-links',
+    tag: 'Short links',
+    writeSchema: shortLinkSchema,
+    responseSchema: shortLinkResponseSchema,
+    readPermission: 'content:read',
+    writePermission: 'content:write',
+    deletePermission: 'content:delete',
   }),
 };
 
@@ -1073,6 +1093,10 @@ export function buildOpenApiDocument() {
       { name: 'Experience' },
       { name: 'Tech' },
       { name: 'Skill groups' },
+      {
+        name: 'Short links',
+        description: 'Tracked /go/{slug} redirects to pages on this site.',
+      },
       { name: 'Content', description: 'Cross-collection tools (MDX preview).' },
       { name: 'Leads' },
       { name: 'Media' },

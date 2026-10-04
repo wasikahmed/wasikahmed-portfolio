@@ -106,6 +106,7 @@ src/
     resume/, wasik-ahmed-resume.pdf/
                      Both stream the live résumé (server/resume-response.ts).
     x/               First-party Umami relay — scripts and beacons (§10).
+    go/[slug]/       Tracked short links, managed at /admin/short-links (§10).
     (site)/[...missing]/  Sends unknown URLs to (site)/not-found.tsx, inside
                      the site layout — nav, footer and analytics included.
     layout.tsx       Root: fonts, MotionProvider.
@@ -504,6 +505,16 @@ then; nothing analytics-related runs in this compose project any more).
   `utm_source` = platform (`github`, `linkedin`, `email`, `resume`),
   `utm_medium` = placement (`readme`, `profile`, `signature`, `pdf`),
   `utm_campaign=portfolio`, `utm_content` = the specific page or repo.
+- **Where the URL itself is shown** (an application form's link field, a
+  bio, a printed CV) use a short link instead: `/go/<name>`
+  (`src/server/short-links.ts`), created at `/admin/short-links` with its
+  source, placement and destination. It 307s to the destination with
+  those UTMs and `utm_content=<name>`, and counts the open server-side —
+  `short_link_open` in Umami plus a `clicks` count on the link, with the
+  same bot/prefetch/admin exclusions as `resume_view`. A name that isn't
+  saved still redirects home, tagged `utm_source=short-link`. Destinations
+  are site paths only (`SHORT_LINK_DESTINATION_PATTERN`), so /go/ can't
+  become an open redirect.
 - **Who isn't counted:** any browser that has opened `/admin`
   (`ExcludeFromAnalytics` sets Umami's `umami.disabled` opt-out), and
   `/admin` itself, which never renders the script. For `resume_view`,

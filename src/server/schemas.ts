@@ -1,5 +1,10 @@
 import { z, type ZodType } from 'zod';
 import { can, PERMISSIONS, type Role } from './permissions';
+import {
+  SHORT_LINK_DESTINATION_PATTERN,
+  SHORT_LINK_NAME_MAX,
+  SHORT_LINK_NAME_PATTERN,
+} from '@/lib/short-links';
 
 /**
  * Zod schemas — the validation boundary for every content collection.
@@ -181,6 +186,31 @@ export const testimonialSchema = z.object({
   projectSlug: z.string().optional(),
   featured: z.boolean().default(true),
   order: z.number().int().default(0),
+});
+
+const shortLinkName = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(SHORT_LINK_NAME_MAX)
+  .regex(SHORT_LINK_NAME_PATTERN, 'Lowercase letters, numbers and single hyphens only.');
+
+/**
+ * A `/go/<slug>` link (models/short-link.ts). `clicks`/`lastClickedAt` are
+ * deliberately absent: only the redirect writes them.
+ */
+export const shortLinkSchema = z.object({
+  slug: shortLinkName,
+  /** Where the link is placed — "Pathao application form". Admin-only. */
+  label: z.string().trim().min(1).max(120),
+  source: shortLinkName,
+  medium: shortLinkName.default('link'),
+  destination: z
+    .string()
+    .trim()
+    .regex(SHORT_LINK_DESTINATION_PATTERN, 'A path on this site, like / or /work.')
+    .default('/'),
+  notes: z.string().max(500).optional(),
 });
 
 export const roleSchema = z.object({

@@ -22,6 +22,7 @@ const BASE_GROUPS: { label: string; links: { label: string; href: string }[] }[]
     links: [
       { label: 'Media', href: '/admin/media' },
       { label: 'Leads', href: '/admin/leads' },
+      { label: 'Short links', href: '/admin/short-links' },
       { label: 'Site copy', href: '/admin/site-copy' },
       { label: 'Settings', href: '/admin/settings' },
     ],
