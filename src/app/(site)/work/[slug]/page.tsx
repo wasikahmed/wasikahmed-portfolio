@@ -115,15 +115,18 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
       </Section>
 
       {/*
-       * "At a glance" bar. Sticks under the header while you read, so the
-       * outcome stays visible through the detail rather than being something
-       * you have to scroll back up for.
+       * "At a glance" bar. From `sm` up it sticks under the header while you
+       * read, so the outcome stays visible through the detail rather than
+       * being something you have to scroll back up for. Not on phones: there
+       * it plus the header covered over a quarter of the screen for the whole
+       * read, so it scrolls away like any other block — and since it no
+       * longer costs reading space, every metric shows rather than the first.
        */}
-      <div className="border-border-subtle bg-bg/85 sticky top-16 z-30 border-y backdrop-blur-xl">
+      <div className="border-border-subtle sm:bg-bg/85 border-y sm:sticky sm:top-16 sm:z-30 sm:backdrop-blur-xl">
         <Container className="px-6 lg:px-10">
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 py-5 sm:grid-cols-3">
             {project.metrics.map((metric, index) => (
-              <div key={metric.label} className={index === 0 ? '' : 'hidden sm:block'}>
+              <div key={metric.label}>
                 <ViewTransition name={index === 0 ? `project-metric-${project.slug}` : undefined}>
                   <Metric value={metric.value} label={metric.label} baseline={metric.baseline} />
                 </ViewTransition>
@@ -143,7 +146,11 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
             <article className="min-w-0">
               {project.sections.map((section) => (
-                <section key={section.id} id={section.id} className="mb-14 scroll-mt-40 last:mb-0">
+                <section
+                  key={section.id}
+                  id={section.id}
+                  className="mb-14 scroll-mt-24 last:mb-0 sm:scroll-mt-40"
+                >
                   <Reveal>
                     <h2 className="font-display text-2xl font-bold tracking-tight">
                       {section.title}
