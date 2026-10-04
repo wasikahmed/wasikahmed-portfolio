@@ -515,6 +515,12 @@ then; nothing analytics-related runs in this compose project any more).
   saved still redirects home, tagged `utm_source=short-link`. Destinations
   are site paths only (`SHORT_LINK_DESTINATION_PATTERN`), so /go/ can't
   become an open redirect.
+  Link previewers (LinkedInBot, facebookexternalhit, Slackbot…) get a
+  200 with the destination's preview tags and `og:url` set to the `/go/`
+  link instead of the redirect: every page declares its clean canonical
+  as `og:url`, so LinkedIn would otherwise store the untagged address on a
+  Featured card. A PDF destination still redirects (LinkedIn keeps its
+  tagged URL).
 - **Who isn't counted:** any browser that has opened `/admin`
   (`ExcludeFromAnalytics` sets Umami's `umami.disabled` opt-out), and
   `/admin` itself, which never renders the script. For `resume_view`,

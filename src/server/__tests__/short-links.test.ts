@@ -45,7 +45,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   afterMock.mockReset();
-  fetchMock.mockClear();
+  fetchMock.mockReset();
+  fetchMock.mockImplementation(async () => new Response('{}', { status: 200 }));
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   await ShortLink.deleteMany({});
@@ -150,6 +151,72 @@ describe('GET /go/<name>', () => {
     expect(res.status).toBe(307);
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('link previewers', () => {
+  const PAGE = `<!doctype html><html><head><title>Wasik Ahmed</title>
+<meta name="description" content="Backends that real products run on."/>
+<meta property="og:title" content="Wasik Ahmed"/>
+<meta property="og:url" content="https://wasikahmed.me"/>
+<meta property="og:image" content="https://wasikahmed.me/opengraph-image"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<link rel="canonical" href="https://wasikahmed.me"/></head><body>page</body></html>`;
+
+  function serve(body: string, type: string) {
+    fetchMock.mockImplementation(
+      async () => new Response(body, { headers: { 'content-type': type } }),
+    );
+  }
+
+  it("gives a previewer the destination's card, addressed to the short link", async () => {
+    await savePathao();
+    serve(PAGE, 'text/html; charset=utf-8');
+    const res = await open('pathao', { 'user-agent': 'LinkedInBot/1.0 (compatible; Mozilla/5.0)' });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('<title>Wasik Ahmed</title>');
+    expect(html).toContain(
+      '<meta property="og:image" content="https://wasikahmed.me/opengraph-image"/>',
+    );
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image"/>');
+    expect(html).toMatch(/og:url" content="http[^"]*\/go\/pathao"/);
+    expect(html).not.toContain('content="https://wasikahmed.me"/>');
+    expect(html).not.toContain('body>page');
+    // It asked for the tagged destination, and nothing was counted.
+    expect(String((fetchMock.mock.calls[0] as unknown as [URL])[0])).toContain(
+      '/work?utm_source=application',
+    );
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
+  it('lets a previewer follow the redirect when the destination is not a page', async () => {
+    await ShortLink.create({
+      slug: 'li-resume',
+      label: 'CV',
+      source: 'linkedin',
+      destination: '/resume',
+    });
+    serve('%PDF', 'application/pdf');
+    const res = await open('li-resume', { 'user-agent': 'LinkedInBot/1.0' });
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toMatch(/^\/resume\?/);
+  });
+
+  it('falls back to the redirect when the destination cannot be fetched', async () => {
+    await savePathao();
+    fetchMock.mockImplementation(async () => {
+      throw new Error('down');
+    });
+    const res = await open('pathao', { 'user-agent': 'facebookexternalhit/1.1' });
+    expect(res.status).toBe(307);
+  });
+
+  it('never serves the card to a person', async () => {
+    await savePathao();
+    serve(PAGE, 'text/html');
+    const res = await open('pathao');
+    expect(res.status).toBe(307);
   });
 });
 

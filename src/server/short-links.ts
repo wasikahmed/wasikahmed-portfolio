@@ -10,6 +10,7 @@ import {
   SHORT_LINK_NAME_MAX,
   SHORT_LINK_NAME_PATTERN,
   UNSAVED_SHORT_LINK_SOURCE,
+  shortLinkPath,
 } from '@/lib/short-links';
 import { connectToDatabase } from './db';
 import { ShortLink } from './models/short-link';
@@ -97,6 +98,59 @@ function redirect(location: string): Response {
   });
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
+
+/*
+ * Link previewers build a card from the page's own `og:url` — and every
+ * page here declares its clean canonical address, so a tagged link pasted
+ * into LinkedIn's Featured section is stored as plain https://wasikahmed.me
+ * and every click on the card arrives untagged. (Found 2026-10-05.) So a
+ * previewer asking for /go/<name> gets the destination's preview tags with
+ * og:url pointing back at /go/<name>: the card keeps the short link, and a
+ * person clicking it still goes through the redirect and is counted.
+ * People never see this response; search engines don't crawl /go/
+ * (robots.txt) and it's noindex anyway. Pages' own canonical/og:url are
+ * untouched.
+ */
+const LINK_PREVIEWER =
+  /linkedinbot|facebookexternalhit|facebot|twitterbot|slackbot|discordbot|telegrambot|whatsapp|skypeuripreview|redditbot|embedly|pinterest/i;
+
+/** `<title>` and the description/og:/twitter: tags of an HTML page's head. */
+export function previewTags(html: string): string[] {
+  const end = html.indexOf('</head>');
+  const head = end === -1 ? html : html.slice(0, end);
+  const title = head.match(/<title>[^<]*<\/title>/);
+  const meta = head.match(/<meta\s+(?:property|name)="(?:og:|twitter:|description")[^>]*>/g) ?? [];
+  return [...(title ? [title[0]] : []), ...meta.filter((tag) => !/property="og:url"/.test(tag))];
+}
+
+async function previewResponse(slug: string, location: string): Promise<Response | null> {
+  let html: string;
+  try {
+    const res = await fetch(new URL(location, SITE_URL), {
+      headers: { Accept: 'text/html' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5_000),
+    });
+    // A PDF (/resume) or an error: let the previewer follow the redirect,
+    // which is what it did before — LinkedIn keeps a PDF's tagged URL.
+    if (!res.ok || !res.headers.get('content-type')?.includes('text/html')) return null;
+    html = await res.text();
+  } catch {
+    return null;
+  }
+
+  const self = `${SITE_URL}${shortLinkPath(slug)}`;
+  const body = `<!doctype html><html><head><meta charset="utf-8">${previewTags(html).join('')}<meta property="og:url" content="${self}"/><link rel="canonical" href="${self}"/><meta name="robots" content="noindex"/></head><body></body></html>`;
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex',
+    },
+  });
+}
+
 export async function shortLinkResponse(request: Request, rawSlug: string): Promise<Response> {
   const slug = rawSlug.toLowerCase();
   // Not a name the admin could ever save — a typo or a probe. Home, untagged.
@@ -114,6 +168,12 @@ export async function shortLinkResponse(request: Request, rawSlug: string): Prom
     console.warn('[short-links] lookup failed', slug, err);
   }
 
+  const location = shortLinkLocation(slug, link);
+  if (LINK_PREVIEWER.test(request.headers.get('user-agent') ?? '')) {
+    const preview = await previewResponse(slug, location);
+    if (preview) return preview;
+  }
+
   recordOpen(request, slug, link);
-  return redirect(shortLinkLocation(slug, link));
+  return redirect(location);
 }
