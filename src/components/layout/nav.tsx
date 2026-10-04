@@ -8,6 +8,10 @@ import { Wordmark } from '@/components/brand/wordmark';
 import { NAV_LINKS } from '@/lib/nav';
 import type { Settings } from '@/lib/types';
 import { StatusDot } from '@/components/ui/eyebrow';
+import { buttonVariants } from '@/components/ui/button';
+import { EmailLink } from '@/components/ui/email-link';
+import { BrandIcon } from '@/components/ui/brand-icon';
+import { socialIcon } from '@/lib/brand-icons';
 import { cn } from '@/lib/cn';
 
 function isActive(pathname: string, href: string) {
@@ -199,33 +203,83 @@ export function Nav({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="border-border-subtle bg-bg/95 border-t backdrop-blur-xl md:hidden"
+            /*
+             * Fills the screen below the header rather than dropping a panel
+             * over the page: the short version left the page showing through
+             * underneath, with no way to tell it was inert. Scrolls on its
+             * own on a short landscape phone, where the body is locked.
+             */
+            className="border-border-subtle bg-bg/95 h-[calc(100dvh-var(--spacing)*16)] overflow-y-auto overscroll-contain border-t backdrop-blur-xl md:hidden"
           >
-            <nav aria-label="Mobile" className="px-6 pt-2 pb-6">
+            <nav aria-label="Mobile" className="flex min-h-full flex-col px-6 pt-2 pb-8">
               <ul className="flex flex-col">
                 {NAV_LINKS.map((link) => {
                   const active = isActive(pathname, link.href);
                   return (
                     <li key={link.href}>
+                      {/* No trailing arrow: ↗ marks links that leave the
+                          site everywhere else (footer, contact), and these
+                          don't. */}
                       <Link
                         href={link.href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'border-border-subtle flex items-center justify-between border-b py-4 text-lg',
+                          'border-border-subtle flex items-center border-b py-4 text-lg',
                           active ? 'text-accent' : 'text-fg',
                         )}
                       >
                         {link.label}
-                        <span aria-hidden className="text-2xs text-fg-subtle font-mono">
-                          ↗
-                        </span>
                       </Link>
                     </li>
                   );
                 })}
               </ul>
+
+              {/* The one thing a recruiter on a phone most often came for,
+                  and before this it was only reachable from the footer.
+                  A plain <a>: /resume is a route handler streaming a PDF,
+                  and the (site)/[...missing] catch-all makes every path
+                  look like a page to the lint rule. */}
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a href="/resume" className={cn(buttonVariants({ variant: 'ghost' }), 'mt-6 w-full')}>
+                Download résumé
+              </a>
+
+              {settings.socials.length > 0 ? (
+                <ul className="mt-4 flex flex-wrap gap-x-6">
+                  {settings.socials.map((social) => {
+                    const className =
+                      'text-fg-muted inline-flex min-h-11 items-center gap-2 text-sm';
+                    return (
+                      <li key={social.label}>
+                        {social.href.startsWith('mailto:') ? (
+                          <EmailLink
+                            email={social.href.slice('mailto:'.length)}
+                            className={className}
+                          >
+                            <BrandIcon icon={socialIcon(social.href)} />
+                            {social.label}
+                          </EmailLink>
+                        ) : (
+                          <a
+                            href={social.href}
+                            {...(social.href.startsWith('http')
+                              ? { target: '_blank', rel: 'noopener noreferrer' }
+                              : {})}
+                            className={className}
+                          >
+                            <BrandIcon icon={socialIcon(social.href)} />
+                            {social.label}
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
               {settings.available ? (
-                <p className="text-2xs text-accent mt-5 flex items-center gap-2 font-mono">
+                <p className="text-2xs text-accent mt-auto flex items-center gap-2 pt-8 font-mono">
                   <StatusDot />
                   {settings.availableFor}
                 </p>
