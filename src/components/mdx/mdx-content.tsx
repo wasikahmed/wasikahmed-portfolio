@@ -1,17 +1,7 @@
 import { MDXRemote } from 'next-mdx-remote-client/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
-import { Callout } from './callout';
-import { CodeCompare } from './code-compare';
-import { Metric } from '@/components/motion/metric';
+import { mdxComponents } from './components';
 import { cn } from '@/lib/cn';
-
-/**
- * The three MDX custom blocks meant for prose authoring (PLAN.md's fourth,
- * `<Architecture>`, stays a structured `project.architecture` field rather
- * than an MDX shortcode — see project-card.tsx's comment on why structured
- * diagram data doesn't fit well as free-form MDX children).
- */
-const mdxComponents = { Callout, CodeCompare, Metric };
 
 /**
  * Renders MDX source stored in Mongo into the real site typography — the
@@ -38,9 +28,11 @@ export async function MdxContent({ source, className }: { source: string; classN
         '[&_ul]:flex [&_ul]:list-none [&_ul]:flex-col [&_ul]:gap-2 [&_ul>li]:relative [&_ul>li]:pl-5',
         "[&_ul>li]:before:bg-accent [&_ul>li]:before:absolute [&_ul>li]:before:top-[0.6em] [&_ul>li]:before:left-0 [&_ul>li]:before:h-1 [&_ul>li]:before:w-1 [&_ul>li]:before:rounded-full [&_ul>li]:before:content-['']",
         '[&_ol]:marker:text-2xs [&_ol]:marker:text-accent [&_ol]:flex [&_ol]:list-decimal [&_ol]:flex-col [&_ol]:gap-2 [&_ol]:pl-5 [&_ol]:marker:font-mono',
-        // Diagrams in post bodies: same card treatment as the rest of the
-        // site, and width-bound so a wide SVG scales instead of overflowing.
-        '[&_img]:border-border-subtle [&_img]:bg-surface-1 [&_img]:h-auto [&_img]:w-full [&_img]:rounded-md [&_img]:border',
+        // Images in post bodies: same card treatment as the rest of the
+        // site. Capped at the column rather than stretched to it — a wide
+        // diagram scales down, but a small screenshot keeps its own size
+        // instead of being blown up and blurred.
+        '[&_img]:border-border-subtle [&_img]:bg-surface-1 [&_img]:mx-auto [&_img]:block [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-md [&_img]:border',
         '[&_blockquote]:border-border-strong [&_blockquote]:text-fg [&_blockquote]:border-l-2 [&_blockquote]:pl-5',
         className,
       )}

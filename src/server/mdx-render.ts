@@ -4,9 +4,7 @@ import 'server-only';
 
 import { evaluate } from 'next-mdx-remote-client/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
-import { Callout } from '@/components/mdx/callout';
-import { CodeCompare } from '@/components/mdx/code-compare';
-import { Metric } from '@/components/motion/metric';
+import { mdxComponents } from '@/components/mdx/components';
 
 /**
  * Renders MDX to a plain HTML string — used only by the admin preview
@@ -28,7 +26,7 @@ import { Metric } from '@/components/motion/metric';
 export async function renderMdxToHtml(source: string): Promise<string> {
   const { content, error } = await evaluate({
     source,
-    components: { Callout, CodeCompare, Metric },
+    components: mdxComponents,
     options: {
       mdxOptions: {
         rehypePlugins: [[rehypePrettyCode, { theme: 'github-dark-dimmed', keepBackground: false }]],
@@ -40,7 +38,7 @@ export async function renderMdxToHtml(source: string): Promise<string> {
 
   // Dynamic import, not static: Next's bundler refuses to build a route
   // that statically imports react-dom/server alongside a component (any
-  // of Callout/CodeCompare/Metric above) reachable from the page/RSC
+  // of `mdxComponents` above) reachable from the page/RSC
   // graph — "You're importing a component that imports react-dom/server."
   // A runtime import isn't part of that static reachability walk.
   const { renderToStaticMarkup } = await import('react-dom/server');

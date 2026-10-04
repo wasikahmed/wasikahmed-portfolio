@@ -4,6 +4,7 @@ import { Section, Container } from '@/components/ui/section';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Tag } from '@/components/ui/tag';
 import { Reveal } from '@/components/motion/reveal';
+import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { getPosts, getSettings, getSiteCopy } from '@/server/queries';
 import { pageTitle, pageMetadata } from '@/lib/seo';
@@ -41,7 +42,12 @@ export default async function WritingPage() {
         </h1>
         <p className="text-fg-muted mt-5 max-w-xl text-lg text-pretty">{copy.writing.intro}</p>
 
-        <div className="mt-16 grid gap-16 lg:grid-cols-[1fr_minmax(0,20rem)] lg:gap-20">
+        <div
+          className={cn(
+            'mt-16 grid gap-16',
+            tils.length > 0 && 'lg:grid-cols-[1fr_minmax(0,20rem)] lg:gap-20',
+          )}
+        >
           <div>
             <p className="text-2xs text-fg-subtle mb-2 font-mono tracking-widest uppercase">
               Articles
@@ -80,26 +86,32 @@ export default async function WritingPage() {
             </ul>
           </div>
 
-          <aside>
-            <p className="text-2xs text-fg-subtle mb-2 font-mono tracking-widest uppercase">TIL</p>
-            <ul>
-              {tils.map((post, i) => (
-                <Reveal as="li" key={post.slug} delay={i * 0.05}>
-                  <Link
-                    href={`/writing/${post.slug}`}
-                    className="group border-border-subtle block border-b py-5"
-                  >
-                    <h2 className="text-fg duration-fast group-hover:text-accent text-sm leading-snug transition-colors">
-                      {post.title}
-                    </h2>
-                    <p className="text-2xs text-fg-subtle mt-1.5 font-mono">
-                      {formatDate(post.date)} · {post.readTime}
-                    </p>
-                  </Link>
-                </Reveal>
-              ))}
-            </ul>
-          </aside>
+          {/* No TIL column until there is a TIL — an empty labelled column
+              reads as something failed to load. */}
+          {tils.length > 0 ? (
+            <aside>
+              <p className="text-2xs text-fg-subtle mb-2 font-mono tracking-widest uppercase">
+                TIL
+              </p>
+              <ul>
+                {tils.map((post, i) => (
+                  <Reveal as="li" key={post.slug} delay={i * 0.05}>
+                    <Link
+                      href={`/writing/${post.slug}`}
+                      className="group border-border-subtle block border-b py-5"
+                    >
+                      <h2 className="text-fg duration-fast group-hover:text-accent text-sm leading-snug transition-colors">
+                        {post.title}
+                      </h2>
+                      <p className="text-2xs text-fg-subtle mt-1.5 font-mono">
+                        {formatDate(post.date)} · {post.readTime}
+                      </p>
+                    </Link>
+                  </Reveal>
+                ))}
+              </ul>
+            </aside>
+          ) : null}
         </div>
       </Container>
     </Section>

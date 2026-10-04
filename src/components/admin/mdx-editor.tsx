@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Label } from '@/components/ui/field';
+import { ImagePicker } from '@/components/admin/image-picker';
 import { adminFetchJson } from '@/lib/admin-fetch';
 
 /**
@@ -24,6 +25,8 @@ export function MdxEditor({
   const [html, setHtml] = useState('');
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -42,11 +45,49 @@ export function MdxEditor({
     return () => clearTimeout(debounceRef.current);
   }, [value]);
 
+  /**
+   * Inserts at the caret — which the textarea keeps while the picker has
+   * focus — padded with blank lines so the snippet is its own MDX block
+   * (a `<Figure>` inside a paragraph would be a `<figure>` inside a `<p>`).
+   */
+  const insertBlock = (snippet: string) => {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const lead = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+    const trail = !after
+      ? '\n'
+      : after.startsWith('\n\n')
+        ? ''
+        : after.startsWith('\n')
+          ? '\n'
+          : '\n\n';
+    const caret = before.length + lead.length + snippet.length;
+    onChange(before + lead + snippet + trail + after);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
+  };
+
   return (
     <div>
-      <Label htmlFor={`mdx-${label}`}>{label}</Label>
+      <div className="flex items-baseline justify-between gap-3">
+        <Label htmlFor={`mdx-${label}`}>{label}</Label>
+        <button
+          type="button"
+          onClick={() => setPicking(true)}
+          className="text-2xs text-accent mb-1.5 font-mono hover:underline"
+        >
+          + Insert image
+        </button>
+      </div>
+      {picking ? <ImagePicker onInsert={insertBlock} onClose={() => setPicking(false)} /> : null}
       <div className="grid gap-3 lg:grid-cols-2">
         <textarea
+          ref={textareaRef}
           id={`mdx-${label}`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
