@@ -4,8 +4,8 @@ import type { Metadata } from 'next';
  * Search results show about 60 characters of a title and 155–160 of a
  * description before cutting them off. A per-item title override gets
  * `pageTitle`'s " — {name}" (14 characters) appended, hence its lower cap.
- * Here rather than in schemas.ts so the admin forms' counters, which are
- * Client Components, can read the same numbers the API enforces.
+ * What the admin inputs allow and count against. The API accepts a little
+ * more (schemas.ts's `seoSchema` explains why); `snippet()` covers the gap.
  */
 export const META_TITLE_MAX = 60;
 export const SEO_TITLE_MAX = 46;

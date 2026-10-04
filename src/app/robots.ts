@@ -27,7 +27,11 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      allow: '/',
+      // The spec is the one thing under /api/ a crawler needs: /docs is a
+      // Client Component that fetches it, and Google's renderer obeys
+      // robots.txt for sub-resources — blocked, /docs renders as an empty
+      // shell. The longest matching rule wins, so this beats `/api/`.
+      allow: ['/', '/api/openapi.json'],
       // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
       // and beacons, nothing to index. /api/ is JSON: the health check, the
       // contact endpoint, and the OpenAPI spec, whose human-readable form is

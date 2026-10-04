@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Analytics } from '@/components/analytics/analytics';
-import { pageMetadata, pageTitle } from '@/lib/seo';
+import { canonical, pageMetadata, pageTitle } from '@/lib/seo';
 import { getSettings, getSiteCopy } from '@/server/queries';
 
 /**
@@ -28,13 +28,20 @@ export const dynamic = 'force-dynamic';
  * the same Client Component reason as `dynamic` above.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
-  return pageMetadata({
-    title: pageTitle('API Reference', settings.name),
-    description: copy.docs.metaDescription,
-    path: '/docs',
-    siteName: settings.name,
-  });
+  // The reference itself needs no database, so an outage mustn't take it
+  // down over its <title>: fall back to the root layout's metadata, with
+  // the canonical still set.
+  try {
+    const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+    return pageMetadata({
+      title: pageTitle('API Reference', settings.name),
+      description: copy.docs.metaDescription,
+      path: '/docs',
+      siteName: settings.name,
+    });
+  } catch {
+    return { alternates: canonical('/docs') };
+  }
 }
 
 export default function DocsLayout({ children }: { children: ReactNode }) {

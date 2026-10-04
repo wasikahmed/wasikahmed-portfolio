@@ -99,6 +99,8 @@ test.describe('Crawl files', () => {
   }) => {
     const body = await (await request.get('/robots.txt')).text();
     for (const path of ['/admin', '/api/', '/x/']) expect(body).toContain(`Disallow: ${path}`);
+    // /docs renders from this; blocked, crawlers see an empty page.
+    expect(body).toContain('Allow: /api/openapi.json');
     expect(body).toMatch(/Sitemap: https?:\/\/\S+\/sitemap\.xml/);
   });
 

@@ -1,5 +1,4 @@
 import { z, type ZodType } from 'zod';
-import { META_DESCRIPTION_MAX, META_TITLE_MAX, SEO_TITLE_MAX } from '@/lib/seo';
 import { can, PERMISSIONS, type Role } from './permissions';
 
 /**
@@ -45,10 +44,20 @@ export const categorySchema = z.enum(['AI', 'Automation', 'Systems', 'Web']);
 /** Shared across every content collection — PLAN.md §3. */
 export const statusSchema = z.enum(['draft', 'scheduled', 'published']);
 
+/*
+ * Deliberately looser than what the admin inputs allow (lib/seo.ts's
+ * SEO_TITLE_MAX / META_DESCRIPTION_MAX): content history restores old
+ * snapshots through these same schemas (revisions.ts), and tightening them
+ * would make every older version with a longer title unrestorable. The
+ * forms steer new text to fit a search result; `snippet()` cuts anything
+ * longer at render time.
+ */
 export const seoSchema = z.object({
-  title: z.string().max(SEO_TITLE_MAX).optional(),
-  description: z.string().max(META_DESCRIPTION_MAX).optional(),
-  ogImage: z.string().optional(),
+  title: z.string().max(70).optional(),
+  description: z.string().max(200).optional(),
+  // Absolute: the [slug] opengraph-image routes fetch it server-side,
+  // where a site-relative path has no host to resolve against.
+  ogImage: z.string().url().optional(),
 });
 
 /**
@@ -254,13 +263,12 @@ export const settingsSchema = z.object({
 });
 
 const copyText = z.string().trim().min(1);
-// Meta descriptions get the same ceiling `seoSchema` applies to
-// per-project/per-post descriptions: Google cuts snippets off at roughly
-// 155–160 characters, so anything longer is written for nobody.
-const metaDescription = z.string().trim().min(1).max(META_DESCRIPTION_MAX);
+// Meta descriptions get the same 200-character API ceiling `seoSchema`
+// applies (see its comment for why the form's 160 isn't enforced here).
+const metaDescription = z.string().trim().min(1).max(200);
 // A whole <title>, not a fragment `pageTitle` adds a suffix to — the home
 // page's is written out in full so it can carry the name variants.
-const metaTitle = z.string().trim().min(1).max(META_TITLE_MAX);
+const metaTitle = z.string().trim().min(1).max(70);
 
 /**
  * PATCH /api/admin/site-copy — the whole document every time, every field

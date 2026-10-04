@@ -67,7 +67,11 @@ export async function generateMetadata({
 
 export default async function CaseStudyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [project, copy] = await Promise.all([getProject(slug), getSiteCopy()]);
+  const [project, copy, settings] = await Promise.all([
+    getProject(slug),
+    getSiteCopy(),
+    getSettings(),
+  ]);
   if (!project) notFound();
 
   const { next } = await getAdjacentProjects(slug);
@@ -80,7 +84,7 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
         dangerouslySetInnerHTML={{
           __html: serializeJsonLd(
             jsonLdGraph(
-              caseStudyJsonLd(project),
+              caseStudyJsonLd(project, settings),
               breadcrumbJsonLd([
                 { name: 'Home', path: '/' },
                 { name: 'Work', path: '/work' },

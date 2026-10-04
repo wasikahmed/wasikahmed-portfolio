@@ -50,7 +50,7 @@ export async function generateMetadata({
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = await getPost(slug);
+  const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
   if (!post) notFound();
 
   const { next } = await getAdjacentPosts(slug);
@@ -62,7 +62,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         dangerouslySetInnerHTML={{
           __html: serializeJsonLd(
             jsonLdGraph(
-              articleJsonLd(post),
+              articleJsonLd(post, settings),
               breadcrumbJsonLd([
                 { name: 'Home', path: '/' },
                 { name: 'Writing', path: '/writing' },

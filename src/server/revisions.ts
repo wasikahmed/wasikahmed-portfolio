@@ -15,6 +15,7 @@ import { TechItem } from './models/tech-item';
 import { SkillGroup } from './models/skill-group';
 import { Settings, SETTINGS_SINGLETON_ID } from './models/settings';
 import { SiteCopyModel, SITE_COPY_SINGLETON_ID } from './models/site-copy';
+import { mergeSiteCopy } from './queries';
 import {
   projectSchema,
   postSchema,
@@ -223,7 +224,13 @@ export async function restoreRevision(
   // JSON round trip first: Mongo hands snapshot dates back as `Date`
   // objects, while the write schemas take ISO strings (`publishedAt`) —
   // exactly the form a normal save through the API arrives in.
-  const parsed = schema.safeParse(JSON.parse(JSON.stringify(revision.snapshot)));
+  const snapshot = JSON.parse(JSON.stringify(revision.snapshot)) as Record<string, unknown>;
+  // Site copy gains fields over time and its schema requires every one, so
+  // an older snapshot would fail validation for lacking a field that didn't
+  // exist yet. Filling the gaps from the defaults is exactly what the live
+  // page showed for those fields at the time (getSiteCopy does the same).
+  const input = entityType === 'siteCopy' ? mergeSiteCopy(snapshot) : snapshot;
+  const parsed = schema.safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,

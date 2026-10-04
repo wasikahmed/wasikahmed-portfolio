@@ -85,16 +85,22 @@ describe('seoSchema', () => {
     expect(seoSchema.safeParse({}).success).toBe(true);
   });
 
-  // The title gets " — {name}" appended, so its cap leaves room for that
-  // inside the ~60 characters a search result shows.
-  it('accepts a title up to 46 characters and rejects one longer', () => {
-    expect(seoSchema.safeParse({ title: 'x'.repeat(46) }).success).toBe(true);
-    expect(seoSchema.safeParse({ title: 'x'.repeat(47) }).success).toBe(false);
+  // Looser than the admin inputs on purpose: older versions in content
+  // history are restored through this schema (see its comment).
+  it('accepts a title up to 70 characters and rejects one longer', () => {
+    expect(seoSchema.safeParse({ title: 'x'.repeat(70) }).success).toBe(true);
+    expect(seoSchema.safeParse({ title: 'x'.repeat(71) }).success).toBe(false);
   });
 
-  it('accepts a description up to 160 characters and rejects one longer', () => {
-    expect(seoSchema.safeParse({ description: 'x'.repeat(160) }).success).toBe(true);
-    expect(seoSchema.safeParse({ description: 'x'.repeat(161) }).success).toBe(false);
+  it('accepts a description up to 200 characters and rejects one longer', () => {
+    expect(seoSchema.safeParse({ description: 'x'.repeat(200) }).success).toBe(true);
+    expect(seoSchema.safeParse({ description: 'x'.repeat(201) }).success).toBe(false);
+  });
+
+  // The card routes fetch it server-side, where a relative path can't resolve.
+  it('requires a social image override to be an absolute URL', () => {
+    expect(seoSchema.safeParse({ ogImage: 'https://example.com/card.png' }).success).toBe(true);
+    expect(seoSchema.safeParse({ ogImage: '/card.png' }).success).toBe(false);
   });
 });
 

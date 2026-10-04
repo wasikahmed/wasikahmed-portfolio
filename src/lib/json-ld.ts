@@ -21,6 +21,16 @@ export const WEBSITE_ID = `${SITE_URL}/#website`;
 
 const personRef = { '@id': PERSON_ID };
 
+/**
+ * The person as an article's author or publisher. Not a bare `@id`: the
+ * full node is only on / and /about, Google doesn't follow a reference to
+ * another page, and an author with no type or name fails the Article rich
+ * result. The shared `@id` still merges it with the full node.
+ */
+function personSummary(settings: Settings) {
+  return { '@type': 'Person', '@id': PERSON_ID, name: settings.name, url: SITE_URL };
+}
+
 /** Site-relative paths (`/portrait.webp`) become absolute; absolute URLs pass through. */
 function absoluteUrl(url: string): string {
   return url.startsWith('http') ? url : `${SITE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
@@ -115,7 +125,7 @@ export function breadcrumbJsonLd(trail: { name: string; path: string }[]) {
   };
 }
 
-export function articleJsonLd(post: Post) {
+export function articleJsonLd(post: Post, settings: Settings) {
   const url = `${SITE_URL}/writing/${post.slug}`;
   const published = post.publishedAt ?? post.date;
   return {
@@ -135,8 +145,8 @@ export function articleJsonLd(post: Post) {
     mainEntityOfPage: url,
     inLanguage: 'en',
     keywords: post.tags,
-    author: personRef,
-    publisher: personRef,
+    author: personSummary(settings),
+    publisher: personSummary(settings),
     isPartOf: { '@id': WEBSITE_ID },
   };
 }
@@ -146,7 +156,7 @@ export function articleJsonLd(post: Post) {
  * `keywords` carries the stack, which is what someone searching for, say,
  * a Django real-time backend would match on.
  */
-export function caseStudyJsonLd(project: Project) {
+export function caseStudyJsonLd(project: Project, settings: Settings) {
   const url = `${SITE_URL}/work/${project.slug}`;
   const image = project.seo?.ogImage || project.cover?.url;
   return {
@@ -165,8 +175,8 @@ export function caseStudyJsonLd(project: Project) {
     mainEntityOfPage: url,
     inLanguage: 'en',
     keywords: project.stack,
-    author: personRef,
-    publisher: personRef,
+    author: personSummary(settings),
+    publisher: personSummary(settings),
     isPartOf: { '@id': WEBSITE_ID },
   };
 }

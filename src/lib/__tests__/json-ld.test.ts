@@ -130,23 +130,32 @@ const post: Post = {
 
 describe('articleJsonLd', () => {
   it('uses the last save as dateModified', () => {
-    const node = articleJsonLd({ ...post, updatedAt: '2026-10-03T10:00:00.000Z' });
+    const node = articleJsonLd({ ...post, updatedAt: '2026-10-03T10:00:00.000Z' }, settings);
     expect(node.datePublished).toBe('2026-09-20');
     expect(node.dateModified).toBe('2026-10-03T10:00:00.000Z');
   });
 
   // A scheduled post is saved before it goes live.
   it('never dates a modification before publication', () => {
-    const node = articleJsonLd({
-      ...post,
-      publishedAt: '2026-10-05T00:00:00.000Z',
-      updatedAt: '2026-10-01T00:00:00.000Z',
-    });
+    const node = articleJsonLd(
+      {
+        ...post,
+        publishedAt: '2026-10-05T00:00:00.000Z',
+        updatedAt: '2026-10-01T00:00:00.000Z',
+      },
+      settings,
+    );
     expect(node.dateModified).toBe('2026-10-05T00:00:00.000Z');
   });
 
-  it('credits the shared Person node', () => {
-    expect(articleJsonLd(post).author).toEqual({ '@id': PERSON_ID });
+  // Google won't follow the @id to another page, so the author has to
+  // carry its own type and name to count as one.
+  it('credits the shared Person node, named', () => {
+    expect(articleJsonLd(post, settings).author).toMatchObject({
+      '@type': 'Person',
+      '@id': PERSON_ID,
+      name: 'Wasik Ahmed',
+    });
   });
 });
 
@@ -160,10 +169,10 @@ describe('caseStudyJsonLd', () => {
   } as Project;
 
   it('prefers the SEO overrides and uses the cover as the image', () => {
-    const node = caseStudyJsonLd({
-      ...project,
-      seo: { title: 'Thing: a Django backend', description: 'Override.' },
-    });
+    const node = caseStudyJsonLd(
+      { ...project, seo: { title: 'Thing: a Django backend', description: 'Override.' } },
+      settings,
+    );
     expect(node.headline).toBe('Thing: a Django backend');
     expect(node.description).toBe('Override.');
     expect(node.image).toBe(project.cover!.url);

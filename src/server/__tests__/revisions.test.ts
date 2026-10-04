@@ -297,6 +297,36 @@ describe('restoring', () => {
     expect((await restore(revisionId)).status).toBe(403);
   });
 
+  // Site copy's schema requires every field, and fields get added (the home
+  // title and /docs description did). A version saved before that must
+  // still restore, with the new fields at their defaults.
+  it('restores a site-copy version saved before newer fields existed', async () => {
+    authedAs('admin');
+    const { siteCopyDefaults } = await import('../seed-data/site-copy');
+    const { SiteCopyModel } = await import('../models/site-copy');
+    const old = structuredClone(siteCopyDefaults) as unknown as Record<
+      string,
+      Record<string, string>
+    >;
+    delete old.seo.homeTitle;
+    delete old.docs;
+    old.about.heading = 'An older heading.';
+    const revision = await Revision.create({
+      entityType: 'siteCopy',
+      entityId: 'site-copy',
+      label: 'Site copy',
+      action: 'update',
+      userEmail: 'admin@example.com',
+      snapshot: old,
+    });
+
+    expect((await restore(String(revision._id))).status).toBe(200);
+    const stored = await SiteCopyModel.findById('site-copy').lean();
+    expect(stored?.about?.heading).toBe('An older heading.');
+    expect(stored?.seo?.homeTitle).toBe(siteCopyDefaults.seo.homeTitle);
+    await SiteCopyModel.deleteMany({});
+  });
+
   it('404s for an unknown revision', async () => {
     authedAs('admin');
     const missing = new mongoose.Types.ObjectId().toString();
