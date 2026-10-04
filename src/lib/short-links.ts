@@ -22,16 +22,43 @@ export const SHORT_LINK_NAME_MAX = 40;
 export const SHORT_LINK_DESTINATION_PATTERN =
   /^\/(?:(?!\.\.?(?:\/|$))[A-Za-z0-9._~-]+(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9._~-]+)*\/?)?$/;
 
-/** Suggested `source` values — the platforms the UTM register already uses, plus applications. */
+/*
+ * Suggested `source`/`medium` values — the fixed vocabularies of the
+ * owner's link guideline (kept outside this repo, in the CV folder's
+ * analytics-links.md). Suggestions only: the API accepts any well-formed
+ * name, so a new platform needs no deploy. No catch-alls like `social` or
+ * `other` — they lump unrelated places into one row in Umami.
+ */
 export const SHORT_LINK_SOURCES = [
   'application',
   'job-board',
   'linkedin',
   'github',
   'email',
-  'social',
   'resume',
-  'other',
+  'facebook',
+  'x',
+  'instagram',
+  'youtube',
+  'discord',
+  'whatsapp',
+  'print',
+] as const;
+
+export const SHORT_LINK_MEDIUMS = [
+  'form',
+  'resume',
+  'email',
+  'cover-letter',
+  'message',
+  'profile',
+  'bio',
+  'post',
+  'featured',
+  'readme',
+  'signature',
+  'print',
+  'link',
 ] as const;
 
 /**

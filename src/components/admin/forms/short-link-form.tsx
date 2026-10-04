@@ -9,6 +9,7 @@ import { adminFetchJson } from '@/lib/admin-fetch';
 import {
   SHORT_LINK_CAMPAIGN,
   SHORT_LINK_NAME_MAX,
+  SHORT_LINK_MEDIUMS,
   SHORT_LINK_SOURCES,
   shortLinkPath,
 } from '@/lib/short-links';
@@ -179,6 +180,7 @@ export function ShortLinkForm({ link }: { link?: ShortLink }) {
           <Input
             id="medium"
             required
+            list="short-link-mediums"
             maxLength={SHORT_LINK_NAME_MAX}
             pattern={NAME_PATTERN_ATTR}
             autoCapitalize="none"
@@ -186,6 +188,11 @@ export function ShortLinkForm({ link }: { link?: ShortLink }) {
             value={draft.medium}
             onChange={(e) => set('medium', e.target.value.toLowerCase())}
           />
+          <datalist id="short-link-mediums">
+            {SHORT_LINK_MEDIUMS.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
         </Field>
       </div>
 
