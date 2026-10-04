@@ -72,7 +72,17 @@ export function Experience({ roles, heading }: { roles: Role[]; heading: string 
             >
               <div>
                 <p className="text-2xs text-accent font-mono tracking-wide">{role.period}</p>
-                <p className="text-2xs text-fg-subtle mt-2 font-mono">{role.type}</p>
+                {/* Each " · " part kept on one line. The column is 11rem,
+                    and left to itself the browser broke "On-site" at its
+                    hyphen, so a part now wraps whole or not at all. */}
+                <p className="text-2xs text-fg-subtle mt-2 font-mono">
+                  {role.type.split(' · ').map((part, j) => (
+                    <span key={part}>
+                      {j > 0 ? ' · ' : null}
+                      <span className="whitespace-nowrap">{part}</span>
+                    </span>
+                  ))}
+                </p>
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-4">
