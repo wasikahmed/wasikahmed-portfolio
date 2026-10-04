@@ -5,6 +5,15 @@ import { ProjectCard } from '@/components/work/project-card';
 import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { getProjects, getSiteCopy } from '@/server/queries';
 import { fillCount } from '@/lib/format';
+import { cn } from '@/lib/cn';
+
+/**
+ * How many cards a phone gets before the "see all" button. Every card is
+ * roughly a full screen tall there, so all seven made this one section six
+ * screens of the same list /work already shows, and pushed everything after
+ * it out of reach. Wider screens fit two per row and keep the full set.
+ */
+const PHONE_LIMIT = 3;
 
 /**
  * The first project gets a full-width feature tile and the rest fall into
@@ -34,10 +43,12 @@ export async function SelectedWork() {
                 {fillCount(copy.home.workHeading, projects.length)}
               </h2>
             </div>
+            {/* Phones get theirs after the cards instead (below) — up
+                here it asked for a decision before the list it skips. */}
             <Button
               href="/work"
               variant="ghost"
-              className="group"
+              className="group hidden sm:inline-flex"
               data-track="cta_click"
               data-track-cta="all_work"
             >
@@ -48,24 +59,41 @@ export async function SelectedWork() {
         </Reveal>
 
         {lead ? (
-          <Stagger className="mt-12 grid gap-5 lg:grid-cols-2" gap={0.08}>
-            {/* Full width, not a row-spanning column. The previous layout
+          <>
+            <Stagger className="mt-12 grid gap-5 lg:grid-cols-2" gap={0.08}>
+              {/* Full width, not a row-spanning column. The previous layout
                 gave the lead `lg:row-span-2 h-full` against an unbounded
                 right column, so the card stretched to whatever the stack
                 beside it happened to total — 2168px against a 256px cover
                 once a fifth project and cover images landed. Spanning the
                 row instead keeps the hierarchy break without tying one
                 card's height to the number of others. */}
-            <StaggerItem className="lg:col-span-2">
-              <ProjectCard project={lead} size="feature" />
-            </StaggerItem>
-
-            {rest.map((project) => (
-              <StaggerItem key={project.slug}>
-                <ProjectCard project={project} className="h-full" />
+              <StaggerItem className="lg:col-span-2">
+                <ProjectCard project={lead} size="feature" />
               </StaggerItem>
-            ))}
-          </Stagger>
+
+              {rest.map((project, i) => (
+                <StaggerItem
+                  key={project.slug}
+                  className={cn(i + 1 >= PHONE_LIMIT && 'hidden sm:block')}
+                >
+                  <ProjectCard project={project} className="h-full" />
+                </StaggerItem>
+              ))}
+            </Stagger>
+            {projects.length > PHONE_LIMIT ? (
+              <Button
+                href="/work"
+                variant="ghost"
+                className="group mt-8 w-full sm:hidden"
+                data-track="cta_click"
+                data-track-cta="all_work"
+              >
+                See all {projects.length} projects
+                <ArrowRight />
+              </Button>
+            ) : null}
+          </>
         ) : (
           // No published projects yet — a real, reachable state (a fresh
           // install before seeding, or every project unpublished from the
