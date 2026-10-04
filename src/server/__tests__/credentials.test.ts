@@ -11,7 +11,7 @@ import { Secret, TOTP } from 'otpauth';
  * e2e/admin.spec.ts's real browser login.
  */
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let User: (typeof import('../models/user'))['User'];
 let hashPassword: (typeof import('../password'))['hashPassword'];
 let encryptTotpSecret: (typeof import('../totp'))['encryptTotpSecret'];
@@ -40,7 +40,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

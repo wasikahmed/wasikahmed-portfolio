@@ -59,7 +59,7 @@ function req(
   });
 }
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let Project: (typeof import('../models/project'))['Project'];
 let AuditLog: (typeof import('../models/audit-log'))['AuditLog'];
 let admin: typeof import('../admin-crud');
@@ -93,11 +93,15 @@ beforeAll(async () => {
   admin = await import('../admin-crud');
   schemas = await import('../schemas');
   await connectToDatabase();
+  // Mongoose builds the unique `slug` index in the background after
+  // connecting; the 409 test fails (201 instead) whenever it runs first.
+  // Seen on a cold-cache run, 2026-10-04.
+  await Project.syncIndexes();
 }, 60_000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

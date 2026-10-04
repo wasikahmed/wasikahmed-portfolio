@@ -57,7 +57,7 @@ function uploadReq(fields: Record<string, string>, bytes: Buffer = PDF, name = '
 
 const params = <T>(value: T) => ({ params: Promise.resolve(value) });
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let ResumeVersionModel: (typeof import('../models/resume'))['ResumeVersionModel'];
 let SiteCopyModel: (typeof import('../models/site-copy'))['SiteCopyModel'];
 let resumesRoute: typeof import('@/app/api/admin/resumes/route');
@@ -90,7 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

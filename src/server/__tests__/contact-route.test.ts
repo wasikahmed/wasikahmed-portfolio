@@ -14,7 +14,7 @@ const sendLeadNotification = vi.fn();
 const sendLeadReceipt = vi.fn();
 vi.mock('../email', () => ({ sendLeadNotification, sendLeadReceipt }));
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let Lead: (typeof import('../models/lead'))['Lead'];
 let Settings: (typeof import('../models/settings'))['Settings'];
 let SETTINGS_SINGLETON_ID: (typeof import('../models/settings'))['SETTINGS_SINGLETON_ID'];
@@ -51,7 +51,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

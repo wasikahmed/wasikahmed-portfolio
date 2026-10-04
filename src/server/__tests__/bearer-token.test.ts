@@ -16,7 +16,7 @@ import { NextRequest } from 'next/server';
  */
 vi.mock('../session', () => ({ getAdminSession: vi.fn() }));
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let User: (typeof import('../models/user'))['User'];
 let RefreshToken: (typeof import('../models/refresh-token'))['RefreshToken'];
 let RateLimit: (typeof import('../models/rate-limit'))['RateLimit'];
@@ -77,7 +77,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

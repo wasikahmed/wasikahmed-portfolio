@@ -11,7 +11,7 @@ import { NextRequest } from 'next/server';
  * expiry/single-use logic, not Cloudflare's widget.
  */
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let User: (typeof import('../models/user'))['User'];
 let Invite: (typeof import('../models/invite'))['Invite'];
 let saltedHash: (typeof import('../rate-limit'))['saltedHash'];
@@ -44,7 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

@@ -25,7 +25,7 @@ import mongoose from 'mongoose';
  * not in `visibleNow()` itself.
  */
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let Project: (typeof import('../models/project'))['Project'];
 let Post: (typeof import('../models/post'))['Post'];
 let Settings: (typeof import('../models/settings'))['Settings'];
@@ -97,7 +97,7 @@ beforeAll(async () => {
 afterAll(async () => {
   vi.useRealTimers();
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 beforeEach(async () => {

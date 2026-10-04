@@ -81,6 +81,16 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      # The mongod binary mongodb-memory-server downloads for `pnpm test`
+      # (~75MB; its postinstall is off, see pnpm-workspace.yaml). Keyed on
+      # the lockfile because the package version picks the default mongod
+      # version. A miss is only slower: vitest.global-setup.ts downloads it
+      # once before any test file runs.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: mongodb-binaries-${{ runner.os }}-
       - run: pnpm test
       # generateStaticParams() catches the unreachable-DB case by design
       # (see the Dockerfile's comment) — no MONGODB_URI needed here either.

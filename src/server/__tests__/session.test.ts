@@ -18,7 +18,7 @@ import mongoose from 'mongoose';
 
 vi.mock('../auth', () => ({ auth: vi.fn() }));
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let User: (typeof import('../models/user'))['User'];
 let getAdminSession: (typeof import('../session'))['getAdminSession'];
 let authMock: ReturnType<typeof vi.mocked<(typeof import('../auth'))['auth']>>;
@@ -37,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 beforeEach(async () => {

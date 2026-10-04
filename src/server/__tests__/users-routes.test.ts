@@ -45,7 +45,7 @@ function req(method: string, { body, csrf = true }: { body?: unknown; csrf?: boo
   });
 }
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let User: (typeof import('../models/user'))['User'];
 let Invite: (typeof import('../models/invite'))['Invite'];
 let AuditLog: (typeof import('../models/audit-log'))['AuditLog'];
@@ -70,7 +70,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {

@@ -21,5 +21,6 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['node_modules/**', '.next/**'],
+    globalSetup: ['./vitest.global-setup.ts'],
   },
 });

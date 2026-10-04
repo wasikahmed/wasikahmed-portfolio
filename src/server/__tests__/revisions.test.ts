@@ -41,7 +41,7 @@ function req(method: string, url: string, body?: unknown): NextRequest {
 
 const params = <T>(value: T) => ({ params: Promise.resolve(value) });
 
-let mongod: MongoMemoryServer;
+let mongod: MongoMemoryServer | undefined;
 let Project: (typeof import('../models/project'))['Project'];
 let Revision: (typeof import('../models/revision'))['Revision'];
 let AuditLog: (typeof import('../models/audit-log'))['AuditLog'];
@@ -98,7 +98,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongod.stop();
+  await mongod?.stop();
 });
 
 afterEach(async () => {
