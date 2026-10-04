@@ -35,6 +35,8 @@ function recordResumeView(request: Request, status: 200 | 304) {
  */
 export const FALLBACK_RESUME_PATH = '/resume-fallback.pdf';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
+
 /**
  * The live résumé as a response — shared by /resume and by
  * /wasik-ahmed-resume.pdf, the bundled file's old address.
@@ -63,6 +65,11 @@ export async function currentResumeResponse(request: Request): Promise<Response>
   const headers = {
     ...pdfHeaders(current.fileName, current.sha256, current.size),
     'Cache-Control': 'public, no-cache',
+    // The same bytes answer at two URLs (see above). A PDF has no <head>
+    // to put a canonical in, so it goes in a header — the form Google
+    // documents for non-HTML files — naming /resume, the address every
+    // link uses, so the two don't compete as duplicates in search.
+    Link: `<${SITE_URL}/resume>; rel="canonical"`,
   };
 
   if (request.headers.get('if-none-match') === `"${current.sha256}"`) {

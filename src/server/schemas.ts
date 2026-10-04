@@ -1,4 +1,5 @@
 import { z, type ZodType } from 'zod';
+import { META_DESCRIPTION_MAX, META_TITLE_MAX, SEO_TITLE_MAX } from '@/lib/seo';
 import { can, PERMISSIONS, type Role } from './permissions';
 
 /**
@@ -45,8 +46,8 @@ export const categorySchema = z.enum(['AI', 'Automation', 'Systems', 'Web']);
 export const statusSchema = z.enum(['draft', 'scheduled', 'published']);
 
 export const seoSchema = z.object({
-  title: z.string().max(70).optional(),
-  description: z.string().max(200).optional(),
+  title: z.string().max(SEO_TITLE_MAX).optional(),
+  description: z.string().max(META_DESCRIPTION_MAX).optional(),
   ogImage: z.string().optional(),
 });
 
@@ -247,13 +248,19 @@ export const settingsSchema = z.object({
   // existed must keep validating rather than locking the admin out.
   story: z.array(z.string().min(1)).default([]),
   approach: z.array(approachStepSchema).default([]),
+  // Structured data only (lib/json-ld.ts) — never rendered on a page.
+  alternateNames: z.array(z.string().trim().min(1)).default([]),
+  sameAs: z.array(z.string().trim().url()).default([]),
 });
 
 const copyText = z.string().trim().min(1);
-// Meta descriptions get the same 200-character ceiling `seoSchema` applies
-// to per-project/per-post descriptions — search engines truncate long
-// before that anyway.
-const metaDescription = z.string().trim().min(1).max(200);
+// Meta descriptions get the same ceiling `seoSchema` applies to
+// per-project/per-post descriptions: Google cuts snippets off at roughly
+// 155–160 characters, so anything longer is written for nobody.
+const metaDescription = z.string().trim().min(1).max(META_DESCRIPTION_MAX);
+// A whole <title>, not a fragment `pageTitle` adds a suffix to — the home
+// page's is written out in full so it can carry the name variants.
+const metaTitle = z.string().trim().min(1).max(META_TITLE_MAX);
 
 /**
  * PATCH /api/admin/site-copy — the whole document every time, every field
@@ -262,7 +269,7 @@ const metaDescription = z.string().trim().min(1).max(200);
  * full shape means a saved document is always complete.
  */
 export const siteCopySchema = z.object({
-  seo: z.object({ siteDescription: metaDescription }),
+  seo: z.object({ siteDescription: metaDescription, homeTitle: metaTitle }),
   home: z.object({
     workHeading: copyText,
     impactHeading: copyText,
@@ -281,6 +288,7 @@ export const siteCopySchema = z.object({
   writing: z.object({ metaDescription, heading: copyText, intro: copyText }),
   contact: z.object({ metaDescription, heading: copyText, intro: copyText }),
   caseStudy: z.object({ ctaText: copyText }),
+  docs: z.object({ metaDescription }),
   footer: z.object({ unavailableText: copyText }),
   notFound: z.object({ heading: copyText, body: copyText }),
 });

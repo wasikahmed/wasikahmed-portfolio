@@ -35,6 +35,14 @@ export async function Hero() {
             </p>
 
             <h1 className="font-display mt-6 text-5xl font-bold tracking-tighter">
+              {/* The page's main heading should say whose site this is —
+                  the tagline alone names nobody, and search engines weigh
+                  the h1. Visually hidden rather than shown: the wordmark
+                  in the nav already puts the name on screen, so the hero
+                  can stay the headline it was designed as. */}
+              <span className="sr-only">
+                {settings.name}, {settings.role}:{' '}
+              </span>
               <TextReveal text={settings.tagline} accentWords={[0, 1]} delay={0.1} />
             </h1>
 

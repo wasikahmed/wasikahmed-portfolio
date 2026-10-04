@@ -190,7 +190,7 @@ export const getSettings = cache(async (): Promise<SettingsType> => {
   // like every other collection's — dropped rather than exposed as `id`.
   const normalized = normalizeDoc(doc);
   delete (normalized as Record<string, unknown>).id;
-  return normalized as SettingsType;
+  return normalized as unknown as SettingsType;
 });
 
 // ── Site copy (singleton) ──────────────────────────────────────────────

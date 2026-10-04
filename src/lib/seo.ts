@@ -1,5 +1,16 @@
 import type { Metadata } from 'next';
 
+/*
+ * Search results show about 60 characters of a title and 155–160 of a
+ * description before cutting them off. A per-item title override gets
+ * `pageTitle`'s " — {name}" (14 characters) appended, hence its lower cap.
+ * Here rather than in schemas.ts so the admin forms' counters, which are
+ * Client Components, can read the same numbers the API enforces.
+ */
+export const META_TITLE_MAX = 60;
+export const SEO_TITLE_MAX = 46;
+export const META_DESCRIPTION_MAX = 160;
+
 /**
  * `${page} — ${siteName}` — the title convention every page in `(site)`
  * uses. Centralised so replacing the seven pages that used to hardcode
@@ -11,12 +22,33 @@ export function pageTitle(page: string, siteName: string): string {
 }
 
 /**
- * `metadata.alternates.canonical` for a site-relative path. Resolves to an
- * absolute URL against the root layout's `metadataBase`, same mechanism
- * `opengraph-image` already relies on to produce an absolute image URL.
+ * A description cut to fit a search snippet, at a word boundary.
+ *
+ * Overrides are capped at the API, but the fallbacks are not: a case
+ * study's `problem` or a post's `excerpt` is body copy with no length
+ * limit, and the two longest ran past 220 characters — Google then cuts
+ * them mid-word wherever it likes.
+ */
+export function snippet(text: string, max = META_DESCRIPTION_MAX): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.—–-]+$/, '')}…`;
+}
+
+/**
+ * `metadata.alternates` for a site-relative path: its canonical URL, which
+ * resolves to an absolute one against the root layout's `metadataBase`
+ * (the same mechanism `opengraph-image` relies on), and the RSS feed.
+ *
+ * The feed rides along on every page rather than just /writing because
+ * `alternates`, like `openGraph`, is replaced wholesale by a child segment
+ * — a layout can't add it site-wide — and feed readers and crawlers look
+ * for it on whatever page they were given, usually the home page.
  */
 export function canonical(path: string): Metadata['alternates'] {
-  return { canonical: path };
+  return { canonical: path, types: { 'application/rss+xml': '/writing/feed.xml' } };
 }
 
 /**
@@ -59,11 +91,18 @@ export function pageMetadata({
   path,
   siteName,
   ownCard = false,
+  article,
 }: {
   title: string;
   description: string;
   path: string;
   siteName: string;
+  /**
+   * Marks the page as `og:type=article`, with the dates and tags LinkedIn
+   * and other unfurlers show. Posts and case studies; every other page is
+   * a `website`.
+   */
+  article?: { publishedTime?: string; modifiedTime?: string; tags?: string[] };
   /**
    * The page's segment has its own `opengraph-image` file. Images are then
    * left unset so that file supplies them, and `twitter` is still restated
@@ -74,11 +113,15 @@ export function pageMetadata({
   // Spread rather than `images: undefined`: Next treats a present-but-empty
   // key as "this page has no image" and drops the file-based one too.
   const images = ownCard ? {} : { images: [SITE_CARD] };
+  const text = snippet(description);
+  const openGraph: Metadata['openGraph'] = article
+    ? { type: 'article', authors: [siteName], ...article }
+    : { type: 'website' };
   return {
     title,
-    description,
+    description: text,
     alternates: canonical(path),
-    openGraph: { type: 'website', siteName, title, description, url: path, ...images },
+    openGraph: { ...openGraph, siteName, title, description: text, url: path, ...images },
     // Restated whole for the same wholesale-replace reason; X falls back to
     // og:image anyway, but other `twitter:` consumers do not.
     twitter: { card: 'summary_large_image', ...images },

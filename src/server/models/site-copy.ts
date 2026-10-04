@@ -18,7 +18,7 @@ const group = (fields: string[]) =>
 const siteCopySchema = new Schema(
   {
     _id: { type: String, default: SITE_COPY_SINGLETON_ID },
-    seo: { type: group(['siteDescription']), default: undefined },
+    seo: { type: group(['siteDescription', 'homeTitle']), default: undefined },
     home: {
       type: group([
         'workHeading',
@@ -40,6 +40,7 @@ const siteCopySchema = new Schema(
     writing: { type: group(['metaDescription', 'heading', 'intro']), default: undefined },
     contact: { type: group(['metaDescription', 'heading', 'intro']), default: undefined },
     caseStudy: { type: group(['ctaText']), default: undefined },
+    docs: { type: group(['metaDescription']), default: undefined },
     footer: { type: group(['unavailableText']), default: undefined },
     notFound: { type: group(['heading', 'body']), default: undefined },
   },

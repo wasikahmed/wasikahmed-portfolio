@@ -194,6 +194,18 @@ describe('/resume', () => {
     expect(res.status).toBe(200);
     expect(Buffer.from(await res.arrayBuffer()).equals(PDF)).toBe(true);
   });
+
+  // Same bytes at two URLs: both name /resume as the one to index.
+  it('names /resume as canonical from both addresses', async () => {
+    authedAs('admin');
+    await resumesRoute.POST(uploadReq({ label: 'Live', makeCurrent: 'true' }));
+    for (const res of [
+      await publicResume.GET(new Request('http://localhost/resume')),
+      await legacyResume.GET(new Request('http://localhost/wasik-ahmed-resume.pdf')),
+    ]) {
+      expect(res.headers.get('link')).toMatch(/^<https?:\/\/[^>]+\/resume>; rel="canonical"$/);
+    }
+  });
 });
 
 describe('site copy', () => {

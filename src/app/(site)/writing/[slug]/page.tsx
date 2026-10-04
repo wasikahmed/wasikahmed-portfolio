@@ -9,7 +9,7 @@ import { MdxContent } from '@/components/mdx/mdx-content';
 import { formatDate } from '@/lib/format';
 import { getPostSlugs, getPost, getAdjacentPosts, getSettings } from '@/server/queries';
 import { pageTitle, pageMetadata } from '@/lib/seo';
-import { articleJsonLd } from '@/lib/json-ld';
+import { articleJsonLd, breadcrumbJsonLd, jsonLdGraph, serializeJsonLd } from '@/lib/json-ld';
 
 export async function generateStaticParams() {
   // Best-effort pre-render: `next build` runs this with no guarantee the
@@ -40,12 +40,17 @@ export async function generateMetadata({
     path: `/writing/${slug}`,
     siteName: settings.name,
     ownCard: true,
+    article: {
+      publishedTime: post.publishedAt ?? post.date,
+      modifiedTime: post.updatedAt,
+      tags: post.tags,
+    },
   });
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
+  const post = await getPost(slug);
   if (!post) notFound();
 
   const { next } = await getAdjacentPosts(slug);
@@ -54,7 +59,18 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd(post, settings)) }}
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            jsonLdGraph(
+              articleJsonLd(post),
+              breadcrumbJsonLd([
+                { name: 'Home', path: '/' },
+                { name: 'Writing', path: '/writing' },
+                { name: post.title, path: `/writing/${post.slug}` },
+              ]),
+            ),
+          ),
+        }}
       />
       <ReadingProgress />
 

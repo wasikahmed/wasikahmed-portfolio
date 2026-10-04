@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { optimizedImageUrl } from '@/lib/mdx-image';
 
 /**
  * A company's logo in a small tile. Callers render it only when the role
@@ -31,9 +32,20 @@ export function CompanyMark({ logo, className }: { logo: string; className?: str
     >
       {/* A plain <img>, not next/image: the URL is whatever was pasted in
           the admin, and next/image throws at render for any host missing
-          from images.remotePatterns. At 40px there is nothing to optimise. */}
+          from images.remotePatterns. A Cloudinary upload is still asked
+          for at 80px (2x the tile) in a modern format — served as
+          uploaded, the logos were full-size PNGs, one of them 134 KB, the
+          heaviest thing on the home page. Any other URL passes through. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={logo} alt="" width={40} height={40} className="size-full object-contain" />
+      <img
+        src={optimizedImageUrl(logo, 80)}
+        alt=""
+        width={40}
+        height={40}
+        loading="lazy"
+        decoding="async"
+        className="size-full object-contain"
+      />
     </span>
   );
 }

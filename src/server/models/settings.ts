@@ -42,6 +42,8 @@ const settingsSchema = new Schema(
     portrait: { type: mediaRefSchema, default: undefined },
     story: { type: [String], default: [] },
     approach: { type: [approachStepSchema], default: [] },
+    alternateNames: { type: [String], default: [] },
+    sameAs: { type: [String], default: [] },
   },
   { timestamps: true },
 );

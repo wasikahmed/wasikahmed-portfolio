@@ -1,4 +1,5 @@
 import type { SiteCopy } from './types';
+import { META_DESCRIPTION_MAX, META_TITLE_MAX } from './seo';
 
 /**
  * Layout of the /admin/site-copy form — which field sits under which page,
@@ -26,7 +27,7 @@ export interface SiteCopyGroup {
   fields: (Omit<SiteCopyField, 'key'> & { key: string })[];
 }
 
-const META_HINT = 'What search engines and link previews show for this page. Up to 200 characters.';
+const META_HINT = `What search engines and link previews show for this page. Up to ${META_DESCRIPTION_MAX} characters.`;
 const COUNT_HINT =
   '{Count} becomes the number of published projects in words ("Seven"), {count} the same in lowercase, {s} an "s" unless there is exactly one.';
 
@@ -53,9 +54,15 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
       {
         key: 'siteDescription',
         label: 'Site description',
-        hint: 'The fallback search and link-preview description. Up to 200 characters.',
+        hint: `The fallback search and link-preview description. Up to ${META_DESCRIPTION_MAX} characters.`,
         multiline: true,
-        max: 200,
+        max: META_DESCRIPTION_MAX,
+      },
+      {
+        key: 'homeTitle',
+        label: 'Home page title',
+        hint: `The whole <title> of the home page, written out — every other page is "Page — Name". Put the name people search for first. Up to ${META_TITLE_MAX} characters.`,
+        max: META_TITLE_MAX,
       },
     ],
   }),
@@ -96,7 +103,7 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
         label: 'Meta description',
         hint: META_HINT,
         multiline: true,
-        max: 200,
+        max: META_DESCRIPTION_MAX,
       },
       { key: 'heading', label: 'Page heading' },
       { key: 'skillsHeading', label: 'Skills heading' },
@@ -112,7 +119,7 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
         label: 'Meta description',
         hint: META_HINT,
         multiline: true,
-        max: 200,
+        max: META_DESCRIPTION_MAX,
       },
       { key: 'heading', label: 'Page heading' },
       { key: 'intro', label: 'Intro', hint: COUNT_HINT, multiline: true },
@@ -128,7 +135,7 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
         label: 'Meta description',
         hint: META_HINT,
         multiline: true,
-        max: 200,
+        max: META_DESCRIPTION_MAX,
       },
       { key: 'heading', label: 'Page heading' },
       { key: 'intro', label: 'Intro', multiline: true },
@@ -144,7 +151,7 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
         label: 'Meta description',
         hint: META_HINT,
         multiline: true,
-        max: 200,
+        max: META_DESCRIPTION_MAX,
       },
       { key: 'heading', label: 'Page heading' },
       { key: 'intro', label: 'Intro', multiline: true },
@@ -156,6 +163,20 @@ export const SITE_COPY_GROUPS: SiteCopyGroup[] = [
     description: 'Shared by every /work/[slug] page.',
     fields: [
       { key: 'ctaText', label: 'Closing line', hint: 'Next to the “Start a conversation” button.' },
+    ],
+  }),
+  group({
+    group: 'docs',
+    title: 'API reference',
+    description: '/docs.',
+    fields: [
+      {
+        key: 'metaDescription',
+        label: 'Meta description',
+        hint: META_HINT,
+        multiline: true,
+        max: META_DESCRIPTION_MAX,
+      },
     ],
   }),
   group({

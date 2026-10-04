@@ -111,7 +111,8 @@ export default async function ContactPage() {
                       <a
                         href={social.href}
                         {...(social.href.startsWith('http')
-                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                          ? // `me`: the same identity claim as the footer's links.
+                            { target: '_blank', rel: 'me noopener noreferrer' }
                           : {})}
                         className="text-fg-muted duration-fast hover:text-fg inline-flex items-center gap-2 text-sm transition-colors"
                       >

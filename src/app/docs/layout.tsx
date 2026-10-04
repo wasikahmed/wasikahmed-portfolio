@@ -1,5 +1,8 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Analytics } from '@/components/analytics/analytics';
+import { pageMetadata, pageTitle } from '@/lib/seo';
+import { getSettings, getSiteCopy } from '@/server/queries';
 
 /**
  * `page.tsx` is a Client Component (Scalar's reference needs the DOM), so
@@ -17,6 +20,22 @@ import { Analytics } from '@/components/analytics/analytics';
  * server never surfaces this because it always renders per request.
  */
 export const dynamic = 'force-dynamic';
+
+/*
+ * Outside `(site)`, so none of that group's metadata reaches here — until
+ * this existed /docs went out with the root layout's bare "Wasik Ahmed",
+ * the generic description and no canonical. Here and not in page.tsx for
+ * the same Client Component reason as `dynamic` above.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
+  return pageMetadata({
+    title: pageTitle('API Reference', settings.name),
+    description: copy.docs.metaDescription,
+    path: '/docs',
+    siteName: settings.name,
+  });
+}
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
   // The API reference is a public page like any other, so it is counted

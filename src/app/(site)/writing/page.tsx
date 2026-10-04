@@ -11,16 +11,13 @@ import { pageTitle, pageMetadata } from '@/lib/seo';
 
 export async function generateMetadata(): Promise<Metadata> {
   const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
-  const metadata = pageMetadata({
+  // The RSS alternate comes with every page's canonical (lib/seo.ts).
+  return pageMetadata({
     title: pageTitle('Writing', settings.name),
     description: copy.writing.metaDescription,
     path: '/writing',
     siteName: settings.name,
   });
-  return {
-    ...metadata,
-    alternates: { ...metadata.alternates, types: { 'application/rss+xml': '/writing/feed.xml' } },
-  };
 }
 
 /**

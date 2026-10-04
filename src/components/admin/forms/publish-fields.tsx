@@ -2,6 +2,7 @@
 
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import type { ContentStatus, Seo } from '@/lib/types';
+import { META_DESCRIPTION_MAX, SEO_TITLE_MAX } from '@/lib/seo';
 
 /** Converts between the API's ISO string and <input type="datetime-local">'s local-time format. */
 function toLocalInput(iso?: string): string {
@@ -64,24 +65,42 @@ export function PublishFields({
           <Field
             label="Title override"
             htmlFor="seoTitle"
-            hint="Defaults to the page title if empty."
+            hint={`What the search result's headline says, before " — Name" is added. Defaults to the page title if empty. Up to ${SEO_TITLE_MAX} characters.`}
           >
             <Input
               id="seoTitle"
-              maxLength={70}
+              maxLength={SEO_TITLE_MAX}
               value={seo?.title ?? ''}
               onChange={(e) => onChange({ seo: { ...seo, title: e.target.value || undefined } })}
             />
           </Field>
-          <Field label="Description override" htmlFor="seoDescription">
+          <Field
+            label="Description override"
+            htmlFor="seoDescription"
+            hint={`The search snippet. Defaults to the opening paragraph, cut to fit. Up to ${META_DESCRIPTION_MAX} characters.`}
+          >
             <Textarea
               id="seoDescription"
               rows={2}
-              maxLength={200}
+              maxLength={META_DESCRIPTION_MAX}
               value={seo?.description ?? ''}
               onChange={(e) =>
                 onChange({ seo: { ...seo, description: e.target.value || undefined } })
               }
+            />
+          </Field>
+          {/* The API and the [slug] card routes have honoured this since
+              W3; only the input was missing. */}
+          <Field
+            label="Social image override"
+            htmlFor="seoOgImage"
+            hint="Optional. A media-library URL, ideally 1200×630, shown when the page is shared. Defaults to the generated card."
+          >
+            <Input
+              id="seoOgImage"
+              placeholder="https://…"
+              value={seo?.ogImage ?? ''}
+              onChange={(e) => onChange({ seo: { ...seo, ogImage: e.target.value || undefined } })}
             />
           </Field>
         </div>

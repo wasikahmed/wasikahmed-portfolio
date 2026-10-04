@@ -13,6 +13,7 @@ import type { SiteCopy } from '@/lib/types';
 export const siteCopyDefaults: SiteCopy = {
   seo: {
     siteDescription: 'Software engineer building AI and automation systems.',
+    homeTitle: 'Wasik Ahmed (Apon) — Software Engineer in Dhaka',
   },
   home: {
     workHeading: '{Count} system{s}, still in production.',
@@ -56,6 +57,10 @@ export const siteCopyDefaults: SiteCopy = {
   },
   caseStudy: {
     ctaText: 'Got a problem shaped like this one?',
+  },
+  docs: {
+    metaDescription:
+      'Reference for the REST API behind this portfolio’s admin CMS: authentication, Bearer tokens, permissions and every content endpoint.',
   },
   footer: {
     unavailableText: 'Not taking on new work right now.',

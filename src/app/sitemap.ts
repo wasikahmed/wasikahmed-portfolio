@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getProjects, getPosts } from '@/server/queries';
+import { getProjects, getPosts, getSettings } from '@/server/queries';
 
 /*
  * Generated from the query layer (PLAN.md W3) — `getProjects`/`getPosts` are
@@ -23,30 +23,69 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 // every page in `(site)`.
 export const dynamic = 'force-dynamic';
 
+/** The newest of some ISO timestamps, or undefined when there are none. */
+function latest(...dates: (string | undefined)[]): string | undefined {
+  return dates
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .at(-1);
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [projects, posts] = await Promise.all([getProjects(), getPosts()]);
+  const [projects, posts, settings] = await Promise.all([getProjects(), getPosts(), getSettings()]);
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    { url: SITE_URL, changeFrequency: 'monthly', priority: 1 },
-    { url: `${SITE_URL}/work`, changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${SITE_URL}/writing`, changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.5 },
-  ];
-
+  // `lastModified` is the one sitemap field Google says it actually uses,
+  // and only while it stays accurate — so it comes from `updatedAt`, which
+  // every save moves. `publishedAt` (what this used before) is set only for
+  // scheduled items, which left most entries with no date at all.
   const projectRoutes: MetadataRoute.Sitemap = projects.map((project) => ({
     url: `${SITE_URL}/work/${project.slug}`,
-    lastModified: project.publishedAt,
+    lastModified: latest(project.updatedAt, project.publishedAt),
     changeFrequency: 'monthly',
     priority: 0.8,
   }));
 
   const postRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE_URL}/writing/${post.slug}`,
-    lastModified: post.publishedAt ?? post.date,
+    lastModified: latest(post.updatedAt, post.publishedAt ?? post.date),
     changeFrequency: 'monthly',
     priority: 0.7,
   }));
+
+  // An index page changes when anything listed on it does. Home lists
+  // projects and is built from settings; /work lists projects; /writing
+  // lists posts; /about is settings (plus roles and skills, which carry no
+  // timestamps of their own here).
+  const projectsChanged = latest(...projectRoutes.map((r) => r.lastModified as string | undefined));
+  const postsChanged = latest(...postRoutes.map((r) => r.lastModified as string | undefined));
+
+  const staticRoutes: MetadataRoute.Sitemap = [
+    {
+      url: SITE_URL,
+      lastModified: latest(projectsChanged, settings.updatedAt),
+      changeFrequency: 'monthly',
+      priority: 1,
+    },
+    {
+      url: `${SITE_URL}/work`,
+      lastModified: projectsChanged,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/writing`,
+      lastModified: postsChanged,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
+      url: `${SITE_URL}/about`,
+      lastModified: settings.updatedAt,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.5 },
+  ];
 
   return [...staticRoutes, ...projectRoutes, ...postRoutes];
 }

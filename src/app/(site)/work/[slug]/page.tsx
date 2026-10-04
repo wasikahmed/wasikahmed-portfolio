@@ -22,6 +22,7 @@ import {
   getSiteCopy,
 } from '@/server/queries';
 import { pageTitle, pageMetadata } from '@/lib/seo';
+import { breadcrumbJsonLd, caseStudyJsonLd, jsonLdGraph, serializeJsonLd } from '@/lib/json-ld';
 
 export async function generateStaticParams() {
   // Best-effort pre-render: `next build` runs this with no guarantee the
@@ -56,6 +57,11 @@ export async function generateMetadata({
     path: `/work/${slug}`,
     siteName: settings.name,
     ownCard: true,
+    article: {
+      publishedTime: project.publishedAt,
+      modifiedTime: project.updatedAt,
+      tags: project.stack,
+    },
   });
 }
 
@@ -69,6 +75,21 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            jsonLdGraph(
+              caseStudyJsonLd(project),
+              breadcrumbJsonLd([
+                { name: 'Home', path: '/' },
+                { name: 'Work', path: '/work' },
+                { name: project.title, path: `/work/${project.slug}` },
+              ]),
+            ),
+          ),
+        }}
+      />
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <Section density="compact" ambient={['blob']} className="pt-10 sm:pt-14">
         <Container>
@@ -96,6 +117,26 @@ export default async function CaseStudyPage({ params }: { params: Promise<{ slug
           </ViewTransition>
 
           <p className="text-fg-muted mt-4 max-w-xl text-lg text-pretty">{project.tagline}</p>
+
+          {/* The live product, store listing or repo. Home's "Shipped &
+              public" list was the only place these appeared, so a reader
+              who arrived on a case study from search had no way to open
+              the thing it describes. */}
+          {project.links?.length ? (
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2">
+              {project.links.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-fg-muted duration-fast hover:text-accent font-mono text-xs transition-colors"
+                >
+                  {link.label} <span aria-hidden>↗</span>
+                </a>
+              ))}
+            </div>
+          ) : null}
 
           {/* Absent means the hero reads exactly as it did before cover
               images existed (PLAN.md W15 item 1). */}

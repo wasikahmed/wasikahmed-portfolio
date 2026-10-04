@@ -85,12 +85,16 @@ describe('seoSchema', () => {
     expect(seoSchema.safeParse({}).success).toBe(true);
   });
 
-  it('rejects a title over 70 characters', () => {
-    expect(seoSchema.safeParse({ title: 'x'.repeat(71) }).success).toBe(false);
+  // The title gets " — {name}" appended, so its cap leaves room for that
+  // inside the ~60 characters a search result shows.
+  it('accepts a title up to 46 characters and rejects one longer', () => {
+    expect(seoSchema.safeParse({ title: 'x'.repeat(46) }).success).toBe(true);
+    expect(seoSchema.safeParse({ title: 'x'.repeat(47) }).success).toBe(false);
   });
 
-  it('rejects a description over 200 characters', () => {
-    expect(seoSchema.safeParse({ description: 'x'.repeat(201) }).success).toBe(false);
+  it('accepts a description up to 160 characters and rejects one longer', () => {
+    expect(seoSchema.safeParse({ description: 'x'.repeat(160) }).success).toBe(true);
+    expect(seoSchema.safeParse({ description: 'x'.repeat(161) }).success).toBe(false);
   });
 });
 
@@ -257,6 +261,21 @@ describe('settingsSchema', () => {
     responseTime: '24 hours',
     socials: [validLink],
   };
+
+  it('defaults the search-only identity fields to empty', () => {
+    const result = settingsSchema.safeParse(valid);
+    expect(result.success && result.data.alternateNames).toEqual([]);
+    expect(result.success && result.data.sameAs).toEqual([]);
+  });
+
+  it('requires every extra profile to be a URL', () => {
+    expect(
+      settingsSchema.safeParse({ ...valid, sameAs: ['https://www.kaggle.com/someone'] }).success,
+    ).toBe(true);
+    expect(settingsSchema.safeParse({ ...valid, sameAs: ['kaggle.com/someone'] }).success).toBe(
+      false,
+    );
+  });
 
   it('accepts valid settings', () => {
     expect(settingsSchema.safeParse(valid).success).toBe(true);

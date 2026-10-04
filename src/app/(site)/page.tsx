@@ -7,14 +7,16 @@ import { Process } from '@/components/home/process';
 import { Shipped } from '@/components/home/shipped';
 import { CtaBand } from '@/components/home/cta-band';
 import { SectionRail } from '@/components/layout/section-rail';
-import { getSettings, getRoles, getSiteCopy } from '@/server/queries';
+import { getSettings, getRoles, getSiteCopy, getSkillGroups } from '@/server/queries';
 import { pageMetadata } from '@/lib/seo';
-import { personJsonLd } from '@/lib/json-ld';
+import { jsonLdGraph, personJsonLd, serializeJsonLd, websiteJsonLd } from '@/lib/json-ld';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
+  const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
   return pageMetadata({
-    title: `${settings.name} — ${settings.role}`,
+    // Written out whole in the CMS rather than built from name and role,
+    // so it can carry the name variant people actually search for.
+    title: copy.seo.homeTitle,
     description: settings.proof,
     path: '/',
     siteName: settings.name,
@@ -32,15 +34,24 @@ const RAIL = [
 ];
 
 export default async function HomePage() {
-  const [roles, settings, copy] = await Promise.all([getRoles(), getSettings(), getSiteCopy()]);
+  const [roles, settings, copy, skillGroups] = await Promise.all([
+    getRoles(),
+    getSettings(),
+    getSiteCopy(),
+    getSkillGroups(),
+  ]);
 
   return (
     <>
-      {/* Person schema (PLAN.md W3) — the one page it's unambiguous the
-          whole site is "about", so it's the only place this renders. */}
+      {/* The site and the person it is about (PLAN.md W3). Every other
+          page's structured data points back at these by `@id`. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd(settings)) }}
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            jsonLdGraph(websiteJsonLd(settings), personJsonLd(settings, { roles, skillGroups })),
+          ),
+        }}
       />
       <SectionRail sections={RAIL} />
       <Hero />

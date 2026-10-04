@@ -8,6 +8,13 @@ import { Reveal, Stagger, StaggerItem } from '@/components/motion/reveal';
 import { RoleAccordion } from '@/components/experience/role-accordion';
 import { getSkillGroups, getRoles, getSettings, getSiteCopy } from '@/server/queries';
 import { pageTitle, pageMetadata } from '@/lib/seo';
+import {
+  breadcrumbJsonLd,
+  jsonLdGraph,
+  personJsonLd,
+  profilePageJsonLd,
+  serializeJsonLd,
+} from '@/lib/json-ld';
 
 export async function generateMetadata(): Promise<Metadata> {
   const [settings, copy] = await Promise.all([getSettings(), getSiteCopy()]);
@@ -27,8 +34,24 @@ export default async function AboutPage() {
     getSiteCopy(),
   ]);
 
+  const person = personJsonLd(settings, { roles, skillGroups });
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(
+            jsonLdGraph(
+              profilePageJsonLd(person, settings.updatedAt),
+              breadcrumbJsonLd([
+                { name: 'Home', path: '/' },
+                { name: 'About', path: '/about' },
+              ]),
+            ),
+          ),
+        }}
+      />
       <Section density="spacious" ambient={['blob']} className="pt-10 sm:pt-16">
         <Container>
           <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-20">

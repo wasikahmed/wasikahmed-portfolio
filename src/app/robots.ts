@@ -29,8 +29,10 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
       // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
-      // and beacons, nothing to index.
-      disallow: ['/admin', '/x/'],
+      // and beacons, nothing to index. /api/ is JSON: the health check, the
+      // contact endpoint, and the OpenAPI spec, whose human-readable form is
+      // /docs. The OG cards are not under it — they live beside each page.
+      disallow: ['/admin', '/x/', '/api/'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

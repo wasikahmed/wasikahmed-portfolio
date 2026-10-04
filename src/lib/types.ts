@@ -67,6 +67,12 @@ export interface Project {
   links?: { label: string; href: string }[];
   status: ContentStatus;
   publishedAt?: string;
+  /**
+   * Mongoose's `timestamps`, as ISO strings via `normalizeDoc`. The honest
+   * "last changed" for the sitemap and structured data — `publishedAt` is
+   * only ever set for scheduled items.
+   */
+  updatedAt?: string;
   seo?: Seo;
   order: number;
 }
@@ -84,6 +90,12 @@ export interface Post {
   bodyMdx: string;
   status: ContentStatus;
   publishedAt?: string;
+  /**
+   * Mongoose's `timestamps`, as ISO strings via `normalizeDoc`. The honest
+   * "last changed" for the sitemap and structured data — `publishedAt` is
+   * only ever set for scheduled items.
+   */
+  updatedAt?: string;
   seo?: Seo;
   order: number;
 }
@@ -205,6 +217,20 @@ export interface Settings {
    */
   story: string[];
   approach: ApproachStep[];
+  /**
+   * Other names this person is known by, for search engines only — the
+   * Person structured data's `alternateName`. Never rendered: the page
+   * shows `name`. GitHub and LinkedIn say "Wasik Ahmed Apon", so without
+   * this nothing on the site tells Google they are the same person.
+   */
+  alternateNames?: string[];
+  /**
+   * Further profile URLs for the Person structured data's `sameAs`, beyond
+   * `socials` — profiles worth claiming (Kaggle, PyPI, LeetCode) that
+   * don't merit a link in the footer.
+   */
+  sameAs?: string[];
+  updatedAt?: string;
 }
 
 export interface Media {
@@ -291,7 +317,7 @@ export interface ApiToken {
  * `{count}`/`{Count}`/`{s}` tokens (see `fillCount` in format.ts).
  */
 export interface SiteCopy {
-  seo: { siteDescription: string };
+  seo: { siteDescription: string; homeTitle: string };
   home: {
     workHeading: string;
     impactHeading: string;
@@ -310,6 +336,7 @@ export interface SiteCopy {
   writing: { metaDescription: string; heading: string; intro: string };
   contact: { metaDescription: string; heading: string; intro: string };
   caseStudy: { ctaText: string };
+  docs: { metaDescription: string };
   footer: { unavailableText: string };
   notFound: { heading: string; body: string };
 }

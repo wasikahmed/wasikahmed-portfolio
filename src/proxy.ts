@@ -106,7 +106,20 @@ function randomNonce(): string {
 }
 
 export default auth(async (request: NextAuthRequest) => {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
+
+  // www.wasikahmed.me answered with the full site (200) rather than
+  // redirecting, so every page existed at two addresses. The canonical tag
+  // already names the apex, but a 301 is the stronger signal and also
+  // moves anyone who bookmarked the www form. Keyed on the Host header
+  // alone, not NEXT_PUBLIC_SITE_URL: that is inlined at build time and the
+  // Docker build has none (AGENTS.md §9). Always https — Cloudflare
+  // terminates TLS for both names. If the Tunnel ever stops passing the
+  // visitor's Host through, this simply never matches.
+  const host = request.headers.get('host') ?? '';
+  if (host.startsWith('www.')) {
+    return NextResponse.redirect(`https://${host.slice('www.'.length)}${pathname}${search}`, 301);
+  }
 
   const nonce = randomNonce();
   const requestHeaders = new Headers(request.headers);

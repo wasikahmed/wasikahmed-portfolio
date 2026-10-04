@@ -241,6 +241,30 @@ export default function SettingsPage() {
           />
         </Field>
 
+        <Field
+          label="Other names"
+          htmlFor="alternateNames"
+          hint="Names you are also known by — a full name, a nickname. Search engines only: nothing on the site shows them, but they tie your profiles that use them to this site."
+        >
+          <StringList
+            value={draft.alternateNames ?? []}
+            onChange={(alternateNames) => set('alternateNames', alternateNames)}
+            placeholder="Wasik Ahmed Apon"
+          />
+        </Field>
+
+        <Field
+          label="Other profiles"
+          htmlFor="sameAs"
+          hint="Full URLs of profiles that are you (Kaggle, PyPI, LeetCode…) but don't need a link in the footer. Search engines only — the social links below are included automatically."
+        >
+          <StringList
+            value={draft.sameAs ?? []}
+            onChange={(sameAs) => set('sameAs', sameAs)}
+            placeholder="https://www.kaggle.com/…"
+          />
+        </Field>
+
         <Field label="Social links" htmlFor="socials">
           <ObjectArrayEditor
             value={draft.socials}

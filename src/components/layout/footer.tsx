@@ -137,7 +137,10 @@ export function Footer({
                   <li key={social.label}>
                     <a
                       href={social.href}
-                      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      // `me` says the profile at the other end belongs to
+                      // whoever owns this site (rel="me" / IndieWeb); search
+                      // engines and Mastodon-style verification read it.
+                      {...(external ? { target: '_blank', rel: 'me noopener noreferrer' } : {})}
                       className={`group inline-flex items-center gap-2 ${LINK}`}
                     >
                       <BrandIcon icon={socialIcon(social.href)} />

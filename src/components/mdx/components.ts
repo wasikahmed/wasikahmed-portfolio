@@ -1,3 +1,4 @@
+import { createElement, type ComponentProps } from 'react';
 import { Callout } from './callout';
 import { CodeCompare } from './code-compare';
 import { Figure, MdxImage } from './figure';
@@ -15,4 +16,21 @@ import { Metric } from '@/components/motion/metric';
  * diagram data doesn't fit well as free-form MDX children), plus `img`,
  * which re-routes Markdown's `![alt](url)` through the optimised renderer.
  */
-export const mdxComponents = { Callout, CodeCompare, Metric, Figure, img: MdxImage };
+/**
+ * A `#` heading in a body renders as an h2. The page around every body
+ * already has its h1 (the post or project title), and a second one is
+ * both an accessibility fault and a mixed signal to search engines about
+ * what the page is. Styled by MdxContent's `[&_h2]` rules like any other.
+ */
+function BodyHeading(props: ComponentProps<'h1'>) {
+  return createElement('h2', props);
+}
+
+export const mdxComponents = {
+  Callout,
+  CodeCompare,
+  Metric,
+  Figure,
+  img: MdxImage,
+  h1: BodyHeading,
+};

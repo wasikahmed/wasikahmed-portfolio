@@ -44,10 +44,11 @@ export async function GET() {
     .join('');
 
   const feed = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>${escapeXml(settings.name)} — Writing</title>
     <link>${SITE_URL}/writing</link>
+    <atom:link href="${SITE_URL}/writing/feed.xml" rel="self" type="application/rss+xml" />
     <description>${escapeXml(settings.tagline)}</description>
     <language>en</language>${items}
   </channel>

@@ -532,11 +532,11 @@ placeholders on 2026-09-20 (commit `7e42655`).
 **Deployed as of 2026-10-02** — every push to `main` since has passed
 `deploy.yml`'s `verify` gate and shipped. Locally, the full gate passes.
 
-**Not healthy — see PLAN.md for each:**
+**Fixed since:** the `next/og` RCE advisory (`next` is on 16.3.8, PLAN.md
+§2) and the red daily E2E run (PLAN.md §3).
 
-- Production runs `next@16.3.3`, inside the range of a critical RCE in
-  `next/og`'s `ImageResponse`, which this site serves on public routes.
-  Fix before anything else (PLAN.md §2).
+**Still open — see PLAN.md for each:**
+
 - `e2e.yml`'s daily run has been red since 2026-09-21 on stale seed slugs,
   not a site bug — but until it is fixed it catches nothing (PLAN.md §3).
 - Analytics moved to an externally hosted Umami with a first-party relay,
