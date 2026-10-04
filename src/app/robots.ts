@@ -23,22 +23,50 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:4000';
 // this env var to be read at request time instead of build time.
 export const dynamic = 'force-dynamic';
 
+/*
+ * Link-preview bots (LinkedIn, Facebook, X, Slack…) obey robots.txt, and a
+ * crawler follows only the most specific group that names it — so they get
+ * their own group: everything `*` allows, plus /go/, where short links
+ * answer them with a preview card (src/server/short-links.ts). Blocked from
+ * /go/, LinkedIn can't build a card for a short link at all (found
+ * 2026-10-05). Search engines stay out of /go/ under `*`.
+ */
+const LINK_PREVIEWERS = [
+  'LinkedInBot',
+  'facebookexternalhit',
+  'Facebot',
+  'Twitterbot',
+  'Slackbot',
+  'Slackbot-LinkExpanding',
+  'Discordbot',
+  'TelegramBot',
+  'WhatsApp',
+];
+
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: '*',
-      // The spec is the one thing under /api/ a crawler needs: /docs is a
-      // Client Component that fetches it, and Google's renderer obeys
-      // robots.txt for sub-resources — blocked, /docs renders as an empty
-      // shell. The longest matching rule wins, so this beats `/api/`.
-      allow: ['/', '/api/openapi.json'],
-      // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
-      // and beacons, nothing to index. /go/ is short-link redirects: a
-      // crawler following them would only re-find pages it already knows. /api/ is JSON: the health check, the
-      // contact endpoint, and the OpenAPI spec, whose human-readable form is
-      // /docs. The OG cards are not under it — they live beside each page.
-      disallow: ['/admin', '/x/', '/go/', '/api/'],
-    },
+    rules: [
+      {
+        userAgent: '*',
+        // The spec is the one thing under /api/ a crawler needs: /docs is a
+        // Client Component that fetches it, and Google's renderer obeys
+        // robots.txt for sub-resources — blocked, /docs renders as an empty
+        // shell. The longest matching rule wins, so this beats `/api/`.
+        allow: ['/', '/api/openapi.json'],
+        // /x/ is the analytics relay (src/server/umami-proxy.ts) — scripts
+        // and beacons, nothing to index. /go/ is short-link redirects: a
+        // search crawler following them would only re-find pages it already
+        // knows. /api/ is JSON: the health check, the contact endpoint, and
+        // the OpenAPI spec, whose human-readable form is /docs. The OG cards
+        // are not under it — they live beside each page.
+        disallow: ['/admin', '/x/', '/go/', '/api/'],
+      },
+      {
+        userAgent: LINK_PREVIEWERS,
+        allow: ['/', '/go/', '/api/openapi.json'],
+        disallow: ['/admin', '/x/', '/api/'],
+      },
+    ],
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
