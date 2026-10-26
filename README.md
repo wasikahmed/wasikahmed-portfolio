@@ -19,7 +19,8 @@ Live: [wasikahmed.me](https://wasikahmed.me/?utm_source=github&utm_medium=readme
   the same schemas
 - **Delivery:** Vitest and Playwright tests; each push to `main` runs
   typecheck, lint, tests and build, then deploys a Docker image to a VPS,
-  with automatic rollback if the health check fails
+  backing up the database first and failing the deploy if the app never
+  turns healthy
 
 ## Stack
 

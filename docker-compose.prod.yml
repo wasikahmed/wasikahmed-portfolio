@@ -1,33 +1,61 @@
-# Production stack — runs on the VPS behind the existing Cloudflare Tunnel.
-# Dev stack is docker-compose.yml (hot reload, unauthenticated mongo, ports
-# published to the host). This one:
-#   - binds `web` to 127.0.0.1 only — cloudflared reaches it over loopback,
-#     nothing else can, since the VPS has no inbound ports open at all
-#   - runs mongo with auth and no published port — only `web` can reach it,
-#     over the compose network, and only with a password
-#   - pulls a prebuilt image from Docker Hub rather than building locally —
-#     CI already built and tested it; the VPS's only job is to run it
+# Production stack. Runs on the Advergo VPS as the Hostinger Docker Manager project
+# "wasikahmed-portfolio", in /docker/wasikahmed-portfolio/ as docker-compose.yml next to its
+# .env. The dev stack is docker-compose.yml (hot reload, unauthenticated mongo, ports published
+# to the host).
 #
-# The deploy workflow writes IMAGE_TAG into .env before every `docker compose
-# pull && up -d` — always an immutable `sha-<short>` tag, never `latest`, so
-# rolling back is "write the previous tag, re-run those two commands."
+# Who owns what:
+#   - This file belongs to the repo. Every deploy copies it to the server with the image pinned to
+#     the exact build (sha-<commit>), so lasting changes go here, not in the panel's YAML editor.
+#     Changing the tag there for an emergency rollback is fine.
+#   - Settings belong to the panel's Environment box (the server's .env). Deploys never write it.
+#     The panel rejects `env_file`, and only fills in the ${...} values below, so every setting
+#     the app reads is listed here explicitly. Add a setting in both places.
+#
+# Traffic reaches the app only through this project's own Cloudflare Tunnel (the `tunnel`
+# service): wasikahmed.me and www.wasikahmed.me -> http://web:3000. The loopback port exists only
+# so the deploy can health-check the app from the VPS itself. Mongo runs with auth and no
+# published port: only this project's containers can reach it, and only with the password.
+#
+# The image is built by CI and pushed to Docker Hub; nothing is built on the server.
 services:
   web:
-    image: ${DOCKERHUB_USERNAME}/portfolio:${IMAGE_TAG:-latest}
+    image: itzwasik/portfolio:latest
     restart: unless-stopped
     init: true
     ports:
-      - '127.0.0.1:${PORT_HOST:-5000}:3000'
-    env_file:
-      - .env
+      - '127.0.0.1:5000:3000'
     environment:
       NODE_ENV: production
       PORT: '3000'
       HOSTNAME: '0.0.0.0'
-      # Overrides whatever MONGODB_URI is in .env — built here from the
-      # same MONGO_ROOT_USER/PASSWORD the mongo service below authenticates
-      # with, so there is exactly one place to rotate the password.
-      MONGODB_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/portfolio?authSource=admin
+      # Built from the same MONGO_ROOT_USER/PASSWORD the mongo service authenticates with, so
+      # there is exactly one place to rotate the password.
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:?set MONGO_ROOT_USER in the panel Environment}:${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in the panel Environment}@mongo:27017/portfolio?authSource=admin
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL in the panel Environment}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in the panel Environment}
+      # Required in production (AGENTS.md §7): without it Auth.js builds absolute URLs from the
+      # 0.0.0.0 bind address. Taken from NEXT_PUBLIC_SITE_URL rather than a second setting that
+      # could drift from it.
+      AUTH_URL: ${NEXT_PUBLIC_SITE_URL:?set NEXT_PUBLIC_SITE_URL in the panel Environment}
+      # Google sign-in; both unset = no Google button (AGENTS.md §7).
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      # Read only by `node dist-scripts/seed-admin.mjs` run in this container (AGENTS.md §10).
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # The app skips sending mail and Turnstile checks when these are unset, which is only
+      # meant for local development, so production requires them.
+      GMAIL_USER: ${GMAIL_USER:?set GMAIL_USER in the panel Environment}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:?set GMAIL_APP_PASSWORD in the panel Environment}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?set TURNSTILE_SITE_KEY in the panel Environment}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?set TURNSTILE_SECRET_KEY in the panel Environment}
+      # Unset either one = no analytics script and /x/ 404s.
+      UMAMI_URL: ${UMAMI_URL:-}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?set CLOUDINARY_CLOUD_NAME in the panel Environment}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?set CLOUDINARY_API_KEY in the panel Environment}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?set CLOUDINARY_API_SECRET in the panel Environment}
+      # Same default as src/server/cloudinary.ts.
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-portfolio/admin/media}
     depends_on:
       mongo:
         condition: service_healthy
@@ -43,8 +71,10 @@ services:
     image: mongo:7
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      # Mongo creates this root user on its very first start only (an empty volume). Changing
+      # these in the panel afterwards does not change the user; it just breaks the connection.
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?set MONGO_ROOT_USER in the panel Environment}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in the panel Environment}
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -67,5 +97,71 @@ services:
       retries: 20
       start_period: 40s
 
+  tunnel:
+    # This project's own tunnel (Cloudflare Zero Trust -> Networks -> Tunnels -> wasikahmed-portfolio).
+    image: cloudflare/cloudflared:2026.9.3
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in the panel Environment}
+    # Started, not healthy: the tunnel is the only way in, so a slow health check must never hold
+    # it back. If the app is briefly unhealthy, visitors get Cloudflare's error page for a moment
+    # instead of no route at all; ops/deploy.sh still waits for health and fails the deploy if it
+    # never comes.
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  backup:
+    # The mongo image itself, so mongodump always matches the server's major version (it is
+    # Ubuntu-based: GNU date, which the schedule below relies on for `date -d`).
+    # Daily dump at 03:00 Dhaka time (21:00 UTC; Bangladesh has no daylight saving), plus one when
+    # this container starts. Files land in /docker/wasikahmed-portfolio/backups on the VPS and are
+    # kept for BACKUP_KEEP_DAYS. On-server only: they protect against a bad migration or an
+    # admin-CMS mistake, not against losing the VPS. Media is on Cloudinary, so Mongo is all there
+    # is to back up.
+    image: mongo:7
+    environment:
+      MONGO_ROOT_USER: ${MONGO_ROOT_USER:?set MONGO_ROOT_USER in the panel Environment}
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in the panel Environment}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint: ['/bin/sh', '-c']
+    # $$ is a literal $ for the shell; a single $ would be read by Compose instead.
+    # -maxdepth 1 keeps the rotation away from backups/prod, where ops/deploy.sh puts its
+    # pre-deploy dumps.
+    command:
+      - |
+        set -u
+        backup() {
+          file="/backups/wasikahmed-portfolio-$$(date -u +%Y%m%d-%H%M%S).archive.gz"
+          if mongodump --host mongo --username "$$MONGO_ROOT_USER" --password "$$MONGO_ROOT_PASSWORD" \
+              --authenticationDatabase admin --archive --gzip > "$$file.partial"; then
+            mv "$$file.partial" "$$file"
+            echo "$$(date -u) backup written: $$file ($$(du -h "$$file" | cut -f1))"
+          else
+            rm -f "$$file.partial"
+            echo "$$(date -u) BACKUP FAILED" >&2
+          fi
+          find /backups -maxdepth 1 -name 'wasikahmed-portfolio-*.archive.gz' \
+            -mtime +"$$BACKUP_KEEP_DAYS" -print -delete
+        }
+        backup
+        while true; do
+          now=$$(date -u +%s)
+          next=$$(date -u -d "$$(date -u +%Y-%m-%d) 21:00:00" +%s)
+          [ "$$next" -le "$$now" ] && next=$$((next + 86400))
+          sleep $$((next - now))
+          backup
+        done
+    restart: unless-stopped
+
+# Compose prefixes this with the project name: wasikahmed-portfolio_mongo-data on the VPS. Never
+# rename the panel project: a new name means a new, empty volume (the old one stays on disk, just
+# no longer attached).
 volumes:
   mongo-data:
