@@ -8,8 +8,8 @@ Operating guide for this repository. Read this before changing anything.
 
 A personal portfolio site for Wasik Ahmed with a self-hosted admin CMS behind it.
 Public site and admin are one Next.js app; content lives in MongoDB and is edited
-through `/admin`, not through code. It deploys as a Docker image to a VPS behind
-a Cloudflare Tunnel.
+through `/admin`, not through code. It deploys as a Docker image to the Advergo
+VPS behind its own Cloudflare Tunnel.
 
 **Stack**
 
@@ -135,7 +135,8 @@ src/
     home/ work/ case-study/ contact/ experience/ brand/ mdx/ admin/
 e2e/                 Playwright: smoke, route/responsive sweep, motion contract,
                      admin pipeline, invitation round trip.
-scripts/             seed.ts, seed-admin.ts, seed-e2e-*.ts, vps-backup.sh
+scripts/             seed.ts, seed-admin.ts, seed-e2e-*.ts
+ops/deploy.sh        Runs on the VPS for every deploy (§10).
 docs/history/        Archived PLAN.md files. Read-only record; PLAN.md is live.
 ```
 
@@ -262,9 +263,9 @@ Tunnel itself is unaffected and still the only ingress to the VPS.
 `HOSTNAME=0.0.0.0` Docker binding, that fallback leaks the container's own
 bind address into absolute URLs it builds instead of the real domain
 (caught live, 2026-09-20: sign-out redirecting to `http://0.0.0.0:<port>/
-admin/login` in production). `deploy.yml` sets it from the existing
-`NEXT_PUBLIC_SITE_URL` value rather than a second variable that could drift
-from it. Not needed locally — `pnpm dev` and the dev compose stack don't hit
+admin/login` in production). `docker-compose.prod.yml` sets it from the
+existing `NEXT_PUBLIC_SITE_URL` value rather than a second variable that could
+drift from it. Not needed locally — `pnpm dev` and the dev compose stack don't hit
 this, since neither binds to `0.0.0.0`.
 
 **Two ways to authenticate, one session model.** Alongside credentials,
@@ -330,7 +331,8 @@ too.
 - Prefer extending `admin-crud.ts` or a `ui/` primitive over writing a new
   one-off.
 - New env vars go in `.env.example` **with a comment saying what reads them**,
-  and in `.github/workflows/deploy.yml`'s heredoc if production needs them.
+  and, if production needs them, in `docker-compose.prod.yml`'s `web`
+  environment and the panel's Environment box (§10).
 - Do not add a dependency for something the stack already does.
 
 ---
@@ -362,7 +364,8 @@ too.
   fetching to imply it.
 - **No `NEXT_PUBLIC_*` value the Docker build doesn't have.** Next inlines
   them into the client bundle at build time, and the image is built with no
-  `.env` — deploy.yml writes that on the VPS afterwards. A runtime-only
+  `.env` — settings only reach the container at runtime, from the panel's
+  Environment box on the VPS (§10). A runtime-only
   `NEXT_PUBLIC_` var therefore ships as `undefined` while working fine in
   `pnpm dev`. The Turnstile site key hit this for real (fixed 2026-10-04):
   the widget never rendered in production, so every contact submission and
@@ -400,20 +403,67 @@ too.
 
 ## 10. Deployment
 
+Production runs on the Advergo VPS (Hostinger KVM 2, Ubuntu 24.04) as the
+Hostinger Docker Manager project **`wasikahmed-portfolio`**, in
+`/docker/wasikahmed-portfolio/`: `docker-compose.yml` (this repo's
+`docker-compose.prod.yml`) and `.env` (the panel's Environment box). Visitors
+reach it only through the project's own Cloudflare Tunnel
+(`wasikahmed-portfolio`: `wasikahmed.me`, `www.wasikahmed.me` →
+`http://web:3000`); the VPS has no inbound port for it. Mongo runs with auth
+and no published port. The data lives in the volume
+`wasikahmed-portfolio_mongo-data` — never rename the panel project, or Compose
+attaches a new, empty volume.
+
 Push to `main` → `deploy.yml`'s `verify` job runs `typecheck`/`lint`/`format:check`/
 `test`/`build`, then (only if that passes) `build-and-push` builds a `linux/amd64`
-image and pushes it to Docker Hub tagged `sha-<short>`, then `deploy` SSHes to the
-VPS, writes `.env` from repo secrets/variables, and runs `docker compose -f
-docker-compose.prod.yml pull && up -d`. E2E runs separately, in `e2e.yml`, on a
+image and pushes `itzwasik/portfolio:sha-<short>` (and `:latest`) to Docker Hub,
+then `deploy` copies `docker-compose.prod.yml` to the server as
+`docker-compose.yml` with the image pinned to that build and runs
+`ops/deploy.sh` there: a `mongodump` of the running database into
+`backups/prod/` (a failed dump stops the deploy), the previous compose file
+kept as `backups/docker-compose.previous.yml`, pull, `up -d --wait`, a check
+that `web` runs the new tag, and `http://127.0.0.1:5000/api/health` on the
+VPS. Deploys never write `.env`. E2E runs separately, in `e2e.yml`, on a
 daily schedule and on PRs — not in this path, so a slow browser suite never gates
 a hotfix. The local gate in §2 is still worth running before pushing; CI is a
 backstop, not a substitute for running it yourself first.
 
-Rollback on a failed healthcheck is automatic (`deploy.yml`'s `deploy` job stashes
-the outgoing `IMAGE_TAG` before overwriting `.env` and restores it if the new
-image never goes healthy) — the job still fails either way, since a rollback
-means production is safe, not that the push was good. To roll back to some
-_other_ tag manually: SSH in, set `IMAGE_TAG` in `.env`, re-run pull + up.
+| Production setting (panel Environment) | Purpose                                                   |
+| -------------------------------------- | --------------------------------------------------------- |
+| `NEXT_PUBLIC_SITE_URL`                 | `https://wasikahmed.me`; also used as `AUTH_URL` (§7)     |
+| `AUTH_SECRET`                          | Auth.js signing secret; also keys the TOTP encryption     |
+| `MONGO_ROOT_USER`                      | Mongo root user, created on the volume's first start only |
+| `MONGO_ROOT_PASSWORD`                  | Its password; `MONGODB_URI` is built from these two       |
+| `GMAIL_USER`                           | Gmail account that sends lead notifications and invites   |
+| `GMAIL_APP_PASSWORD`                   | Its app password                                          |
+| `TURNSTILE_SITE_KEY`                   | Cloudflare Turnstile widget key, read per request         |
+| `TURNSTILE_SECRET_KEY`                 | Turnstile verification secret                             |
+| `CLOUDINARY_CLOUD_NAME`                | Cloudinary account for the media library                  |
+| `CLOUDINARY_API_KEY`                   | Cloudinary API key                                        |
+| `CLOUDINARY_API_SECRET`                | Cloudinary API secret                                     |
+| `CLOUDFLARE_TUNNEL_TOKEN`              | The `wasikahmed-portfolio` tunnel's token                 |
+| `CLOUDINARY_FOLDER`                    | Optional; default `portfolio/admin/media`                 |
+| `UMAMI_URL`, `UMAMI_WEBSITE_ID`        | Optional; analytics (below). Unset = no tracking          |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Optional; Google sign-in (§7). Unset = no Google button   |
+| `ADMIN_EMAIL`                          | Optional; the default email for `seed-admin.mjs` (below)  |
+| `BACKUP_KEEP_DAYS`                     | Optional; days of daily backups to keep, default 7        |
+
+A new setting must be added to both the panel's Environment box and
+`docker-compose.prod.yml`: the panel rejects `env_file`, so each one is listed
+there explicitly. A missing required setting stops the deploy with
+"set X in the panel Environment". Nothing is passed to the image build; the
+image carries no settings (§9, `NEXT_PUBLIC_*`).
+
+GitHub secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `VPS_HOST`,
+`VPS_SSH_PORT`, `VPS_SSH_USER` (`root`) and `VPS_SSH_KEY` (the shared
+`advergo-vps-01-deploy` key). No repository variables are used.
+
+**Rolling back.** There is no automatic rollback: a deploy that never goes
+healthy fails the job and leaves the new containers in place. In the panel,
+set the `image:` tag in the YAML editor to the previous `sha-…` and press
+Deploy (the previous file is also on the server as
+`backups/docker-compose.previous.yml`). If a deploy damaged data, restore the
+`backups/prod/` dump it made first (below).
 
 **Seeding production.** The runner image cannot run `pnpm seed`. It is
 `next build`'s standalone output plus static assets — there is no pnpm on
@@ -434,29 +484,43 @@ not re-seeded. `seed-admin.mjs` still works, and is the only way to create
 the owner account on a fresh volume:
 
 ```bash
-cd $DEPLOY_PATH
-docker compose -p portfolio -f docker-compose.prod.yml exec web node dist-scripts/seed-admin.mjs
+cd /docker/wasikahmed-portfolio
+docker compose exec web node dist-scripts/seed-admin.mjs
 ```
 
-`MONGODB_URI` comes from the compose environment and `ADMIN_EMAIL` from
-`.env`, so it needs no arguments; pass an email to override it. It resets
-the password and prints the new one once, so only run it when you intend
-that.
+`MONGODB_URI` and `ADMIN_EMAIL` come from the compose environment, so it
+needs no arguments; pass an email to override it (or if `ADMIN_EMAIL` is
+unset). It resets the password and prints the new one once, so only run it
+when you intend that.
 
 Note `pnpm seed` **upserts and never deletes** (scripts/seed.ts). Against
 a local database that already holds superseded seed content, it adds the
 new documents alongside the old ones; drop the local volume for a clean
 state.
 
-**Backups.** A cron job installed on the VPS by `deploy.yml`'s "Install the
-backup cron job" step runs `scripts/vps-backup.sh` nightly — a
-`mongodump`, dated and rotated locally under `$DEPLOY_PATH/backups` (default 7-day retention). Local retention
-only, deliberately, decided 2026-08-30 (PLAN.md W4) — it protects against
-a bad migration or an admin-CMS mistake, not against losing the VPS
-itself. Media no longer needs a local-volume backup of its own (PLAN.md
-W15 item 1 moved it to Cloudinary — off-box and versioned on its own, on
-an account this app never has write access outside its own folder in).
-Mongo is the one thing left with only a local copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
+**Backups.** The compose project's `backup` service (the `mongo:7` image)
+runs `mongodump --archive --gzip` when it starts and daily at 21:00 UTC
+(03:00 in Dhaka) into the project folder's
+`backups/wasikahmed-portfolio-<UTC timestamp>.archive.gz`, deleting those
+older than `BACKUP_KEEP_DAYS` (default 7). Every deploy also dumps first, into
+`backups/prod/wasikahmed-portfolio-predeploy-<UTC timestamp>.archive.gz`;
+those are not rotated. To restore one (`--drop` replaces each collection in
+the dump):
+
+```bash
+cd /docker/wasikahmed-portfolio
+docker compose exec -T mongo sh -c 'mongorestore -u "$MONGO_INITDB_ROOT_USERNAME" \
+  -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip --drop' \
+  < backups/<file>.archive.gz
+```
+
+Local retention only, deliberately, decided 2026-08-30 (PLAN.md W4) — it
+protects against a bad migration or an admin-CMS mistake, not against losing
+the VPS itself. Media no longer needs a
+local-volume backup of its own (PLAN.md W15 item 1 moved it to Cloudinary —
+off-box and versioned on its own, on an account this app never has write
+access outside its own folder in). Mongo is the one thing left with only a
+local copy; revisit shipping that off-box (e.g. rclone to an S3-compatible
 bucket) as its own task if that risk becomes worth carrying.
 
 **Analytics: Umami, hosted elsewhere, served first-party.** Analytics is
@@ -466,8 +530,8 @@ then; nothing analytics-related runs in this compose project any more).
 
 - **Config:** `UMAMI_URL` (the instance's base URL) and `UMAMI_WEBSITE_ID`,
   server-only and read at request time — unset either one and no script
-  renders and `/x/` 404s. Changing them is a GitHub variable edit plus a
-  redeploy, never a rebuild. Local development points at a separate
+  renders and `/x/` 404s. Changing them is a panel Environment edit plus a
+  redeploy from the panel, never a rebuild. Local development points at a separate
   "Portfolio — Dev (localhost)" website in the same Umami, so localhost
   traffic never reaches production's numbers; the tracker's
   `data-domains` (from `NEXT_PUBLIC_SITE_URL`'s hostname) is the second
